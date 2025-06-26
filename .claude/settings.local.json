@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:eclipse.dev)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:wasi-gfx.github.io)",
+      "Bash(cargo:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "WebFetch(domain:www.eclipse.org)",
+      "Bash(npx tsc:*)",
+      "Bash(git restore:*)"
+    ],
+    "deny": []
+  }
+}

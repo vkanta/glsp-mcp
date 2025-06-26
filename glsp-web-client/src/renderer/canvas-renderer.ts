@@ -5,6 +5,7 @@
 
 import { DiagramModel, ModelElement, Node, Edge, Bounds, Position } from '../model/diagram.js';
 import { SelectionManager } from '../selection/selection-manager.js';
+import { InteractionMode, InteractionModeManager } from '../interaction/interaction-mode.js';
 
 export interface RenderOptions {
     backgroundColor?: string;
@@ -19,9 +20,10 @@ export interface RenderOptions {
 }
 
 export interface InteractionEvent {
-    type: 'click' | 'hover' | 'drag-start' | 'drag-move' | 'drag-end';
+    type: 'click' | 'hover' | 'drag-start' | 'drag-move' | 'drag-end' | 'canvas-click' | 'edge-start' | 'edge-end';
     position: Position;
     element?: ModelElement;
+    sourceElement?: ModelElement; // For edge creation
     originalEvent: MouseEvent;
 }
 
@@ -33,11 +35,16 @@ export class CanvasRenderer {
     private options: Required<RenderOptions>;
     private currentDiagram?: DiagramModel;
     private selectionManager: SelectionManager;
+    private modeManager: InteractionModeManager;
     private interactionHandlers: InteractionHandler[] = [];
     private isDragging = false;
     private dragStart?: Position;
+    private dragOffsets: Map<string, Position> = new Map();
+    private hasDragged = false;
     private selectionRect?: { start: Position; end: Position };
     private isSelectingRect = false;
+    private edgeCreationSource?: ModelElement;
+    private edgePreviewTarget?: Position;
 
     constructor(canvas: HTMLCanvasElement, options: RenderOptions = {}) {
         this.canvas = canvas;
@@ -47,6 +54,7 @@ export class CanvasRenderer {
         }
         this.ctx = ctx;
         this.selectionManager = new SelectionManager();
+        this.modeManager = new InteractionModeManager();
 
         this.options = {
             backgroundColor: '#ffffff',
@@ -71,11 +79,11 @@ export class CanvasRenderer {
     }
 
     private setupEventListeners(): void {
-        // Mouse events
-        this.canvas.addEventListener('click', this.handleClick.bind(this));
-        this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        // Mouse events - Note: mousedown/up should be before click for proper event ordering
         this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+        this.canvas.addEventListener('click', this.handleClick.bind(this));
         this.canvas.addEventListener('wheel', this.handleWheel.bind(this));
 
         // Resize observer
@@ -141,22 +149,76 @@ export class CanvasRenderer {
     }
 
     private handleClick(event: MouseEvent): void {
+        // Don't process click if we just finished dragging
+        if (this.hasDragged) {
+            this.hasDragged = false;
+            return;
+        }
+        
         const position = this.getMousePosition(event);
         const element = this.getElementAt(position);
+        const mode = this.modeManager.getMode();
+        
+        // console.log('Click:', { position, element, mode });
 
-        if (element) {
-            this.selectionManager.handleKeyboardSelection(element.id, event);
-        } else if (!event.ctrlKey && !event.metaKey) {
-            // Clear selection when clicking empty space
-            this.selectionManager.clearSelection();
+        switch (mode) {
+            case InteractionMode.Select:
+                if (element) {
+                    this.selectionManager.handleKeyboardSelection(element.id, event);
+                } else if (!event.ctrlKey && !event.metaKey) {
+                    // Clear selection when clicking empty space
+                    this.selectionManager.clearSelection();
+                }
+                this.emit({
+                    type: 'click',
+                    position,
+                    element,
+                    originalEvent: event
+                });
+                break;
+                
+            case InteractionMode.CreateNode:
+                if (!element) {
+                    // Create node at clicked position
+                    this.emit({
+                        type: 'canvas-click',
+                        position,
+                        originalEvent: event
+                    });
+                }
+                break;
+                
+            case InteractionMode.CreateEdge:
+                if (element && (element.type === 'task' || element.type.includes('event') || element.type === 'gateway')) {
+                    if (!this.edgeCreationSource) {
+                        // Start edge creation
+                        this.edgeCreationSource = element;
+                        this.emit({
+                            type: 'edge-start',
+                            position,
+                            element,
+                            originalEvent: event
+                        });
+                    } else if (element.id !== this.edgeCreationSource.id) {
+                        // Complete edge creation
+                        this.emit({
+                            type: 'edge-end',
+                            position,
+                            element,
+                            sourceElement: this.edgeCreationSource,
+                            originalEvent: event
+                        });
+                        this.edgeCreationSource = undefined;
+                        this.edgePreviewTarget = undefined;
+                    }
+                } else if (!element && this.edgeCreationSource) {
+                    // Cancel edge creation
+                    this.edgeCreationSource = undefined;
+                    this.edgePreviewTarget = undefined;
+                    this.render();
+                }
+                break;
         }
-
-        this.emit({
-            type: 'click',
-            position,
-            element,
-            originalEvent: event
-        });
     }
 
     private handleMouseMove(event: MouseEvent): void {
@@ -164,10 +226,16 @@ export class CanvasRenderer {
         const element = this.getElementAt(position);
 
         if (this.isDragging && this.dragStart) {
-            // const dragDelta = {
-            //     x: position.x - this.dragStart.x,
-            //     y: position.y - this.dragStart.y
-            // };
+            this.hasDragged = true; // Mark that we've actually dragged
+            
+            // Update positions of all selected elements
+            this.dragOffsets.forEach((offset, id) => {
+                const elem = this.currentDiagram?.elements[id];
+                if (elem?.bounds) {
+                    elem.bounds.x = position.x + offset.x;
+                    elem.bounds.y = position.y + offset.y;
+                }
+            });
 
             this.emit({
                 type: 'drag-move',
@@ -192,6 +260,24 @@ export class CanvasRenderer {
                     });
                 }
             }
+            
+            // Update cursor based on mode and hover state
+            const mode = this.modeManager.getMode();
+            if (mode === InteractionMode.Select && element && this.selectionManager.isSelected(element.id)) {
+                this.canvas.style.cursor = 'grab';
+            } else if (mode === InteractionMode.CreateNode) {
+                this.canvas.style.cursor = 'crosshair';
+            } else if (mode === InteractionMode.CreateEdge) {
+                this.canvas.style.cursor = element ? 'pointer' : 'default';
+            } else {
+                this.canvas.style.cursor = 'default';
+            }
+            
+            // Update edge preview if creating edge
+            if (this.edgeCreationSource) {
+                this.edgePreviewTarget = position;
+                this.render();
+            }
         }
     }
 
@@ -203,6 +289,20 @@ export class CanvasRenderer {
             this.isDragging = true;
             this.dragStart = position;
             this.canvas.style.cursor = 'grabbing';
+            
+            // Calculate drag offsets for all selected elements
+            this.dragOffsets.clear();
+            const selectedIds = this.selectionManager.getSelectedIds();
+            
+            selectedIds.forEach(id => {
+                const elem = this.currentDiagram?.elements[id];
+                if (elem?.bounds) {
+                    this.dragOffsets.set(id, {
+                        x: elem.bounds.x - position.x,
+                        y: elem.bounds.y - position.y
+                    });
+                }
+            });
 
             this.emit({
                 type: 'drag-start',
@@ -220,6 +320,7 @@ export class CanvasRenderer {
 
             this.isDragging = false;
             this.dragStart = undefined;
+            this.dragOffsets.clear();
             this.canvas.style.cursor = 'default';
 
             this.emit({
@@ -259,6 +360,10 @@ export class CanvasRenderer {
     
     getSelectionManager(): SelectionManager {
         return this.selectionManager;
+    }
+    
+    getModeManager(): InteractionModeManager {
+        return this.modeManager;
     }
 
     pan(deltaX: number, deltaY: number): void {
@@ -336,6 +441,11 @@ export class CanvasRenderer {
         // Draw selection rectangle if active
         if (this.isSelectingRect && this.selectionRect) {
             this.drawSelectionRectangle();
+        }
+        
+        // Draw edge preview if creating edge
+        if (this.edgeCreationSource && this.edgePreviewTarget) {
+            this.drawEdgePreview();
         }
 
         this.ctx.restore();
@@ -576,5 +686,25 @@ export class CanvasRenderer {
         
         this.ctx.fillStyle = this.options.selectedColor + '20'; // Add transparency
         this.ctx.fillRect(x, y, width, height);
+    }
+    
+    private drawEdgePreview(): void {
+        if (!this.edgeCreationSource?.bounds || !this.edgePreviewTarget) return;
+        
+        const sourceCenter = {
+            x: this.edgeCreationSource.bounds.x + this.edgeCreationSource.bounds.width / 2,
+            y: this.edgeCreationSource.bounds.y + this.edgeCreationSource.bounds.height / 2
+        };
+        
+        this.ctx.strokeStyle = this.options.selectedColor;
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(sourceCenter.x, sourceCenter.y);
+        this.ctx.lineTo(this.edgePreviewTarget.x, this.edgePreviewTarget.y);
+        this.ctx.stroke();
+        
+        this.ctx.setLineDash([]);
     }
 }

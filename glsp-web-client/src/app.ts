@@ -8,6 +8,7 @@ import { DiagramState, DiagramModel } from './model/diagram.js';
 import { CanvasRenderer, InteractionEvent } from './renderer/canvas-renderer.js';
 import { OllamaClient } from './ai/ollama-client.js';
 import { DiagramAgent, DiagramRequest } from './ai/diagram-agent.js';
+import { InteractionMode, DEFAULT_NODE_TYPES, DEFAULT_EDGE_TYPES } from './interaction/interaction-mode.js';
 
 export class GLSPApp {
     private mcpClient: McpClient;
@@ -225,8 +226,8 @@ export class GLSPApp {
                 console.log('Element clicked:', event.element?.id);
                 break;
             case 'drag-end':
-                if (event.element && this.currentDiagramId) {
-                    this.updateElementPosition(event.element.id, event.position);
+                if (this.currentDiagramId) {
+                    this.updateSelectedElementPositions();
                 }
                 break;
             case 'hover':
@@ -235,6 +236,16 @@ export class GLSPApp {
                         diagramId: this.currentDiagramId,
                         elementId: event.element.id
                     }).catch(console.error);
+                }
+                break;
+            case 'canvas-click':
+                if (this.currentDiagramId) {
+                    this.createNodeAtPosition(event.position);
+                }
+                break;
+            case 'edge-end':
+                if (this.currentDiagramId && event.sourceElement && event.element) {
+                    this.createEdgeBetween(event.sourceElement.id, event.element.id);
                 }
                 break;
         }
@@ -383,20 +394,34 @@ export class GLSPApp {
         }
     }
 
-    private async updateElementPosition(elementId: string, position: { x: number; y: number }): Promise<void> {
+    private async updateSelectedElementPositions(): Promise<void> {
         if (!this.currentDiagramId) return;
-
+        
+        const selectedIds = this.renderer.getSelectionManager().getSelectedIds();
+        const diagram = this.diagramState.getDiagram(this.currentDiagramId);
+        if (!diagram) return;
+        
         try {
-            await this.mcpClient.callTool('update_element', {
-                diagramId: this.currentDiagramId,
-                elementId,
-                position
-            });
-
-            // Reload the diagram to get updated state
+            // Update positions for all selected elements
+            for (const elementId of selectedIds) {
+                const element = diagram.elements[elementId];
+                if (element?.bounds) {
+                    await this.mcpClient.callTool('update_element', {
+                        diagramId: this.currentDiagramId,
+                        elementId,
+                        position: {
+                            x: element.bounds.x,
+                            y: element.bounds.y
+                        }
+                    });
+                }
+            }
+            
+            // Reload the diagram to ensure consistency
             await this.loadDiagram(this.currentDiagramId);
+            this.updateStatus(`Moved ${selectedIds.length} element(s)`);
         } catch (error) {
-            console.error('Failed to update element position:', error);
+            console.error('Failed to update element positions:', error);
         }
     }
 
@@ -475,36 +500,155 @@ export class GLSPApp {
     private clearSelection(): void {
         this.renderer.getSelectionManager().clearSelection();
     }
+    
+    private async applyLayout(): Promise<void> {
+        if (!this.currentDiagramId) return;
+        
+        const algorithm = prompt('Layout algorithm (grid, hierarchical):') || 'grid';
+        
+        try {
+            await this.mcpClient.callTool('apply_layout', {
+                diagramId: this.currentDiagramId,
+                algorithm
+            });
+            
+            // Reload diagram to show new layout
+            await this.loadDiagram(this.currentDiagramId);
+            this.updateStatus(`Applied ${algorithm} layout`);
+        } catch (error) {
+            console.error('Failed to apply layout:', error);
+        }
+    }
+    
+    private async createNodeAtPosition(position: { x: number; y: number }): Promise<void> {
+        if (!this.currentDiagramId) return;
+        
+        const nodeType = this.renderer.getModeManager().getSelectedNodeType();
+        const label = prompt(`Enter label for ${nodeType}:`) || `New ${nodeType}`;
+        
+        try {
+            const result = await this.mcpClient.callTool('create_node', {
+                diagramId: this.currentDiagramId,
+                nodeType,
+                position,
+                label
+            });
+            
+            console.log('Created node:', result);
+            
+            // Reload diagram to show new node
+            await this.loadDiagram(this.currentDiagramId);
+            
+            // Switch back to select mode
+            this.renderer.getModeManager().setMode(InteractionMode.Select);
+            this.updateStatus(`Created ${nodeType} node`);
+        } catch (error) {
+            console.error('Failed to create node:', error);
+        }
+    }
+    
+    private async createEdgeBetween(sourceId: string, targetId: string): Promise<void> {
+        if (!this.currentDiagramId) return;
+        
+        const edgeType = this.renderer.getModeManager().getSelectedEdgeType();
+        const label = prompt('Enter edge label (optional):') || undefined;
+        
+        try {
+            const result = await this.mcpClient.callTool('create_edge', {
+                diagramId: this.currentDiagramId,
+                edgeType,
+                sourceId,
+                targetId,
+                label
+            });
+            
+            console.log('Created edge:', result);
+            
+            // Reload diagram to show new edge
+            await this.loadDiagram(this.currentDiagramId);
+            
+            // Stay in edge creation mode for multiple edges
+            this.updateStatus(`Created ${edgeType} edge`);
+        } catch (error) {
+            console.error('Failed to create edge:', error);
+        }
+    }
 
     private createToolbar(): HTMLElement {
         const toolbar = document.createElement('div');
         toolbar.className = 'glsp-toolbar';
         toolbar.innerHTML = `
             <div class="toolbar-group">
-                <button id="new-diagram">New Diagram</button>
-                <button id="save-diagram">Save</button>
-                <button id="export-svg">Export SVG</button>
+                <label>Mode:</label>
+                <button id="mode-select" class="active">Select</button>
+                <button id="mode-pan">Pan</button>
             </div>
             <div class="toolbar-group">
-                <button id="add-node">Add Node</button>
-                <button id="add-edge">Add Edge</button>
+                <label>Create Node:</label>
+                ${DEFAULT_NODE_TYPES.map(nodeType => 
+                    `<button class="node-type" data-type="${nodeType.type}">${nodeType.label}</button>`
+                ).join('')}
+            </div>
+            <div class="toolbar-group">
+                <label>Create Edge:</label>
+                ${DEFAULT_EDGE_TYPES.map(edgeType => 
+                    `<button class="edge-type" data-type="${edgeType.type}">${edgeType.label}</button>`
+                ).join('')}
+            </div>
+            <div class="toolbar-group">
                 <button id="apply-layout">Apply Layout</button>
-            </div>
-            <div class="toolbar-group">
                 <button id="zoom-in">Zoom In</button>
                 <button id="zoom-out">Zoom Out</button>
-                <button id="fit-content">Fit to Content</button>
+                <button id="fit-content">Fit</button>
             </div>
         `;
 
-        // Add event listeners
-        toolbar.querySelector('#new-diagram')?.addEventListener('click', () => this.createNewDiagram());
-        toolbar.querySelector('#save-diagram')?.addEventListener('click', () => this.saveDiagram());
+        const modeManager = this.renderer.getModeManager();
+        
+        // Mode buttons
+        toolbar.querySelector('#mode-select')?.addEventListener('click', (e) => {
+            this.setActiveButton(e.target as HTMLElement, '.toolbar-group button');
+            modeManager.setMode(InteractionMode.Select);
+        });
+        
+        toolbar.querySelector('#mode-pan')?.addEventListener('click', (e) => {
+            this.setActiveButton(e.target as HTMLElement, '.toolbar-group button');
+            modeManager.setMode(InteractionMode.Pan);
+        });
+        
+        // Node type buttons
+        toolbar.querySelectorAll('.node-type').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.target as HTMLElement;
+                const nodeType = button.dataset.type!;
+                this.setActiveButton(button, '.toolbar-group button');
+                modeManager.setSelectedNodeType(nodeType);
+            });
+        });
+        
+        // Edge type buttons
+        toolbar.querySelectorAll('.edge-type').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.target as HTMLElement;
+                const edgeType = button.dataset.type!;
+                this.setActiveButton(button, '.toolbar-group button');
+                modeManager.setSelectedEdgeType(edgeType);
+            });
+        });
+        
+        // Other buttons
+        toolbar.querySelector('#apply-layout')?.addEventListener('click', () => this.applyLayout());
         toolbar.querySelector('#zoom-in')?.addEventListener('click', () => this.renderer.zoom(1.2));
         toolbar.querySelector('#zoom-out')?.addEventListener('click', () => this.renderer.zoom(0.8));
         toolbar.querySelector('#fit-content')?.addEventListener('click', () => this.renderer.fitToContent());
 
         return toolbar;
+    }
+    
+    private setActiveButton(button: HTMLElement, selector: string): void {
+        const parent = button.closest('.glsp-toolbar');
+        parent?.querySelectorAll(selector).forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
     }
 
     private createStatusBar(): HTMLElement {
