@@ -1,5 +1,6 @@
 use crate::model::{DiagramModel, Node, Edge, Position};
 use crate::mcp::protocol::{Tool, CallToolParams, CallToolResult, TextContent};
+use crate::selection::SelectionMode;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use anyhow::Result;
@@ -194,6 +195,130 @@ impl DiagramTools {
                     "required": ["diagramId", "format"]
                 }),
             },
+            // Selection tools
+            Tool {
+                name: "select_elements".to_string(),
+                description: Some("Select one or more elements in the diagram".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        },
+                        "elementIds": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "IDs of elements to select"
+                        },
+                        "mode": {
+                            "type": "string",
+                            "enum": ["single", "multiple", "range"],
+                            "description": "Selection mode",
+                            "default": "single"
+                        },
+                        "append": {
+                            "type": "boolean",
+                            "description": "Whether to append to current selection",
+                            "default": false
+                        }
+                    },
+                    "required": ["diagramId", "elementIds"]
+                }),
+            },
+            Tool {
+                name: "select_all".to_string(),
+                description: Some("Select all elements in the diagram".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "clear_selection".to_string(),
+                description: Some("Clear the current selection".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "get_selection".to_string(),
+                description: Some("Get the currently selected elements".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "hover_element".to_string(),
+                description: Some("Set the hover state for an element".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        },
+                        "elementId": {
+                            "type": "string",
+                            "description": "ID of element to hover (null to clear)",
+                            "nullable": true
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "get_element_at_position".to_string(),
+                description: Some("Find element at given canvas position".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram"
+                        },
+                        "x": {
+                            "type": "number",
+                            "description": "X coordinate"
+                        },
+                        "y": {
+                            "type": "number",
+                            "description": "Y coordinate"
+                        },
+                        "tolerance": {
+                            "type": "number",
+                            "description": "Hit detection tolerance in pixels",
+                            "default": 5.0
+                        },
+                        "includeEdges": {
+                            "type": "boolean",
+                            "description": "Whether to include edges in hit detection",
+                            "default": true
+                        }
+                    },
+                    "required": ["diagramId", "x", "y"]
+                }),
+            },
         ]
     }
 
@@ -206,6 +331,13 @@ impl DiagramTools {
             "update_element" => self.update_element(params.arguments).await,
             "apply_layout" => self.apply_layout(params.arguments).await,
             "export_diagram" => self.export_diagram(params.arguments).await,
+            // Selection tools
+            "select_elements" => self.select_elements(params.arguments).await,
+            "select_all" => self.select_all(params.arguments).await,
+            "clear_selection" => self.clear_selection(params.arguments).await,
+            "get_selection" => self.get_selection(params.arguments).await,
+            "hover_element" => self.hover_element(params.arguments).await,
+            "get_element_at_position" => self.get_element_at_position(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -544,5 +676,236 @@ impl DiagramTools {
 
     pub fn list_diagrams(&self) -> Vec<&DiagramModel> {
         self.models.values().collect()
+    }
+
+    // Selection tool implementations
+    async fn select_elements(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+        let element_ids = args["elementIds"].as_array()
+            .ok_or_else(|| anyhow::anyhow!("Missing elementIds"))?;
+        let mode = args["mode"].as_str().unwrap_or("single");
+        let append = args["append"].as_bool().unwrap_or(false);
+
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        if let Some(selection) = &mut diagram.selection {
+            let ids: Vec<String> = element_ids
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect();
+
+            let mode = match mode {
+                "multiple" => SelectionMode::Multiple,
+                "range" => SelectionMode::Range,
+                _ => SelectionMode::Single,
+            };
+
+            if ids.len() == 1 && !append {
+                selection.select_element(ids[0].clone(), mode);
+            } else {
+                selection.select_multiple(ids, append);
+            }
+
+            let selected_count = selection.get_selected_count();
+            let selected_ids = selection.get_selected_ids();
+
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Selected {} element(s): {:?}", selected_count, selected_ids),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection state not initialized".to_string(),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn select_all(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        let all_ids = diagram.get_all_element_ids();
+        let count = all_ids.len();
+
+        if let Some(selection) = &mut diagram.selection {
+            selection.select_all(all_ids);
+
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Selected all {} elements", count),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection state not initialized".to_string(),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn clear_selection(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        if let Some(selection) = &mut diagram.selection {
+            selection.clear_selection();
+
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection cleared".to_string(),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection state not initialized".to_string(),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn get_selection(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        if let Some(selection) = &diagram.selection {
+            let selected_ids = selection.get_selected_ids();
+            let response = json!({
+                "selectedElements": selected_ids,
+                "count": selected_ids.len(),
+                "hoveredElement": selection.hovered_element,
+                "lastSelected": selection.last_selected,
+                "selectionMode": selection.selection_mode
+            });
+
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&response)?,
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection state not initialized".to_string(),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn hover_element(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+        let element_id = args["elementId"].as_str().map(|s| s.to_string());
+
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        if let Some(selection) = &mut diagram.selection {
+            selection.set_hover(element_id.clone());
+
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: match element_id {
+                        Some(id) => format!("Hovering element: {}", id),
+                        None => "Hover cleared".to_string(),
+                    },
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Selection state not initialized".to_string(),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn get_element_at_position(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+        let x = args["x"].as_f64()
+            .ok_or_else(|| anyhow::anyhow!("Missing x coordinate"))?;
+        let y = args["y"].as_f64()
+            .ok_or_else(|| anyhow::anyhow!("Missing y coordinate"))?;
+        let tolerance = args["tolerance"].as_f64().unwrap_or(5.0);
+
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        match diagram.get_element_at_position(x, y, tolerance) {
+            Some(element_id) => {
+                let element = diagram.get_element(&element_id);
+                let response = json!({
+                    "found": true,
+                    "elementId": element_id,
+                    "elementType": element.map(|e| &e.element_type),
+                    "position": { "x": x, "y": y }
+                });
+
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&response)?,
+                    }],
+                    is_error: None,
+                })
+            }
+            None => {
+                let response = json!({
+                    "found": false,
+                    "position": { "x": x, "y": y }
+                });
+
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&response)?,
+                    }],
+                    is_error: None,
+                })
+            }
+        }
     }
 }

@@ -207,6 +207,11 @@ export class GLSPApp {
         this.renderer.addInteractionHandler((event: InteractionEvent) => {
             this.handleRendererInteraction(event);
         });
+        
+        // Selection change events
+        this.renderer.getSelectionManager().addChangeHandler((change) => {
+            this.handleSelectionChange(change);
+        });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (event) => {
@@ -225,7 +230,12 @@ export class GLSPApp {
                 }
                 break;
             case 'hover':
-                console.log('Element hovered:', event.element?.id);
+                if (this.currentDiagramId && event.element) {
+                    this.mcpClient.callTool('hover_element', {
+                        diagramId: this.currentDiagramId,
+                        elementId: event.element.id
+                    }).catch(console.error);
+                }
                 break;
         }
     }
@@ -254,6 +264,10 @@ export class GLSPApp {
                     event.preventDefault();
                     this.renderer.fitToContent();
                     break;
+                case 'a':
+                    event.preventDefault();
+                    this.selectAllElements();
+                    break;
             }
         }
 
@@ -263,6 +277,26 @@ export class GLSPApp {
                 event.preventDefault();
                 this.deleteSelectedElements();
                 break;
+            case 'Escape':
+                event.preventDefault();
+                this.clearSelection();
+                break;
+        }
+    }
+    
+    private async handleSelectionChange(change: any): Promise<void> {
+        if (!this.currentDiagramId) return;
+        
+        try {
+            // Sync selection with backend
+            await this.mcpClient.callTool('select_elements', {
+                diagramId: this.currentDiagramId,
+                elementIds: change.current,
+                mode: 'multiple',
+                append: false
+            });
+        } catch (error) {
+            console.error('Failed to sync selection:', error);
         }
     }
 
@@ -402,8 +436,44 @@ export class GLSPApp {
     }
 
     private async deleteSelectedElements(): Promise<void> {
-        // This would need to be implemented based on selected elements
-        console.log('Delete selected elements - not implemented yet');
+        if (!this.currentDiagramId) return;
+        
+        const selectedIds = this.renderer.getSelectionManager().getSelectedIds();
+        if (selectedIds.length === 0) return;
+        
+        try {
+            for (const elementId of selectedIds) {
+                await this.mcpClient.callTool('delete_element', {
+                    diagramId: this.currentDiagramId,
+                    elementId
+                });
+            }
+            
+            // Clear selection after deletion
+            this.renderer.getSelectionManager().clearSelection();
+            
+            // Reload the diagram to reflect changes
+            await this.loadDiagram(this.currentDiagramId);
+            this.updateStatus(`Deleted ${selectedIds.length} element(s)`);
+        } catch (error) {
+            console.error('Failed to delete elements:', error);
+        }
+    }
+    
+    private async selectAllElements(): Promise<void> {
+        if (!this.currentDiagramId) return;
+        
+        const diagram = this.diagramState.getDiagram(this.currentDiagramId);
+        if (!diagram) return;
+        
+        const allIds = Object.keys(diagram.elements)
+            .filter(id => id !== diagram.root.id);
+        
+        this.renderer.getSelectionManager().selectAll(allIds);
+    }
+    
+    private clearSelection(): void {
+        this.renderer.getSelectionManager().clearSelection();
     }
 
     private createToolbar(): HTMLElement {

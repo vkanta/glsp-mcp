@@ -4,6 +4,7 @@
  */
 
 import { DiagramModel, ModelElement, Node, Edge, Bounds, Position } from '../model/diagram.js';
+import { SelectionManager } from '../selection/selection-manager.js';
 
 export interface RenderOptions {
     backgroundColor?: string;
@@ -31,12 +32,12 @@ export class CanvasRenderer {
     private ctx: CanvasRenderingContext2D;
     private options: Required<RenderOptions>;
     private currentDiagram?: DiagramModel;
-    private selectedElements: Set<string> = new Set();
-    private hoveredElement?: string;
+    private selectionManager: SelectionManager;
     private interactionHandlers: InteractionHandler[] = [];
     private isDragging = false;
     private dragStart?: Position;
-    // private _dragOffset?: Position;
+    private selectionRect?: { start: Position; end: Position };
+    private isSelectingRect = false;
 
     constructor(canvas: HTMLCanvasElement, options: RenderOptions = {}) {
         this.canvas = canvas;
@@ -45,6 +46,7 @@ export class CanvasRenderer {
             throw new Error('Unable to get 2D context from canvas');
         }
         this.ctx = ctx;
+        this.selectionManager = new SelectionManager();
 
         this.options = {
             backgroundColor: '#ffffff',
@@ -61,6 +63,11 @@ export class CanvasRenderer {
 
         this.setupEventListeners();
         this.resizeCanvas();
+        
+        // Listen to selection changes
+        this.selectionManager.addChangeHandler(() => {
+            this.render();
+        });
     }
 
     private setupEventListeners(): void {
@@ -137,21 +144,11 @@ export class CanvasRenderer {
         const position = this.getMousePosition(event);
         const element = this.getElementAt(position);
 
-        if (event.ctrlKey || event.metaKey) {
-            // Multi-select
-            if (element) {
-                if (this.selectedElements.has(element.id)) {
-                    this.selectedElements.delete(element.id);
-                } else {
-                    this.selectedElements.add(element.id);
-                }
-            }
-        } else {
-            // Single select
-            this.selectedElements.clear();
-            if (element) {
-                this.selectedElements.add(element.id);
-            }
+        if (element) {
+            this.selectionManager.handleKeyboardSelection(element.id, event);
+        } else if (!event.ctrlKey && !event.metaKey) {
+            // Clear selection when clicking empty space
+            this.selectionManager.clearSelection();
         }
 
         this.emit({
@@ -160,8 +157,6 @@ export class CanvasRenderer {
             element,
             originalEvent: event
         });
-
-        this.render();
     }
 
     private handleMouseMove(event: MouseEvent): void {
@@ -184,10 +179,9 @@ export class CanvasRenderer {
             this.render();
         } else {
             // Handle hover
-            const newHovered = element?.id;
-            if (newHovered !== this.hoveredElement) {
-                this.hoveredElement = newHovered;
-                this.render();
+            const newHovered = element?.id || null;
+            if (newHovered !== this.selectionManager.getState().hoveredElement) {
+                this.selectionManager.setHover(newHovered);
 
                 if (element) {
                     this.emit({
@@ -205,7 +199,7 @@ export class CanvasRenderer {
         const position = this.getMousePosition(event);
         const element = this.getElementAt(position);
 
-        if (element && this.selectedElements.has(element.id)) {
+        if (element && this.selectionManager.isSelected(element.id)) {
             this.isDragging = true;
             this.dragStart = position;
             this.canvas.style.cursor = 'grabbing';
@@ -255,15 +249,16 @@ export class CanvasRenderer {
 
     setDiagram(diagram: DiagramModel): void {
         this.currentDiagram = diagram;
-        this.selectedElements.clear();
-        this.hoveredElement = undefined;
+        this.selectionManager.clearSelection();
         this.render();
     }
 
     setSelected(elementIds: string[]): void {
-        this.selectedElements.clear();
-        elementIds.forEach(id => this.selectedElements.add(id));
-        this.render();
+        this.selectionManager.selectMultiple(elementIds, false);
+    }
+    
+    getSelectionManager(): SelectionManager {
+        return this.selectionManager;
     }
 
     pan(deltaX: number, deltaY: number): void {
@@ -337,6 +332,11 @@ export class CanvasRenderer {
 
         // Draw nodes
         this.drawNodes();
+        
+        // Draw selection rectangle if active
+        if (this.isSelectingRect && this.selectionRect) {
+            this.drawSelectionRectangle();
+        }
 
         this.ctx.restore();
     }
@@ -378,8 +378,8 @@ export class CanvasRenderer {
     private drawNode(node: Node): void {
         if (!node.bounds) return;
 
-        const isSelected = this.selectedElements.has(node.id);
-        const isHovered = this.hoveredElement === node.id;
+        const isSelected = this.selectionManager.isSelected(node.id);
+        const isHovered = this.selectionManager.isHovered(node.id);
 
         // Draw node background
         this.ctx.fillStyle = isSelected ? this.options.selectedColor : this.options.nodeColor;
@@ -426,8 +426,8 @@ export class CanvasRenderer {
 
         if (!sourceElement?.bounds || !targetElement?.bounds) return;
 
-        const isSelected = this.selectedElements.has(edge.id);
-        const isHovered = this.hoveredElement === edge.id;
+        const isSelected = this.selectionManager.isSelected(edge.id);
+        const isHovered = this.selectionManager.isHovered(edge.id);
 
         this.ctx.strokeStyle = isSelected || isHovered ? this.options.selectedColor : this.options.edgeColor;
         this.ctx.lineWidth = isSelected ? 2 : 1;
@@ -557,5 +557,24 @@ export class CanvasRenderer {
             to.y - arrowLength * Math.sin(angle + Math.PI / 6)
         );
         this.ctx.stroke();
+    }
+    
+    private drawSelectionRectangle(): void {
+        if (!this.selectionRect) return;
+        
+        const { start, end } = this.selectionRect;
+        const x = Math.min(start.x, end.x);
+        const y = Math.min(start.y, end.y);
+        const width = Math.abs(end.x - start.x);
+        const height = Math.abs(end.y - start.y);
+        
+        this.ctx.strokeStyle = this.options.selectedColor;
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeRect(x, y, width, height);
+        this.ctx.setLineDash([]);
+        
+        this.ctx.fillStyle = this.options.selectedColor + '20'; // Add transparency
+        this.ctx.fillRect(x, y, width, height);
     }
 }

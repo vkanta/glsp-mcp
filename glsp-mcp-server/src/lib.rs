@@ -2,6 +2,7 @@ pub mod mcp;
 pub mod model;
 pub mod operations;
 pub mod validation;
+pub mod selection;
 
 pub use mcp::*;
 pub use model::*;

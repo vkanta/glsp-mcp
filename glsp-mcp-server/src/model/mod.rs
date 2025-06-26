@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+use crate::selection::SelectionState;
 
 /// Core diagram model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,6 +11,8 @@ pub struct DiagramModel {
     pub revision: u32,
     pub root: ModelElement,
     pub elements: HashMap<String, ModelElement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selection: Option<SelectionState>,
 }
 
 /// Base model element
@@ -122,6 +125,7 @@ impl DiagramModel {
             revision: 0,
             root,
             elements,
+            selection: Some(SelectionState::new()),
         }
     }
 
@@ -155,6 +159,27 @@ impl DiagramModel {
             self.root.children = Some(vec![child_id.to_string()]);
         }
         self.revision += 1;
+    }
+
+    pub fn get_all_element_ids(&self) -> Vec<String> {
+        self.elements.keys()
+            .filter(|id| *id != &self.root.id)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_element_at_position(&self, x: f64, y: f64, tolerance: f64) -> Option<String> {
+        for (id, element) in &self.elements {
+            if let Some(bounds) = &element.bounds {
+                if x >= bounds.x - tolerance 
+                   && x <= bounds.x + bounds.width + tolerance
+                   && y >= bounds.y - tolerance 
+                   && y <= bounds.y + bounds.height + tolerance {
+                    return Some(id.clone());
+                }
+            }
+        }
+        None
     }
 }
 
