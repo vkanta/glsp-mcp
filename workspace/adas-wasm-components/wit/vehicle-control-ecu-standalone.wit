@@ -1,0 +1,599 @@
+package adas:vehicle-control@0.1.0;
+
+/// Vehicle control ECU for actuating steering, braking, and acceleration
+interface vehicle-control {
+    /// Vehicle control command
+    record control-command {
+        command-id: u32,
+        timestamp: u64,
+        priority: command-priority,
+        source: control-source,
+        steering-command: option<steering-command>,
+        braking-command: option<braking-command>,
+        acceleration-command: option<acceleration-command>,
+        lighting-command: option<lighting-command>,
+        validation-checksum: u32,
+    }
+
+    enum command-priority {
+        emergency,
+        high,
+        normal,
+        low,
+        background,
+    }
+
+    enum control-source {
+        adas-system,
+        driver,
+        emergency-system,
+        parking-assist,
+        cruise-control,
+        collision-avoidance,
+        lane-keeping,
+        stability-control,
+    }
+
+    record steering-command {
+        target-angle: f32,
+        angular-velocity: f32,
+        torque-limit: f32,
+        execution-time: f32,
+        steering-mode: steering-mode,
+        override-protection: bool,
+    }
+
+    enum steering-mode {
+        position-control,
+        torque-control,
+        rate-control,
+        path-following,
+        lane-centering,
+        emergency-avoidance,
+    }
+
+    record braking-command {
+        target-deceleration: f32,
+        brake-pressure: f32,
+        distribution: brake-distribution,
+        braking-mode: braking-mode,
+        abs-enabled: bool,
+        emergency-brake: bool,
+    }
+
+    record brake-distribution {
+        front-left: f32,
+        front-right: f32,
+        rear-left: f32,
+        rear-right: f32,
+        regenerative-ratio: f32,
+    }
+
+    enum braking-mode {
+        normal,
+        emergency,
+        abs,
+        stability-control,
+        hill-assist,
+        regenerative,
+    }
+
+    record acceleration-command {
+        target-acceleration: f32,
+        target-velocity: f32,
+        throttle-position: f32,
+        acceleration-mode: acceleration-mode,
+        traction-control: bool,
+        eco-mode: bool,
+    }
+
+    enum acceleration-mode {
+        normal,
+        eco,
+        sport,
+        cruise-control,
+        adaptive-cruise,
+        emergency,
+    }
+
+    record lighting-command {
+        headlights: light-state,
+        taillights: light-state,
+        brake-lights: light-state,
+        turn-signals: turn-signal-state,
+        hazard-lights: bool,
+        interior-lights: light-state,
+    }
+
+    enum light-state {
+        off,
+        on,
+        dim,
+        bright,
+        flashing,
+        auto,
+    }
+
+    record turn-signal-state {
+        left-turn: bool,
+        right-turn: bool,
+        frequency: f32,
+    }
+
+    /// Vehicle state feedback
+    record vehicle-state {
+        timestamp: u64,
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        orientation: orientation3d,
+        steering-state: steering-state,
+        braking-state: braking-state,
+        acceleration-state: acceleration-state,
+        lighting-state: lighting-state,
+        dynamics: vehicle-dynamics,
+    }
+
+    record position3d {
+        x: f64,
+        y: f64,
+        z: f64,
+        coordinate-frame: coordinate-frame,
+    }
+
+    enum coordinate-frame {
+        local,
+        utm,
+        wgs84,
+        vehicle-centric,
+    }
+
+    record velocity3d {
+        vx: f32,
+        vy: f32,
+        vz: f32,
+        speed: f32,
+    }
+
+    record acceleration3d {
+        ax: f32,
+        ay: f32,
+        az: f32,
+        magnitude: f32,
+    }
+
+    record orientation3d {
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+        yaw-rate: f32,
+    }
+
+    record steering-state {
+        current-angle: f32,
+        angular-velocity: f32,
+        applied-torque: f32,
+        driver-torque: f32,
+        system-torque: f32,
+        power-assist-level: f32,
+    }
+
+    record braking-state {
+        brake-pedal-position: f32,
+        master-cylinder-pressure: f32,
+        wheel-pressures: list<f32>,
+        abs-active: bool,
+        brake-temperature: list<f32>,
+        brake-wear: list<f32>,
+    }
+
+    record acceleration-state {
+        throttle-position: f32,
+        engine-rpm: f32,
+        engine-torque: f32,
+        transmission-gear: u32,
+        fuel-consumption: f32,
+        intake-manifold-pressure: f32,
+    }
+
+    record lighting-state {
+        headlights-on: bool,
+        high-beams-on: bool,
+        taillights-on: bool,
+        brake-lights-on: bool,
+        turn-signals-active: turn-signal-state,
+        hazard-lights-on: bool,
+        daytime-running-lights: bool,
+    }
+
+    record vehicle-dynamics {
+        lateral-acceleration: f32,
+        longitudinal-acceleration: f32,
+        vertical-acceleration: f32,
+        tire-slip: list<f32>,
+        tire-pressure: list<f32>,
+        wheel-speeds: list<f32>,
+        stability-control-active: bool,
+        traction-control-active: bool,
+    }
+
+    /// Control system limits and constraints
+    record control-limits {
+        steering-limits: steering-limits,
+        braking-limits: braking-limits,
+        acceleration-limits: acceleration-limits,
+        rate-limits: rate-limits,
+        safety-margins: safety-margins,
+    }
+
+    record steering-limits {
+        max-angle: f32,
+        min-angle: f32,
+        max-angular-velocity: f32,
+        max-torque: f32,
+        max-assist-torque: f32,
+    }
+
+    record braking-limits {
+        max-deceleration: f32,
+        max-pressure: f32,
+        max-brake-force: f32,
+        min-stopping-distance: f32,
+        thermal-limits: list<f32>,
+    }
+
+    record acceleration-limits {
+        max-acceleration: f32,
+        max-velocity: f32,
+        max-throttle: f32,
+        max-engine-torque: f32,
+        traction-limits: list<f32>,
+    }
+
+    record rate-limits {
+        steering-rate: f32,
+        brake-pressure-rate: f32,
+        throttle-rate: f32,
+        gear-change-rate: f32,
+    }
+
+    record safety-margins {
+        steering-margin: f32,
+        braking-margin: f32,
+        acceleration-margin: f32,
+        stability-margin: f32,
+        response-time-margin: f32,
+    }
+
+    /// Diagnostic and health monitoring
+    record system-health {
+        overall-health: health-status,
+        subsystem-health: list<subsystem-health>,
+        fault-codes: list<fault-code>,
+        performance-metrics: performance-metrics,
+        calibration-status: calibration-status,
+    }
+
+    enum health-status {
+        excellent,
+        good,
+        degraded,
+        poor,
+        critical,
+        failed,
+    }
+
+    record subsystem-health {
+        subsystem: control-subsystem,
+        status: health-status,
+        temperature: f32,
+        voltage: f32,
+        current: f32,
+        response-time: f32,
+        error-count: u32,
+    }
+
+    enum control-subsystem {
+        steering-ecu,
+        brake-ecu,
+        engine-ecu,
+        transmission-ecu,
+        stability-ecu,
+        lighting-ecu,
+        power-steering,
+        abs-system,
+        traction-control,
+        electronic-throttle,
+    }
+
+    record fault-code {
+        code: string,
+        subsystem: control-subsystem,
+        severity: fault-severity,
+        description: string,
+        occurrence-time: u64,
+        occurrence-count: u32,
+        conditions: list<string>,
+    }
+
+    enum fault-severity {
+        info,
+        warning,
+        error,
+        critical,
+        safety-critical,
+    }
+
+    record performance-metrics {
+        steering-response-time: f32,
+        braking-response-time: f32,
+        acceleration-response-time: f32,
+        command-latency: f32,
+        tracking-accuracy: f32,
+        system-utilization: f32,
+    }
+
+    record calibration-status {
+        steering-calibrated: bool,
+        brake-calibrated: bool,
+        throttle-calibrated: bool,
+        sensors-calibrated: bool,
+        last-calibration: u64,
+        calibration-drift: f32,
+    }
+
+    /// Control modes and configurations
+    record control-config {
+        enabled-systems: list<control-subsystem>,
+        control-mode: control-mode,
+        safety-settings: safety-settings,
+        performance-settings: performance-settings,
+        driver-settings: driver-settings,
+    }
+
+    enum control-mode {
+        manual,
+        assisted,
+        semi-autonomous,
+        autonomous,
+        emergency-only,
+    }
+
+    record safety-settings {
+        enable-safety-checks: bool,
+        emergency-override: bool,
+        driver-intervention: bool,
+        stability-assist: bool,
+        collision-mitigation: bool,
+        max-intervention-force: f32,
+    }
+
+    record performance-settings {
+        response-sensitivity: sensitivity-level,
+        assist-level: assist-level,
+        comfort-mode: comfort-mode,
+        eco-mode-enabled: bool,
+        sport-mode-enabled: bool,
+    }
+
+    enum sensitivity-level {
+        low,
+        medium,
+        high,
+        adaptive,
+    }
+
+    enum assist-level {
+        minimal,
+        light,
+        moderate,
+        strong,
+        maximum,
+    }
+
+    enum comfort-mode {
+        comfort,
+        balanced,
+        sport,
+        eco,
+        custom,
+    }
+
+    record driver-settings {
+        preferred-following-distance: f32,
+        preferred-acceleration: f32,
+        preferred-deceleration: f32,
+        steering-feel: steering-feel,
+        brake-feel: brake-feel,
+    }
+
+    enum steering-feel {
+        light,
+        medium,
+        heavy,
+        adaptive,
+        sport,
+    }
+
+    enum brake-feel {
+        soft,
+        medium,
+        firm,
+        progressive,
+        linear,
+    }
+
+    /// Emergency and failsafe operations
+    record emergency-action {
+        action-type: emergency-type,
+        trigger-condition: string,
+        action-parameters: emergency-parameters,
+        execution-status: execution-status,
+        override-permissions: list<override-permission>,
+    }
+
+    enum emergency-type {
+        emergency-brake,
+        emergency-steer,
+        hazard-stop,
+        minimal-risk-maneuver,
+        safe-park,
+        engine-shutdown,
+        system-isolation,
+    }
+
+    record emergency-parameters {
+        max-deceleration: f32,
+        target-position: option<position3d>,
+        time-limit: f32,
+        force-limit: f32,
+        alert-level: alert-level,
+    }
+
+    enum alert-level {
+        silent,
+        visual,
+        audible,
+        haptic,
+        full-alert,
+    }
+
+    enum execution-status {
+        standby,
+        armed,
+        executing,
+        completed,
+        failed,
+        aborted,
+    }
+
+    enum override-permission {
+        none,
+        driver-only,
+        system-only,
+        either,
+        both-required,
+    }
+
+    enum control-status {
+        offline,
+        initializing,
+        standby,
+        active,
+        emergency,
+        failed,
+        maintenance,
+    }
+
+    /// Initialize vehicle control system
+    initialize: func(config: control-config, limits: control-limits) -> result<_, string>;
+
+    /// Start control system
+    start-control: func() -> result<_, string>;
+
+    /// Stop control system
+    stop-control: func() -> result<_, string>;
+
+    /// Execute control command
+    execute-command: func(command: control-command) -> result<_, string>;
+
+    /// Get current vehicle state
+    get-vehicle-state: func() -> result<vehicle-state, string>;
+
+    /// Set control limits
+    set-limits: func(limits: control-limits) -> result<_, string>;
+
+    /// Trigger emergency action
+    trigger-emergency: func(action: emergency-action) -> result<_, string>;
+
+    /// Override current command
+    override-command: func(command: control-command, override-reason: string) -> result<_, string>;
+
+    /// Get system health
+    get-system-health: func() -> result<system-health, string>;
+
+    /// Calibrate subsystem
+    calibrate-subsystem: func(subsystem: control-subsystem) -> result<_, string>;
+
+    /// Get control status
+    get-status: func() -> control-status;
+
+    /// Update configuration
+    update-config: func(config: control-config) -> result<_, string>;
+
+    /// Run system diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        overall-status: health-status,
+        subsystem-results: list<subsystem-diagnostic>,
+        performance-test: performance-test-result,
+        calibration-check: calibration-check-result,
+        fault-injection-test: option<fault-injection-result>,
+    }
+
+    record subsystem-diagnostic {
+        subsystem: control-subsystem,
+        functional-test: test-result,
+        response-test: test-result,
+        safety-test: test-result,
+        communication-test: test-result,
+    }
+
+    enum test-result {
+        passed,
+        failed,
+        warning,
+        not-tested,
+        timeout,
+    }
+
+    record performance-test-result {
+        steering-performance: performance-result,
+        braking-performance: performance-result,
+        acceleration-performance: performance-result,
+        overall-score: f32,
+    }
+
+    record performance-result {
+        response-time: f32,
+        accuracy: f32,
+        repeatability: f32,
+        linearity: f32,
+        hysteresis: f32,
+    }
+
+    record calibration-check-result {
+        steering-calibration: calibration-result,
+        brake-calibration: calibration-result,
+        throttle-calibration: calibration-result,
+        sensor-calibration: calibration-result,
+        overall-drift: f32,
+    }
+
+    record calibration-result {
+        within-tolerance: bool,
+        drift-amount: f32,
+        recommended-recalibration: bool,
+        last-calibration-age: u32,
+    }
+
+    record fault-injection-result {
+        injected-faults: list<injected-fault>,
+        detection-rate: f32,
+        response-time: f32,
+        recovery-success: bool,
+    }
+
+    record injected-fault {
+        fault-type: string,
+        injection-time: u64,
+        detection-time: option<u64>,
+        recovery-time: option<u64>,
+        impact-severity: fault-severity,
+    }
+}
+
+world vehicle-control-component {
+    export vehicle-control;
+}

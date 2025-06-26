@@ -3,6 +3,7 @@ pub mod model;
 pub mod operations;
 pub mod validation;
 pub mod selection;
+pub mod wasm;
 
 pub use mcp::*;
 pub use model::*;

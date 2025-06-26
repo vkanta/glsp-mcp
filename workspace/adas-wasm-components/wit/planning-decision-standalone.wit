@@ -1,0 +1,917 @@
+package adas:planning-decision@0.1.0;
+
+/// High-level planning and decision making for autonomous driving
+interface planning-decision {
+    /// Mission planning from start to destination
+    record mission-plan {
+        plan-id: u32,
+        start-position: position3d,
+        destination: position3d,
+        waypoints: list<waypoint>,
+        route-segments: list<route-segment>,
+        estimated-duration: f32,
+        estimated-distance: f32,
+        planning-constraints: planning-constraints,
+    }
+
+    record position3d {
+        x: f64,
+        y: f64,
+        z: f64,
+        coordinate-frame: coordinate-frame,
+    }
+
+    enum coordinate-frame {
+        local,
+        utm,
+        wgs84,
+    }
+
+    record waypoint {
+        position: position3d,
+        waypoint-type: waypoint-type,
+        speed-limit: f32,
+        arrival-time: option<u64>,
+        constraints: list<constraint>,
+    }
+
+    enum waypoint-type {
+        navigation,
+        stop,
+        yield,
+        traffic-light,
+        speed-change,
+        lane-change,
+        merge,
+        exit,
+    }
+
+    enum constraint {
+        time-critical,
+        fuel-efficient,
+        safe-following,
+        avoid-construction,
+        prefer-highway,
+        avoid-tolls,
+    }
+
+    record route-segment {
+        segment-id: u32,
+        start-waypoint: u32,
+        end-waypoint: u32,
+        road-type: road-type,
+        segment-length: f32,
+        speed-limit: f32,
+        traffic-conditions: traffic-conditions,
+    }
+
+    enum road-type {
+        highway,
+        arterial,
+        local,
+        ramp,
+        service-road,
+    }
+
+    record traffic-conditions {
+        congestion-level: congestion-level,
+        average-speed: f32,
+        incidents: list<traffic-incident>,
+        construction-zones: list<construction-zone>,
+    }
+
+    enum congestion-level {
+        free-flow,
+        light,
+        moderate,
+        heavy,
+        stop-and-go,
+    }
+
+    record traffic-incident {
+        incident-type: incident-type,
+        location: position3d,
+        severity: severity-level,
+        estimated-clearance: option<u64>,
+    }
+
+    enum incident-type {
+        accident,
+        breakdown,
+        debris,
+        weather-hazard,
+        emergency-vehicles,
+    }
+
+    enum severity-level {
+        minor,
+        moderate,
+        major,
+        severe,
+    }
+
+    record construction-zone {
+        zone-boundaries: list<position3d>,
+        lane-restrictions: list<lane-restriction>,
+        speed-reduction: f32,
+        duration: option<time-range>,
+    }
+
+    record lane-restriction {
+        restricted-lanes: list<u32>,
+        restriction-type: restriction-type,
+    }
+
+    enum restriction-type {
+        closed,
+        reduced-width,
+        merge-required,
+        temporary-signal,
+    }
+
+    record time-range {
+        start-time: u64,
+        end-time: u64,
+    }
+
+    record planning-constraints {
+        max-speed: f32,
+        max-acceleration: f32,
+        max-deceleration: f32,
+        comfort-level: comfort-level,
+        efficiency-priority: efficiency-priority,
+        safety-margin: safety-margin,
+    }
+
+    enum comfort-level {
+        eco,
+        comfort,
+        normal,
+        sport,
+        aggressive,
+    }
+
+    enum efficiency-priority {
+        time-optimal,
+        fuel-optimal,
+        balanced,
+        comfort-optimal,
+    }
+
+    enum safety-margin {
+        minimal,
+        standard,
+        conservative,
+        maximum,
+    }
+
+    /// Tactical planning for immediate maneuvers
+    record tactical-plan {
+        plan-id: u32,
+        time-horizon: f32,
+        planned-trajectory: trajectory,
+        alternative-trajectories: list<alternative-trajectory>,
+        maneuver-sequence: list<planned-maneuver>,
+        risk-assessment: risk-assessment,
+        confidence: f32,
+    }
+
+    record trajectory {
+        trajectory-points: list<trajectory-point>,
+        trajectory-type: trajectory-type,
+        execution-time: f32,
+        spatial-bounds: spatial-bounds,
+    }
+
+    record trajectory-point {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        heading: f32,
+        curvature: f32,
+        timestamp: u64,
+    }
+
+    record velocity3d {
+        vx: f32,
+        vy: f32,
+        vz: f32,
+    }
+
+    record acceleration3d {
+        ax: f32,
+        ay: f32,
+        az: f32,
+    }
+
+    enum trajectory-type {
+        straight,
+        curve,
+        lane-change,
+        merge,
+        turn,
+        stop,
+        park,
+        reverse,
+    }
+
+    record spatial-bounds {
+        min-x: f32,
+        max-x: f32,
+        min-y: f32,
+        max-y: f32,
+        lane-boundaries: list<boundary>,
+    }
+
+    record boundary {
+        points: list<position3d>,
+        boundary-type: boundary-type,
+    }
+
+    enum boundary-type {
+        hard,
+        soft,
+        preferred,
+        forbidden,
+    }
+
+    record alternative-trajectory {
+        trajectory: trajectory,
+        priority: priority-level,
+        conditions: list<execution-condition>,
+        cost: f32,
+    }
+
+    enum priority-level {
+        primary,
+        secondary,
+        fallback,
+        emergency,
+    }
+
+    record execution-condition {
+        condition-type: condition-type,
+        threshold-value: f32,
+        operator: comparison-operator,
+    }
+
+    enum condition-type {
+        object-distance,
+        relative-velocity,
+        time-to-collision,
+        lane-change-availability,
+        traffic-density,
+    }
+
+    enum comparison-operator {
+        less-than,
+        greater-than,
+        equal-to,
+        not-equal-to,
+    }
+
+    record planned-maneuver {
+        maneuver-id: u32,
+        maneuver-type: maneuver-type,
+        start-time: u64,
+        duration: f32,
+        target-state: vehicle-state,
+        preconditions: list<precondition>,
+        postconditions: list<postcondition>,
+    }
+
+    enum maneuver-type {
+        maintain-lane,
+        change-lane-left,
+        change-lane-right,
+        turn-left,
+        turn-right,
+        merge-left,
+        merge-right,
+        overtake,
+        yield,
+        stop,
+        park,
+        reverse,
+        u-turn,
+    }
+
+    record vehicle-state {
+        position: position3d,
+        velocity: velocity3d,
+        heading: f32,
+        lane-id: option<u32>,
+        lane-offset: f32,
+    }
+
+    record precondition {
+        condition-description: string,
+        required-clearance: f32,
+        safety-margin: f32,
+        timeout: option<f32>,
+    }
+
+    record postcondition {
+        expected-state: vehicle-state,
+        tolerance: state-tolerance,
+        verification-time: f32,
+    }
+
+    record state-tolerance {
+        position-tolerance: f32,
+        velocity-tolerance: f32,
+        heading-tolerance: f32,
+    }
+
+    record risk-assessment {
+        overall-risk: risk-level,
+        collision-probability: f32,
+        comfort-impact: comfort-impact,
+        traffic-impact: traffic-impact,
+        legal-compliance: compliance-level,
+    }
+
+    enum risk-level {
+        minimal,
+        low,
+        moderate,
+        high,
+        critical,
+        unacceptable,
+    }
+
+    enum comfort-impact {
+        smooth,
+        acceptable,
+        noticeable,
+        uncomfortable,
+        jarring,
+    }
+
+    enum traffic-impact {
+        none,
+        minimal,
+        moderate,
+        significant,
+        disruptive,
+    }
+
+    enum compliance-level {
+        fully-compliant,
+        mostly-compliant,
+        minor-violation,
+        major-violation,
+        illegal,
+    }
+
+    /// Decision making context
+    record decision-context {
+        current-mission: option<mission-plan>,
+        traffic-situation: traffic-situation,
+        environmental-conditions: environmental-conditions,
+        vehicle-status: vehicle-status,
+        passenger-preferences: passenger-preferences,
+        regulatory-constraints: list<regulatory-constraint>,
+    }
+
+    record traffic-situation {
+        ego-vehicle-state: vehicle-state,
+        nearby-vehicles: list<nearby-vehicle>,
+        vulnerable-road-users: list<vulnerable-user>,
+        traffic-infrastructure: traffic-infrastructure,
+    }
+
+    record nearby-vehicle {
+        vehicle-id: u32,
+        state: vehicle-state,
+        predicted-trajectory: trajectory,
+        vehicle-type: vehicle-type,
+        behavior-assessment: behavior-assessment,
+    }
+
+    enum vehicle-type {
+        car,
+        truck,
+        bus,
+        motorcycle,
+        emergency-vehicle,
+        construction-vehicle,
+    }
+
+    record behavior-assessment {
+        aggressiveness: aggressiveness-level,
+        predictability: predictability-level,
+        compliance: compliance-level,
+        intention: intention-type,
+    }
+
+    enum aggressiveness-level {
+        passive,
+        normal,
+        aggressive,
+        very-aggressive,
+    }
+
+    enum predictability-level {
+        highly-predictable,
+        predictable,
+        somewhat-predictable,
+        unpredictable,
+    }
+
+    enum intention-type {
+        continue,
+        turn-left,
+        turn-right,
+        change-lane-left,
+        change-lane-right,
+        stop,
+        merge,
+        unknown,
+    }
+
+    record vulnerable-user {
+        user-id: u32,
+        user-type: vulnerable-user-type,
+        state: user-state,
+        predicted-path: list<trajectory-point>,
+        attention-level: attention-level,
+    }
+
+    enum vulnerable-user-type {
+        pedestrian,
+        cyclist,
+        motorcyclist,
+        scooter-rider,
+        wheelchair-user,
+    }
+
+    record user-state {
+        position: position3d,
+        velocity: velocity3d,
+        heading: f32,
+        activity: user-activity,
+    }
+
+    enum user-activity {
+        walking,
+        running,
+        standing,
+        cycling,
+        crossing-road,
+        waiting,
+        interacting,
+    }
+
+    enum attention-level {
+        focused,
+        distracted,
+        unaware,
+        impaired,
+    }
+
+    record traffic-infrastructure {
+        traffic-lights: list<traffic-light>,
+        traffic-signs: list<traffic-sign>,
+        road-markings: list<road-marking>,
+        intersections: list<intersection>,
+    }
+
+    record traffic-light {
+        position: position3d,
+        current-state: light-state,
+        applicable-lanes: list<u32>,
+        time-remaining: option<f32>,
+        cycle-timing: option<light-cycle>,
+    }
+
+    enum light-state {
+        red,
+        yellow,
+        green,
+        red-yellow,
+        flashing-red,
+        flashing-yellow,
+        off,
+    }
+
+    record light-cycle {
+        red-duration: f32,
+        yellow-duration: f32,
+        green-duration: f32,
+        cycle-time: f32,
+    }
+
+    record traffic-sign {
+        position: position3d,
+        sign-type: sign-type,
+        content: string,
+        applicable-lanes: list<u32>,
+        visibility: f32,
+    }
+
+    enum sign-type {
+        stop,
+        yield,
+        speed-limit,
+        no-entry,
+        one-way,
+        turn-restriction,
+        lane-restriction,
+        warning,
+    }
+
+    record road-marking {
+        marking-type: marking-type,
+        points: list<position3d>,
+        lane-association: list<u32>,
+    }
+
+    enum marking-type {
+        lane-divider,
+        lane-boundary,
+        stop-line,
+        crosswalk,
+        arrow,
+        text,
+    }
+
+    record intersection {
+        intersection-id: u32,
+        center-position: position3d,
+        approach-lanes: list<lane-approach>,
+        traffic-control: traffic-control-type,
+        right-of-way-rules: list<right-of-way-rule>,
+    }
+
+    record lane-approach {
+        lane-id: u32,
+        approach-angle: f32,
+        allowed-movements: list<movement-type>,
+        yield-requirements: list<yield-requirement>,
+    }
+
+    enum movement-type {
+        straight,
+        left-turn,
+        right-turn,
+        u-turn,
+    }
+
+    record yield-requirement {
+        yield-to-lane: u32,
+        yield-type: yield-type,
+    }
+
+    enum yield-type {
+        always,
+        conditional,
+        right-of-way,
+    }
+
+    enum traffic-control-type {
+        none,
+        stop-signs,
+        traffic-lights,
+        yield-signs,
+        roundabout,
+    }
+
+    record right-of-way-rule {
+        rule-description: string,
+        priority-order: list<u32>,
+        conditions: list<string>,
+    }
+
+    record environmental-conditions {
+        weather: weather-conditions,
+        lighting: lighting-conditions,
+        road-conditions: road-conditions,
+        visibility: visibility-conditions,
+    }
+
+    record weather-conditions {
+        weather-type: weather-type,
+        precipitation: precipitation-info,
+        wind: wind-info,
+        temperature: f32,
+    }
+
+    enum weather-type {
+        clear,
+        cloudy,
+        rain,
+        snow,
+        fog,
+        storm,
+    }
+
+    record precipitation-info {
+        type-of-precipitation: precipitation-type,
+        intensity: intensity-level,
+        accumulation: f32,
+    }
+
+    enum precipitation-type {
+        none,
+        drizzle,
+        rain,
+        snow,
+        sleet,
+        hail,
+    }
+
+    enum intensity-level {
+        none,
+        light,
+        moderate,
+        heavy,
+        severe,
+    }
+
+    record wind-info {
+        speed: f32,
+        direction: f32,
+        gusts: bool,
+    }
+
+    record lighting-conditions {
+        ambient-light: light-level,
+        artificial-lighting: bool,
+        glare-present: bool,
+        shadows: shadow-conditions,
+    }
+
+    enum light-level {
+        bright-daylight,
+        daylight,
+        dusk,
+        dawn,
+        night,
+        artificial,
+    }
+
+    record shadow-conditions {
+        shadow-coverage: f32,
+        shadow-intensity: f32,
+        moving-shadows: bool,
+    }
+
+    record road-conditions {
+        surface-type: surface-type,
+        surface-condition: surface-condition,
+        friction-coefficient: f32,
+        construction-present: bool,
+        debris-present: bool,
+    }
+
+    enum surface-type {
+        asphalt,
+        concrete,
+        gravel,
+        dirt,
+        brick,
+    }
+
+    enum surface-condition {
+        dry,
+        wet,
+        icy,
+        snowy,
+        oily,
+        damaged,
+    }
+
+    record visibility-conditions {
+        visibility-distance: f32,
+        obscuration-type: list<obscuration-type>,
+        visibility-quality: visibility-quality,
+    }
+
+    enum obscuration-type {
+        none,
+        fog,
+        rain,
+        snow,
+        dust,
+        smoke,
+        glare,
+    }
+
+    enum visibility-quality {
+        excellent,
+        good,
+        fair,
+        poor,
+        very-poor,
+    }
+
+    record vehicle-status {
+        fuel-level: f32,
+        battery-level: option<f32>,
+        tire-pressure: list<f32>,
+        brake-condition: brake-condition,
+        system-health: system-health,
+        maintenance-status: maintenance-status,
+    }
+
+    enum brake-condition {
+        excellent,
+        good,
+        fair,
+        worn,
+        critical,
+    }
+
+    record system-health {
+        engine-status: system-status,
+        transmission-status: system-status,
+        steering-status: system-status,
+        suspension-status: system-status,
+        electrical-status: system-status,
+    }
+
+    enum system-status {
+        normal,
+        warning,
+        error,
+        critical,
+        offline,
+    }
+
+    record maintenance-status {
+        miles-to-service: f32,
+        overdue-services: list<service-type>,
+        warning-lights: list<warning-light>,
+    }
+
+    enum service-type {
+        oil-change,
+        tire-rotation,
+        brake-service,
+        transmission-service,
+        cooling-system,
+        electrical-system,
+    }
+
+    enum warning-light {
+        check-engine,
+        oil-pressure,
+        coolant-temperature,
+        battery,
+        brake-system,
+        tire-pressure,
+        abs,
+        airbag,
+    }
+
+    record passenger-preferences {
+        comfort-level: comfort-level,
+        speed-preference: speed-preference,
+        route-preference: route-preference,
+        following-distance: following-distance-preference,
+        lane-change-aggressiveness: aggressiveness-preference,
+    }
+
+    enum speed-preference {
+        eco,
+        below-limit,
+        at-limit,
+        above-limit,
+        maximum-legal,
+    }
+
+    enum route-preference {
+        fastest,
+        shortest,
+        most-economical,
+        scenic,
+        avoid-highways,
+        avoid-tolls,
+    }
+
+    enum following-distance-preference {
+        close,
+        normal,
+        far,
+        adaptive,
+    }
+
+    enum aggressiveness-preference {
+        very-conservative,
+        conservative,
+        normal,
+        aggressive,
+        very-aggressive,
+    }
+
+    record regulatory-constraint {
+        constraint-type: constraint-type,
+        description: string,
+        penalty: penalty-type,
+        enforcement-likelihood: f32,
+    }
+
+    enum constraint-type {
+        speed-limit,
+        lane-restriction,
+        turn-restriction,
+        time-restriction,
+        vehicle-restriction,
+        parking-restriction,
+    }
+
+    enum penalty-type {
+        warning,
+        fine,
+        points,
+        license-suspension,
+        vehicle-impoundment,
+    }
+
+    /// Planning system configuration
+    record planning-config {
+        planning-horizon: f32,
+        update-frequency: u32,
+        max-alternatives: u32,
+        risk-tolerance: risk-tolerance,
+        comfort-priority: priority-weight,
+        efficiency-priority: priority-weight,
+        safety-priority: priority-weight,
+        legality-priority: priority-weight,
+    }
+
+    enum risk-tolerance {
+        very-conservative,
+        conservative,
+        moderate,
+        aggressive,
+        very-aggressive,
+    }
+
+    enum priority-weight {
+        very-low,
+        low,
+        medium,
+        high,
+        very-high,
+    }
+
+    enum planning-status {
+        offline,
+        initializing,
+        active,
+        planning,
+        error,
+        degraded,
+    }
+
+    /// Initialize planning system
+    initialize: func(config: planning-config) -> result<_, string>;
+
+    /// Start planning process
+    start-planning: func() -> result<_, string>;
+
+    /// Stop planning process
+    stop-planning: func() -> result<_, string>;
+
+    /// Create mission plan
+    create-mission-plan: func(start: position3d, destination: position3d, constraints: planning-constraints) -> result<mission-plan, string>;
+
+    /// Generate tactical plan
+    generate-tactical-plan: func(context: decision-context) -> result<tactical-plan, string>;
+
+    /// Make driving decision
+    make-decision: func(context: decision-context, available-options: list<planned-maneuver>) -> result<planned-maneuver, string>;
+
+    /// Update decision context
+    update-context: func(context: decision-context) -> result<_, string>;
+
+    /// Validate plan feasibility
+    validate-plan: func(plan: tactical-plan) -> result<bool, string>;
+
+    /// Get current plan
+    get-current-plan: func() -> result<tactical-plan, string>;
+
+    /// Get planning status
+    get-status: func() -> planning-status;
+
+    /// Update configuration
+    update-config: func(config: planning-config) -> result<_, string>;
+
+    /// Run system diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        planning-performance: f32,
+        decision-latency: u32,
+        plan-success-rate: f32,
+        safety-violations: u32,
+        comfort-score: f32,
+        efficiency-score: f32,
+    }
+}
+
+world planning-decision-component {
+    export planning-decision;
+}

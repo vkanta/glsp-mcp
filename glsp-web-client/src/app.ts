@@ -8,7 +8,9 @@ import { DiagramState, DiagramModel } from './model/diagram.js';
 import { CanvasRenderer, InteractionEvent } from './renderer/canvas-renderer.js';
 import { OllamaClient } from './ai/ollama-client.js';
 import { DiagramAgent, DiagramRequest } from './ai/diagram-agent.js';
-import { InteractionMode, DEFAULT_NODE_TYPES, DEFAULT_EDGE_TYPES } from './interaction/interaction-mode.js';
+import { InteractionMode } from './interaction/interaction-mode.js';
+import { diagramTypeRegistry, getNodeTypesForDiagram, getEdgeTypesForDiagram } from './diagrams/diagram-type-registry.js';
+import { WasmComponentPalette } from './diagrams/wasm-component-palette.js';
 
 export class GLSPApp {
     private mcpClient: McpClient;
@@ -21,11 +23,16 @@ export class GLSPApp {
     private ollamaClient: OllamaClient;
     private diagramAgent: DiagramAgent;
 
+    // WASM Components
+    private wasmComponentPalette: WasmComponentPalette;
+
     // UI Elements
     private toolbarElement: HTMLElement;
     private statusElement: HTMLElement;
     private diagramListElement: HTMLElement;
     private aiPanelElement: HTMLElement;
+    private wasmPaletteElement: HTMLElement;
+    private currentDiagramType: string = 'workflow';
 
     constructor(canvasElement: HTMLCanvasElement) {
         this.canvas = canvasElement;
@@ -37,11 +44,18 @@ export class GLSPApp {
         this.ollamaClient = new OllamaClient();
         this.diagramAgent = new DiagramAgent(this.ollamaClient, this.mcpClient);
 
+        // Set MCP client for WASM component status checking
+        this.renderer.setMcpClient(this.mcpClient);
+
+        // Initialize WASM component palette
+        this.wasmComponentPalette = new WasmComponentPalette(this.mcpClient);
+
         // Initialize UI elements
         this.toolbarElement = this.createToolbar();
         this.statusElement = this.createStatusBar();
         this.diagramListElement = this.createDiagramList();
         this.aiPanelElement = this.createAIPanel();
+        this.wasmPaletteElement = this.wasmComponentPalette.getElement();
 
         this.setupEventHandlers();
         this.initialize();
@@ -60,6 +74,9 @@ export class GLSPApp {
             
             // Check AI connections
             await this.checkAIConnections();
+            
+            // Initialize WASM components via MCP
+            await this.initializeWasmComponents();
             
             // Create a sample diagram
             await this.createSampleDiagram();
@@ -209,6 +226,9 @@ export class GLSPApp {
             this.handleRendererInteraction(event);
         });
         
+        // Canvas drag and drop for WASM components
+        this.setupCanvasDragAndDrop();
+        
         // Selection change events
         this.renderer.getSelectionManager().addChangeHandler((change) => {
             this.handleSelectionChange(change);
@@ -275,6 +295,10 @@ export class GLSPApp {
                     event.preventDefault();
                     this.renderer.fitToContent();
                     break;
+                case 'r':
+                    event.preventDefault();
+                    this.renderer.resetView();
+                    break;
                 case 'a':
                     event.preventDefault();
                     this.selectAllElements();
@@ -340,39 +364,63 @@ export class GLSPApp {
 
     private async addSampleNodes(diagramId: string): Promise<void> {
         try {
+            const nodeIds: string[] = [];
+            
             // Create start node
-            await this.mcpClient.callTool('create_node', {
+            const startResult = await this.mcpClient.callTool('create_node', {
                 diagramId,
                 nodeType: 'start-event',
                 position: { x: 50, y: 100 },
                 label: 'Start'
             });
+            const startMatch = startResult.content[0]?.text.match(/ID: ([a-f0-9-]+)/);
+            if (startMatch) nodeIds.push(startMatch[1]);
 
             // Create task node
-            await this.mcpClient.callTool('create_node', {
+            const taskResult = await this.mcpClient.callTool('create_node', {
                 diagramId,
                 nodeType: 'task',
                 position: { x: 200, y: 100 },
                 label: 'Process Order'
             });
+            const taskMatch = taskResult.content[0]?.text.match(/ID: ([a-f0-9-]+)/);
+            if (taskMatch) nodeIds.push(taskMatch[1]);
 
             // Create gateway
-            await this.mcpClient.callTool('create_node', {
+            const gatewayResult = await this.mcpClient.callTool('create_node', {
                 diagramId,
                 nodeType: 'gateway',
                 position: { x: 350, y: 100 },
                 label: 'Valid?'
             });
+            const gatewayMatch = gatewayResult.content[0]?.text.match(/ID: ([a-f0-9-]+)/);
+            if (gatewayMatch) nodeIds.push(gatewayMatch[1]);
 
             // Create end node
-            await this.mcpClient.callTool('create_node', {
+            const endResult = await this.mcpClient.callTool('create_node', {
                 diagramId,
                 nodeType: 'end-event',
                 position: { x: 500, y: 100 },
                 label: 'End'
             });
+            const endMatch = endResult.content[0]?.text.match(/ID: ([a-f0-9-]+)/);
+            if (endMatch) nodeIds.push(endMatch[1]);
 
-            console.log('Sample nodes created');
+            console.log('Sample nodes created:', nodeIds);
+            
+            // Now create edges between the nodes
+            if (nodeIds.length > 1) {
+                for (let i = 0; i < nodeIds.length - 1; i++) {
+                    await this.mcpClient.callTool('create_edge', {
+                        diagramId,
+                        edgeType: 'flow',
+                        sourceId: nodeIds[i],
+                        targetId: nodeIds[i + 1]
+                    });
+                    console.log(`Created edge: ${nodeIds[i]} → ${nodeIds[i + 1]}`);
+                }
+            }
+            
         } catch (error) {
             console.error('Failed to create sample nodes:', error);
         }
@@ -384,9 +432,29 @@ export class GLSPApp {
             
             if (modelResource.text) {
                 const diagram: DiagramModel = JSON.parse(modelResource.text);
+                
+                // Debug: Log the diagram structure
+                console.log('Loaded diagram:', diagram);
+                console.log('Elements:', Object.keys(diagram.elements));
+                
+                // Debug: Check for edges
+                console.log('All elements with types:', Object.values(diagram.elements).map(e => ({
+                    id: e.id,
+                    type: e.type || e.element_type,
+                    sourceId: e.sourceId || e.properties?.sourceId,
+                    targetId: e.targetId || e.properties?.targetId
+                })));
+                
+                const edges = Object.values(diagram.elements).filter(e => {
+                    const type = e.type || e.element_type || '';
+                    // Check for various edge type patterns
+                    return type.includes('edge') || type === 'flow' || type === 'association' || type === 'dependency';
+                });
+                console.log(`Found ${edges.length} edges:`, edges);
+                
                 this.diagramState.updateDiagram(diagram);
                 this.currentDiagramId = diagramId;
-                this.updateStatus(`Loaded diagram: ${diagram.diagramType}`);
+                this.updateStatus(`Loaded diagram: ${diagram.diagramType} (${edges.length} edges)`);
             }
         } catch (error) {
             console.error('Failed to load diagram:', error);
@@ -426,7 +494,9 @@ export class GLSPApp {
     }
 
     private async createNewDiagram(): Promise<void> {
-        const diagramType = prompt('Enter diagram type (workflow, bpmn, uml):') || 'workflow';
+        const availableTypes = diagramTypeRegistry.getAvailableTypes();
+        const typeOptions = availableTypes.map(t => `${t.type} (${t.label})`).join('\n');
+        const diagramType = prompt(`Enter diagram type:\n${typeOptions}`) || 'workflow';
         
         try {
             const result = await this.mcpClient.callTool('create_diagram', {
@@ -577,7 +647,25 @@ export class GLSPApp {
     private createToolbar(): HTMLElement {
         const toolbar = document.createElement('div');
         toolbar.className = 'glsp-toolbar';
+        this.updateToolbarContent(toolbar);
+        this.setupToolbarEventHandlers(toolbar);
+        return toolbar;
+    }
+    
+    private updateToolbarContent(toolbar: HTMLElement): void {
+        const nodeTypes = getNodeTypesForDiagram(this.currentDiagramType);
+        const edgeTypes = getEdgeTypesForDiagram(this.currentDiagramType);
+        const availableTypes = diagramTypeRegistry.getAvailableTypes();
+        
         toolbar.innerHTML = `
+            <div class="toolbar-group">
+                <label>Diagram Type:</label>
+                <select id="diagram-type-select">
+                    ${availableTypes.map(type => 
+                        `<option value="${type.type}" ${type.type === this.currentDiagramType ? 'selected' : ''}>${type.label}</option>`
+                    ).join('')}
+                </select>
+            </div>
             <div class="toolbar-group">
                 <label>Mode:</label>
                 <button id="mode-select" class="active">Select</button>
@@ -585,13 +673,15 @@ export class GLSPApp {
             </div>
             <div class="toolbar-group">
                 <label>Create Node:</label>
-                ${DEFAULT_NODE_TYPES.map(nodeType => 
-                    `<button class="node-type" data-type="${nodeType.type}">${nodeType.label}</button>`
+                ${nodeTypes.map(nodeType => 
+                    `<button class="node-type" data-type="${nodeType.type}" title="${nodeType.icon || ''}">
+                        ${nodeType.icon || ''} ${nodeType.label}
+                    </button>`
                 ).join('')}
             </div>
             <div class="toolbar-group">
                 <label>Create Edge:</label>
-                ${DEFAULT_EDGE_TYPES.map(edgeType => 
+                ${edgeTypes.map(edgeType => 
                     `<button class="edge-type" data-type="${edgeType.type}">${edgeType.label}</button>`
                 ).join('')}
             </div>
@@ -600,10 +690,24 @@ export class GLSPApp {
                 <button id="zoom-in">Zoom In</button>
                 <button id="zoom-out">Zoom Out</button>
                 <button id="fit-content">Fit</button>
+                <button id="reset-view">Reset</button>
             </div>
         `;
+    }
+    
+    private setupToolbarEventHandlers(toolbar: HTMLElement): void {
 
         const modeManager = this.renderer.getModeManager();
+        
+        // Diagram type selector
+        toolbar.querySelector('#diagram-type-select')?.addEventListener('change', (e) => {
+            const select = e.target as HTMLSelectElement;
+            const newType = select.value;
+            this.onDiagramTypeChanged(newType);
+            this.updateToolbarContent(toolbar);
+            this.setupToolbarEventHandlers(toolbar);
+            console.log(`Switched to diagram type: ${newType}`);
+        });
         
         // Mode buttons
         toolbar.querySelector('#mode-select')?.addEventListener('click', (e) => {
@@ -641,8 +745,7 @@ export class GLSPApp {
         toolbar.querySelector('#zoom-in')?.addEventListener('click', () => this.renderer.zoom(1.2));
         toolbar.querySelector('#zoom-out')?.addEventListener('click', () => this.renderer.zoom(0.8));
         toolbar.querySelector('#fit-content')?.addEventListener('click', () => this.renderer.fitToContent());
-
-        return toolbar;
+        toolbar.querySelector('#reset-view')?.addEventListener('click', () => this.renderer.resetView());
     }
     
     private setActiveButton(button: HTMLElement, selector: string): void {
@@ -689,6 +792,7 @@ export class GLSPApp {
                 <button id="ai-create-btn">Create Diagram</button>
             </div>
             <div class="ai-actions">
+                <button id="ai-test-btn">🧪 Test AI Diagram Creation</button>
                 <button id="ai-analyze-btn">Analyze Current Diagram</button>
                 <button id="ai-optimize-btn">Optimize Layout</button>
             </div>
@@ -704,6 +808,44 @@ export class GLSPApp {
             if (description) {
                 await this.createDiagramFromAI(description);
                 textarea.value = ''; // Clear after creation
+            }
+        });
+
+        panel.querySelector('#ai-test-btn')?.addEventListener('click', async () => {
+            const outputElement = panel.querySelector('#ai-output') as HTMLElement;
+            try {
+                outputElement.innerHTML = '<div class="ai-thinking">🧪 Testing AI diagram creation...</div>';
+                
+                const response = await this.diagramAgent.createTestDiagram();
+                
+                let output = '<div class="ai-response">';
+                output += `<h4>${response.success ? '✅' : '❌'} ${response.message}</h4>`;
+                
+                output += '<div class="ai-steps">';
+                response.steps.forEach(step => {
+                    output += `<div class="step">${step}</div>`;
+                });
+                output += '</div>';
+                
+                if (response.errors && response.errors.length > 0) {
+                    output += '<div class="ai-errors">';
+                    response.errors.forEach(error => {
+                        output += `<div class="error">❌ ${error}</div>`;
+                    });
+                    output += '</div>';
+                }
+                
+                output += '</div>';
+                outputElement.innerHTML = output;
+                
+                // Load the created diagram
+                if (response.success && response.diagramId) {
+                    this.currentDiagramId = response.diagramId;
+                    await this.loadDiagram(response.diagramId);
+                }
+                
+            } catch (error) {
+                outputElement.innerHTML = `<div class="ai-error">❌ Test Error: ${error}</div>`;
             }
         });
 
@@ -850,10 +992,145 @@ export class GLSPApp {
         }
     }
 
+    private async initializeWasmComponents(): Promise<void> {
+        try {
+            // Trigger initial WASM component scan via MCP
+            await this.mcpClient.callTool('scan_wasm_components', {});
+            this.updateStatus('WASM components scanned via MCP');
+            
+        } catch (error) {
+            console.warn('WASM component initialization failed:', error);
+            this.updateStatus('WASM components unavailable');
+        }
+    }
+
+    private async getWasmComponentsStatus(): Promise<any> {
+        try {
+            const statusResource = await this.mcpClient.readResource('wasm://components/status');
+            return JSON.parse(statusResource.text || '{}');
+        } catch (error) {
+            console.warn('Failed to get WASM components status:', error);
+            return null;
+        }
+    }
+
+    private async getMissingComponents(): Promise<any[]> {
+        try {
+            const missingResource = await this.mcpClient.readResource('wasm://components/missing');
+            const data = JSON.parse(missingResource.text || '{}');
+            return data.missingComponents || [];
+        } catch (error) {
+            console.warn('Failed to get missing components:', error);
+            return [];
+        }
+    }
+
     // Public API for HTML
     getToolbar(): HTMLElement { return this.toolbarElement; }
     getStatus(): HTMLElement { return this.statusElement; }
     getDiagramList(): HTMLElement { return this.diagramListElement; }
     getAIPanel(): HTMLElement { return this.aiPanelElement; }
     async loadDiagramPublic(diagramId: string): Promise<void> { return this.loadDiagram(diagramId); }
+    
+    private setupCanvasDragAndDrop(): void {
+        const canvas = this.canvas;
+        
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = 'copy';
+        });
+        
+        canvas.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            
+            const wasmComponentData = e.dataTransfer!.getData('application/wasm-component');
+            if (wasmComponentData) {
+                try {
+                    const dragData = JSON.parse(wasmComponentData);
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const position = {
+                        x: e.clientX - canvasRect.left,
+                        y: e.clientY - canvasRect.top
+                    };
+                    
+                    await this.addWasmComponentToDiagram(dragData.componentName, position);
+                } catch (error) {
+                    console.error('Failed to add WASM component to diagram:', error);
+                    this.wasmComponentPalette.onComponentAddFailed('unknown', String(error));
+                }
+            }
+        });
+    }
+    
+    private async addWasmComponentToDiagram(componentName: string, position: { x: number; y: number }): Promise<void> {
+        if (!this.currentDiagramId) {
+            throw new Error('No active diagram');
+        }
+        
+        try {
+            // Use position directly (canvas coordinates)
+            const worldPosition = position;
+            
+            const result = await this.mcpClient.callTool('load_wasm_component', {
+                diagramId: this.currentDiagramId,
+                componentName: componentName,
+                position: worldPosition
+            });
+            
+            console.log('WASM component added:', result);
+            this.wasmComponentPalette.onComponentAdded(componentName);
+            
+            // Reload the diagram to show the new component
+            await this.loadDiagram(this.currentDiagramId);
+            
+            // Update scroll bounds to include the new component
+            this.renderer.refreshScrollBounds();
+            
+        } catch (error) {
+            console.error('Failed to add WASM component:', error);
+            this.wasmComponentPalette.onComponentAddFailed(componentName, String(error));
+            throw error;
+        }
+    }
+    
+    private onDiagramTypeChanged(newType: string): void {
+        const oldType = this.currentDiagramType;
+        this.currentDiagramType = newType;
+        
+        // Show/hide WASM palette based on diagram type
+        const wasmPaletteContainer = document.getElementById('wasm-palette-container');
+        if (newType === 'wasm-component') {
+            this.wasmComponentPalette.show();
+            if (wasmPaletteContainer) {
+                wasmPaletteContainer.style.display = 'block';
+            }
+        } else {
+            this.wasmComponentPalette.hide();
+            if (wasmPaletteContainer) {
+                wasmPaletteContainer.style.display = 'none';
+            }
+        }
+        
+        console.log(`Diagram type changed from ${oldType} to ${newType}`);
+    }
+
+    // Public API for WASM component management via MCP
+    async getWasmComponentsStatusPublic(): Promise<any> {
+        return this.getWasmComponentsStatus();
+    }
+    
+    async getMissingComponentsPublic(): Promise<any[]> {
+        return this.getMissingComponents();
+    }
+    
+    async scanWasmComponents(): Promise<void> {
+        try {
+            await this.mcpClient.callTool('scan_wasm_components', {});
+            this.updateStatus('WASM components rescanned');
+        } catch (error) {
+            console.error('Failed to scan WASM components:', error);
+        }
+    }
+    
+    getWasmPalette(): HTMLElement { return this.wasmPaletteElement; }
 }

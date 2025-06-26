@@ -16,6 +16,8 @@ tracing-subscriber = "0.3"
 anyhow = "1.0"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+wasm-tools = "1.0"
+wasmparser = "0.118"
 
 [lib]
 name = "glsp_mcp_server"

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCP-GLSP: AI-Native Diagram Editor</title>
+    <link rel="stylesheet" href="src/styles/wasm-palette.css">
     <style>
         * {
             margin: 0;
@@ -16,11 +17,11 @@
             height: 100vh;
             display: grid;
             grid-template-areas: 
-                "header header"
-                "sidebar canvas"
-                "sidebar status";
+                "header header header"
+                "sidebar canvas wasm-palette"
+                "sidebar status wasm-palette";
             grid-template-rows: auto 1fr auto;
-            grid-template-columns: 350px 1fr;
+            grid-template-columns: 350px 1fr 300px;
             background-color: #f5f5f5;
         }
 
@@ -56,6 +57,14 @@
             background: white;
             position: relative;
             overflow: hidden;
+        }
+
+        .wasm-palette-container {
+            grid-area: wasm-palette;
+            background: white;
+            border-left: 1px solid #e0e0e0;
+            overflow: hidden;
+            display: none; /* Hidden by default, shown when wasm-component diagram type is selected */
         }
 
         .canvas-container canvas {
@@ -373,7 +382,7 @@
                 grid-template-rows: auto 1fr auto;
             }
 
-            .sidebar {
+            .sidebar, .wasm-palette-container {
                 display: none;
             }
         }
@@ -397,6 +406,7 @@
                 <li><kbd>Ctrl++</kbd> Zoom In</li>
                 <li><kbd>Ctrl+-</kbd> Zoom Out</li>
                 <li><kbd>Ctrl+0</kbd> Fit to Content</li>
+                <li><kbd>Ctrl+R</kbd> Reset View</li>
                 <li><kbd>Delete</kbd> Delete Selected</li>
             </ul>
         </div>
@@ -405,6 +415,8 @@
     <div class="canvas-container">
         <canvas id="diagram-canvas"></canvas>
     </div>
+
+    <div class="wasm-palette-container" id="wasm-palette-container"></div>
 
     <div id="status-container">
         <div class="connection-status">

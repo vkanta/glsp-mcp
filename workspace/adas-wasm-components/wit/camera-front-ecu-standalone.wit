@@ -1,0 +1,199 @@
+package adas:camera-front@0.1.0;
+
+/// Front-facing camera ECU with AI vision processing
+interface camera-front {
+    /// Camera resolution and capabilities
+    enum camera-resolution {
+        hd-resolution,
+        full-hd-resolution,
+        ultra-hd-resolution,
+        ultra-hd-max-resolution,
+    }
+
+    /// Camera frame data structure
+    record camera-frame {
+        timestamp: u64,
+        frame-id: u32,
+        width: u32,
+        height: u32,
+        pixel-format: pixel-format,
+        data: list<u8>,
+        exposure-time: f32,
+        gain: f32,
+        temperature: f32,
+    }
+
+    enum pixel-format {
+        rgb888,
+        bgr888,
+        yuv420,
+        yuv422,
+        nv12,
+        raw-bayer,
+    }
+
+    /// Camera calibration parameters
+    record camera-calibration {
+        focal-length-x: f64,
+        focal-length-y: f64,
+        principal-point-x: f64,
+        principal-point-y: f64,
+        distortion-coefficients: list<f64>,
+        rotation-matrix: list<f64>,
+        translation-vector: list<f64>,
+    }
+
+    /// Detection result from camera processing
+    record detection-result {
+        object-id: u32,
+        object-type: object-type,
+        confidence: f32,
+        bounding-box: bounding-box,
+        distance-estimate: f32,
+        relative-velocity: f32,
+    }
+
+    enum object-type {
+        vehicle,
+        pedestrian,
+        cyclist,
+        motorcycle,
+        truck,
+        bus,
+        traffic-light,
+        traffic-sign,
+        lane-marking,
+        road-boundary,
+        unknown,
+    }
+
+    record bounding-box {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    }
+
+    /// Lane detection result
+    record lane-detection {
+        left-lane: lane-marking,
+        right-lane: lane-marking,
+        ego-lane-center: point2d,
+        lane-width: f32,
+        curvature: f32,
+        confidence: f32,
+    }
+
+    record lane-marking {
+        points: list<point2d>,
+        line-type: lane-type,
+        color: lane-color,
+        confidence: f32,
+    }
+
+    enum lane-type {
+        solid,
+        dashed,
+        double-solid,
+        double-dashed,
+        solid-dashed,
+        dashed-solid,
+    }
+
+    enum lane-color {
+        white,
+        yellow,
+        blue,
+        red,
+    }
+
+    record point2d {
+        x: f32,
+        y: f32,
+    }
+
+    /// Traffic sign detection
+    record traffic-sign {
+        sign-type: sign-type,
+        value: option<string>,
+        confidence: f32,
+        position: bounding-box,
+        distance: f32,
+    }
+
+    enum sign-type {
+        stop,
+        yield,
+        speed-limit,
+        no-entry,
+        one-way,
+        parking,
+        warning,
+        information,
+    }
+
+    /// Camera system status
+    enum camera-status {
+        offline,
+        initializing,
+        active,
+        error,
+        blocked,
+        cleaning-required,
+    }
+
+    /// Camera configuration
+    record camera-config {
+        resolution: camera-resolution,
+        frame-rate: u32,
+        auto-exposure: bool,
+        auto-gain: bool,
+        hdr-mode: bool,
+        night-vision: bool,
+    }
+
+    /// Initialize camera system
+    initialize: func(config: camera-config, calibration: camera-calibration) -> result<_, string>;
+
+    /// Start camera capture
+    start-capture: func() -> result<_, string>;
+
+    /// Stop camera capture
+    stop-capture: func() -> result<_, string>;
+
+    /// Get latest camera frame
+    get-frame: func() -> result<camera-frame, string>;
+
+    /// Process frame for object detection
+    detect-objects: func(frame: camera-frame) -> result<list<detection-result>, string>;
+
+    /// Detect lane markings
+    detect-lanes: func(frame: camera-frame) -> result<lane-detection, string>;
+
+    /// Detect traffic signs
+    detect-traffic-signs: func(frame: camera-frame) -> result<list<traffic-sign>, string>;
+
+    /// Get camera status
+    get-status: func() -> camera-status;
+
+    /// Update camera configuration
+    update-config: func(config: camera-config) -> result<_, string>;
+
+    /// Get current calibration
+    get-calibration: func() -> camera-calibration;
+
+    /// Self-diagnostic test
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        lens-clean: bool,
+        focus-quality: f32,
+        exposure-stable: bool,
+        temperature-ok: bool,
+        vibration-level: f32,
+    }
+}
+
+world camera-front-component {
+    export camera-front;
+}

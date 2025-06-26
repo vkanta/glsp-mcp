@@ -92,88 +92,221 @@ IMPORTANT:
         try {
             steps.push("🤖 Analyzing description with AI...");
 
+            // Enhanced prompt for better AI responses
+            const enhancedPrompt = `Create a ${request.diagramType || 'workflow'} diagram for: "${request.description}"
+
+EXAMPLE of correct JSON response format:
+{
+  "analysis": "Creating a simple order processing workflow",
+  "toolCalls": [
+    {"tool": "create_diagram", "arguments": {"diagramType": "workflow", "name": "Order Processing"}},
+    {"tool": "create_node", "arguments": {"diagramId": "DIAGRAM_ID", "nodeType": "start-event", "position": {"x": 50, "y": 100}, "label": "Order Received"}},
+    {"tool": "create_node", "arguments": {"diagramId": "DIAGRAM_ID", "nodeType": "task", "position": {"x": 200, "y": 100}, "label": "Validate Order"}},
+    {"tool": "create_node", "arguments": {"diagramId": "DIAGRAM_ID", "nodeType": "end-event", "position": {"x": 350, "y": 100}, "label": "Order Complete"}},
+    {"tool": "create_edge", "arguments": {"diagramId": "DIAGRAM_ID", "edgeType": "flow", "sourceId": "NODE_ID_1", "targetId": "NODE_ID_2"}},
+    {"tool": "apply_layout", "arguments": {"diagramId": "DIAGRAM_ID", "algorithm": "hierarchical"}}
+  ]
+}
+
+Respond with valid JSON only, no additional text.`;
+
             // Get AI analysis and tool calls
             const aiResponse = await this.ollama.generateResponse(
-                `Create a ${request.diagramType || 'workflow'} diagram for: "${request.description}"`,
+                enhancedPrompt,
                 this.systemPrompt
             );
 
             steps.push("✅ AI analysis complete");
+            steps.push(`🔍 Raw AI Response: ${aiResponse.substring(0, 200)}...`);
 
             // Parse AI response
             let parsedResponse;
             try {
-                // Extract JSON from AI response (it might have extra text)
-                const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                // Try to find and parse JSON from the response
+                let jsonStr = aiResponse.trim();
+                
+                // Remove markdown code blocks if present
+                jsonStr = jsonStr.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                
+                // Extract JSON object
+                const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) {
-                    throw new Error("No JSON found in AI response");
+                    // Fallback: try to create a simple structure from the AI response
+                    steps.push("⚠️ No JSON detected, creating simple diagram");
+                    return await this.createSimpleDiagramFallback(request, steps, errors);
                 }
+                
                 parsedResponse = JSON.parse(jsonMatch[0]);
+                steps.push(`📋 Parsed ${parsedResponse.toolCalls?.length || 0} tool calls`);
+                
             } catch (parseError) {
-                errors.push(`Failed to parse AI response: ${parseError}`);
-                return {
-                    success: false,
-                    message: "AI response was not in expected format",
-                    steps,
-                    errors
-                };
+                errors.push(`JSON Parse Error: ${parseError}`);
+                steps.push("⚠️ JSON parsing failed, creating simple diagram");
+                return await this.createSimpleDiagramFallback(request, steps, errors);
             }
 
             steps.push(`💭 AI Analysis: ${parsedResponse.analysis}`);
 
-            // Execute tool calls
-            let diagramId: string | undefined;
-            
-            for (const toolCall of parsedResponse.toolCalls) {
-                try {
-                    steps.push(`🔧 Executing: ${toolCall.tool}`);
-
-                    // Replace DIAGRAM_ID placeholder with actual ID
-                    if (toolCall.arguments.diagramId === "DIAGRAM_ID" && diagramId) {
-                        toolCall.arguments.diagramId = diagramId;
-                    }
-
-                    const result = await this.mcpClient.callTool(toolCall.tool, toolCall.arguments);
-                    
-                    // Extract diagram ID if this was create_diagram
-                    if (toolCall.tool === "create_diagram" && result.content?.[0]?.text) {
-                        const match = result.content[0].text.match(/ID: ([a-f0-9-]+)/);
-                        if (match) {
-                            diagramId = match[1];
-                        }
-                    }
-
-                    steps.push(`✅ ${toolCall.tool} completed`);
-
-                } catch (toolError) {
-                    const errorMsg = `Failed to execute ${toolCall.tool}: ${toolError}`;
-                    errors.push(errorMsg);
-                    steps.push(`❌ ${errorMsg}`);
-                }
-            }
-
-            if (errors.length > 0) {
-                return {
-                    success: false,
-                    message: `Diagram partially created with ${errors.length} errors`,
-                    diagramId,
-                    steps,
-                    errors
-                };
-            }
-
-            return {
-                success: true,
-                message: "Diagram created successfully!",
-                diagramId,
-                steps
-            };
+            // Execute tool calls with improved ID tracking
+            return await this.executeToolCalls(parsedResponse.toolCalls, steps, errors);
 
         } catch (error) {
             errors.push(`Agent error: ${error}`);
             return {
                 success: false,
                 message: "Failed to create diagram",
+                steps,
+                errors
+            };
+        }
+    }
+
+    private async executeToolCalls(toolCalls: any[], steps: string[], errors: string[]): Promise<AgentResponse> {
+        let diagramId: string | undefined;
+        const nodeIds: string[] = [];
+        
+        for (const toolCall of toolCalls) {
+            try {
+                steps.push(`🔧 Executing: ${toolCall.tool} with ${JSON.stringify(toolCall.arguments).substring(0, 100)}...`);
+
+                // Replace placeholders with actual IDs
+                if (toolCall.arguments.diagramId === "DIAGRAM_ID" && diagramId) {
+                    toolCall.arguments.diagramId = diagramId;
+                }
+
+                const result = await this.mcpClient.callTool(toolCall.tool, toolCall.arguments);
+                
+                // Extract IDs from results
+                if (toolCall.tool === "create_diagram" && result.content?.[0]?.text) {
+                    const match = result.content[0].text.match(/ID: ([a-f0-9-]+)/);
+                    if (match) {
+                        diagramId = match[1];
+                        steps.push(`📝 Diagram ID: ${diagramId}`);
+                    }
+                }
+                
+                if (toolCall.tool === "create_node" && result.content?.[0]?.text) {
+                    const match = result.content[0].text.match(/ID: ([a-f0-9-]+)/);
+                    if (match) {
+                        nodeIds.push(match[1]);
+                        steps.push(`📦 Node ID: ${match[1]}`);
+                    }
+                }
+
+                steps.push(`✅ ${toolCall.tool} completed successfully`);
+
+            } catch (toolError) {
+                const errorMsg = `Failed to execute ${toolCall.tool}: ${toolError}`;
+                errors.push(errorMsg);
+                steps.push(`❌ ${errorMsg}`);
+            }
+        }
+        
+        // Auto-connect nodes in sequence if we have multiple nodes but no edges
+        if (nodeIds.length > 1 && !toolCalls.some(tc => tc.tool === "create_edge")) {
+            steps.push("🔗 Auto-connecting nodes in sequence...");
+            
+            for (let i = 0; i < nodeIds.length - 1; i++) {
+                try {
+                    await this.mcpClient.callTool("create_edge", {
+                        diagramId: diagramId,
+                        edgeType: "flow",
+                        sourceId: nodeIds[i],
+                        targetId: nodeIds[i + 1],
+                        label: undefined
+                    });
+                    steps.push(`✅ Connected ${nodeIds[i]} → ${nodeIds[i + 1]}`);
+                } catch (edgeError) {
+                    errors.push(`Failed to connect nodes: ${edgeError}`);
+                }
+            }
+        }
+        
+        // Apply layout as final step if diagram was created
+        if (diagramId && !toolCalls.some(tc => tc.tool === "apply_layout")) {
+            try {
+                steps.push("📐 Applying automatic layout...");
+                await this.mcpClient.callTool("apply_layout", {
+                    diagramId: diagramId,
+                    algorithm: "hierarchical"
+                });
+                steps.push("✅ Layout applied");
+            } catch (layoutError) {
+                // Layout is optional, don't fail the whole operation
+                steps.push(`⚠️ Layout failed: ${layoutError}`);
+            }
+        }
+        
+        if (errors.length > 0) {
+            return {
+                success: false,
+                message: `Diagram partially created with ${errors.length} errors`,
+                diagramId,
+                steps,
+                errors
+            };
+        }
+
+        return {
+            success: true,
+            message: `Diagram created successfully with ${nodeIds.length} nodes!`,
+            diagramId,
+            steps
+        };
+    }
+
+    private async createSimpleDiagramFallback(request: DiagramRequest, steps: string[], errors: string[]): Promise<AgentResponse> {
+        try {
+            steps.push("🔄 Creating fallback diagram structure...");
+            
+            // Create a simple diagram structure based on the description
+            const toolCalls = [
+                {
+                    tool: "create_diagram",
+                    arguments: {
+                        diagramType: request.diagramType || "workflow",
+                        name: `AI Generated: ${request.description.substring(0, 30)}...`
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "start-event",
+                        position: { x: 50, y: 100 },
+                        label: "Start"
+                    }
+                },
+                {
+                    tool: "create_node", 
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "task",
+                        position: { x: 200, y: 100 },
+                        label: "Process"
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID", 
+                        nodeType: "end-event",
+                        position: { x: 350, y: 100 },
+                        label: "End"
+                    }
+                }
+            ];
+            
+            // Add edge creation after we have the node IDs
+            // Note: This will be handled by the executeToolCalls method
+            
+            return await this.executeToolCalls(toolCalls, steps, errors);
+            
+        } catch (error) {
+            errors.push(`Fallback creation failed: ${error}`);
+            return {
+                success: false,
+                message: "Failed to create fallback diagram",
                 steps,
                 errors
             };
@@ -289,5 +422,71 @@ Provide insights about the diagram structure, potential improvements, and any is
         }
 
         return { ollama: ollamaConnected, mcp: mcpConnected };
+    }
+
+    async createTestDiagram(): Promise<AgentResponse> {
+        const steps: string[] = [];
+        const errors: string[] = [];
+
+        try {
+            steps.push("🧪 Creating test diagram to verify functionality...");
+
+            const toolCalls = [
+                {
+                    tool: "create_diagram",
+                    arguments: {
+                        diagramType: "workflow",
+                        name: "AI Test Diagram"
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "start-event",
+                        position: { x: 50, y: 100 },
+                        label: "AI Start"
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "task",
+                        position: { x: 200, y: 100 },
+                        label: "AI Process"
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "gateway",
+                        position: { x: 350, y: 100 },
+                        label: "AI Decision"
+                    }
+                },
+                {
+                    tool: "create_node",
+                    arguments: {
+                        diagramId: "DIAGRAM_ID",
+                        nodeType: "end-event",
+                        position: { x: 500, y: 100 },
+                        label: "AI End"
+                    }
+                }
+            ];
+
+            return await this.executeToolCalls(toolCalls, steps, errors);
+
+        } catch (error) {
+            errors.push(`Test diagram creation failed: ${error}`);
+            return {
+                success: false,
+                message: "Test diagram creation failed",
+                steps,
+                errors
+            };
+        }
     }
 }

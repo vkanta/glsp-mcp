@@ -1,0 +1,315 @@
+package adas:object-detection-ai@0.1.0;
+
+/// AI-powered object detection using deep learning models (YOLO, R-CNN, EfficientDet)
+interface object-detection {
+    /// WASI-NN compatible types for neural network inference
+    /// (Local definitions until WASI-NN runtime support is available)
+    type nn-tensor-dimensions = list<u32>;
+    
+    enum nn-tensor-type {
+        fp16, fp32, fp64, bf16, uint8, int32, int64
+    }
+    
+    type nn-tensor-data = list<u8>;
+    
+    record nn-tensor {
+        dimensions: nn-tensor-dimensions,
+        tensor-type: nn-tensor-type,
+        data: nn-tensor-data,
+    }
+    
+    enum nn-graph-encoding {
+        openvino, onnx, tensorflow, pytorch,
+        tensorflowlite, ggml, autodetect
+    }
+    
+    enum nn-execution-target {
+        cpu, gpu, tpu
+    }
+    /// Neural network model information
+    record model-info {
+        model-name: string,
+        model-version: string,
+        architecture: nn-architecture,
+        input-resolution: resolution,
+        quantization: quantization-type,
+        inference-time: f32,        // milliseconds
+        memory-usage: u32,          // MB
+    }
+
+    enum nn-architecture {
+        yolo-v8,
+        yolo-v9,
+        faster-rcnn,
+        ssd-mobilenet,
+        efficientdet,
+        retinanet,
+        fcos,
+    }
+
+    record resolution {
+        width: u32,
+        height: u32,
+    }
+
+    enum quantization-type {
+        fp32,
+        fp16,
+        int8,
+        int4,
+    }
+
+    /// Object detection result with AI confidence metrics
+    record detection-result {
+        object-id: u32,
+        class-id: u32,
+        class-name: string,
+        confidence: f32,
+        bounding-box: bounding-box,
+        segmentation-mask: option<list<u8>>,
+        features: feature-vector,
+        detection-source: sensor-source,
+        timestamp: u64,
+    }
+
+    record bounding-box {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        rotation: f32,              // degrees
+    }
+
+    record feature-vector {
+        features: list<f32>,        // 512 or 1024 dimensional embedding
+        feature-type: feature-type,
+    }
+
+    enum feature-type {
+        cnn-features,
+        transformer-features,
+        combined-features,
+    }
+
+    enum sensor-source {
+        front-camera,
+        surround-camera,
+        lidar,
+        radar,
+        fused-sensors,
+    }
+
+    /// Object classes with automotive-specific categories
+    enum object-class {
+        // Vehicles
+        car,
+        truck,
+        bus,
+        motorcycle,
+        bicycle,
+        emergency-vehicle,
+        construction-vehicle,
+        
+        // Vulnerable road users
+        pedestrian,
+        child,
+        cyclist,
+        wheelchair-user,
+        
+        // Infrastructure
+        traffic-light,
+        traffic-sign,
+        road-marking,
+        pole,
+        barrier,
+        cone,
+        
+        // Road conditions
+        pothole,
+        debris,
+        water-puddle,
+        ice-patch,
+        
+        // Animals
+        animal-large,
+        animal-small,
+        
+        unknown,
+    }
+
+    /// Multi-frame tracking information
+    record tracking-info {
+        track-id: u32,
+        track-age: u32,             // frames
+        track-confidence: f32,
+        predicted-position: bounding-box,
+        velocity: velocity2d,
+        acceleration: acceleration2d,
+        state-covariance: list<f32>, // 4x4 or 6x6 matrix
+    }
+
+    record velocity2d {
+        vx: f32,
+        vy: f32,
+    }
+
+    record acceleration2d {
+        ax: f32,
+        ay: f32,
+    }
+
+    /// Model performance metrics
+    record performance-metrics {
+        fps: f32,
+        average-precision: f32,
+        recall: f32,
+        f1-score: f32,
+        inference-latency: f32,     // milliseconds
+        memory-peak: u32,           // MB
+        gpu-utilization: f32,       // percentage
+    }
+
+    /// Training and adaptation data
+    record training-data {
+        dataset-name: string,
+        sample-count: u32,
+        class-distribution: list<class-count>,
+        data-augmentation: list<augmentation-type>,
+        validation-split: f32,
+    }
+
+    record class-count {
+        class-name: string,
+        count: u32,
+    }
+
+    enum augmentation-type {
+        rotation,
+        scaling,
+        color-jitter,
+        gaussian-noise,
+        blur,
+        brightness,
+        contrast,
+    }
+
+    /// Real-time adaptation parameters
+    record adaptation-config {
+        enable-online-learning: bool,
+        adaptation-rate: f32,
+        confidence-threshold: f32,
+        nms-threshold: f32,         // Non-Maximum Suppression
+        class-weights: list<f32>,
+        temporal-smoothing: bool,
+    }
+
+    /// Initialize AI model
+    initialize: func(model-path: string, config: adaptation-config) -> result<model-info, string>;
+
+    /// Load pre-trained model
+    load-model: func(model-data: list<u8>) -> result<model-info, string>;
+
+    /// Detect objects in image data
+    detect-objects: func(image-data: list<u8>, width: u32, height: u32, format: pixel-format) -> result<list<detection-result>, string>;
+
+    enum pixel-format {
+        rgb888,
+        bgr888,
+        yuv420,
+        nv12,
+    }
+
+    /// Multi-frame detection with temporal consistency
+    detect-objects-temporal: func(
+        image-sequence: list<frame-data>,
+        previous-tracks: list<tracking-info>
+    ) -> result<detection-sequence, string>;
+
+    record frame-data {
+        image-data: list<u8>,
+        width: u32,
+        height: u32,
+        timestamp: u64,
+    }
+
+    record detection-sequence {
+        detections: list<detection-result>,
+        updated-tracks: list<tracking-info>,
+        new-tracks: list<tracking-info>,
+        lost-tracks: list<u32>,        // track IDs
+    }
+
+    /// Update model with new training data (online learning)
+    update-model: func(training-samples: list<training-sample>) -> result<_, string>;
+
+    record training-sample {
+        image-data: list<u8>,
+        ground-truth: list<detection-result>,
+        weight: f32,
+    }
+
+    /// Get current model performance
+    get-performance: func() -> performance-metrics;
+
+    /// Set detection parameters for different scenarios
+    set-scenario-config: func(scenario: driving-scenario, config: scenario-config) -> result<_, string>;
+
+    enum driving-scenario {
+        highway,
+        city-traffic,
+        parking,
+        night-driving,
+        rain,
+        snow,
+        tunnel,
+        construction-zone,
+    }
+
+    record scenario-config {
+        confidence-threshold: f32,
+        detection-range: f32,
+        priority-classes: list<object-class>,
+        processing-resolution: resolution,
+        temporal-filtering: bool,
+    }
+
+    /// Export model for deployment
+    export-model: func() -> result<list<u8>, string>;
+
+    /// Get model interpretability data
+    get-attention-maps: func(image-data: list<u8>) -> result<list<attention-map>, string>;
+
+    record attention-map {
+        class-name: string,
+        heatmap: list<f32>,         // Normalized attention weights
+        width: u32,
+        height: u32,
+    }
+
+    /// Benchmark model performance
+    benchmark: func(test-dataset: list<frame-data>) -> result<benchmark-results, string>;
+
+    record benchmark-results {
+        total-frames: u32,
+        average-fps: f32,
+        min-fps: f32,
+        max-fps: f32,
+        accuracy-metrics: performance-metrics,
+        failure-cases: list<failure-case>,
+    }
+
+    record failure-case {
+        frame-id: u32,
+        expected-objects: u32,
+        detected-objects: u32,
+        false-positives: u32,
+        false-negatives: u32,
+    }
+
+}
+
+world object-detection-ai-component {
+    /// WASI-NN support prepared for future integration
+    /// Currently using local type definitions
+    export object-detection;
+}

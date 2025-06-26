@@ -1,0 +1,238 @@
+package adas:lidar@0.1.0;
+
+/// LiDAR ECU for 3D point cloud processing and mapping
+interface lidar {
+    /// 3D point in LiDAR coordinate system
+    record point3d {
+        x: f64,
+        y: f64,
+        z: f64,
+        intensity: f32,
+        timestamp: u64,
+        ring: u16,              // laser ring number
+        reflectivity: f32,
+    }
+
+    /// LiDAR point cloud data
+    record point-cloud {
+        timestamp: u64,
+        frame-id: string,
+        points: list<point3d>,
+        point-count: u32,
+        scan-complete: bool,
+        angular-resolution: f32, // degrees
+        range-resolution: f32,   // meters
+    }
+
+    /// LiDAR configuration
+    record lidar-config {
+        rotation-frequency: f32, // Hz
+        angular-resolution: f32, // degrees
+        range-min: f32,         // meters
+        range-max: f32,         // meters
+        laser-count: u16,       // number of laser beams
+        field-of-view-start: f32, // degrees
+        field-of-view-end: f32,   // degrees
+        return-mode: return-mode,
+    }
+
+    enum return-mode {
+        strongest,
+        last,
+        dual,
+        triple,
+    }
+
+    /// Object detected from point cloud
+    record lidar-object {
+        object-id: u32,
+        centroid: point3d,
+        bounding-box: bounding-box3d,
+        point-count: u32,
+        object-type: object-classification,
+        confidence: f32,
+        velocity: velocity3d,
+        dimensions: dimensions3d,
+    }
+
+    record bounding-box3d {
+        min-x: f64,
+        min-y: f64,
+        min-z: f64,
+        max-x: f64,
+        max-y: f64,
+        max-z: f64,
+        rotation: quaternion,
+    }
+
+    record quaternion {
+        w: f64,
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    record velocity3d {
+        vx: f32,
+        vy: f32,
+        vz: f32,
+    }
+
+    record dimensions3d {
+        length: f32,
+        width: f32,
+        height: f32,
+    }
+
+    enum object-classification {
+        vehicle,
+        pedestrian,
+        cyclist,
+        tree,
+        pole,
+        building,
+        ground,
+        vegetation,
+        road-surface,
+        curb,
+        barrier,
+        unknown,
+    }
+
+    /// Ground plane detection
+    record ground-plane {
+        normal-vector: point3d,
+        distance-to-origin: f32,
+        confidence: f32,
+        roughness: f32,
+        slope-angle: f32,
+    }
+
+    /// Road boundary detection
+    record road-boundary {
+        left-boundary: list<point3d>,
+        right-boundary: list<point3d>,
+        boundary-type: boundary-type,
+        confidence: f32,
+    }
+
+    enum boundary-type {
+        curb,
+        guardrail,
+        barrier,
+        vegetation,
+        building,
+        fence,
+    }
+
+    /// LiDAR calibration parameters
+    record lidar-calibration {
+        position: point3d,
+        orientation: quaternion,
+        beam-angles: list<f32>,
+        range-bias: list<f32>,
+        intensity-calibration: list<f32>,
+    }
+
+    /// Environmental impact on LiDAR
+    record environment-impact {
+        weather-attenuation: f32,
+        dust-level: f32,
+        precipitation-impact: f32,
+        temperature-drift: f32,
+        visibility-reduction: f32,
+    }
+
+    /// LiDAR system status
+    enum lidar-status {
+        offline,
+        initializing,
+        active,
+        degraded,
+        blocked,
+        overheating,
+        motor-error,
+        laser-error,
+    }
+
+    /// Performance monitoring
+    record performance-status {
+        rotation-speed: f32,
+        laser-power: list<f32>,
+        detector-temperature: f32,
+        motor-temperature: f32,
+        return-rate: f32,
+        noise-level: f32,
+    }
+
+    /// Initialize LiDAR system
+    initialize: func(config: lidar-config, calibration: lidar-calibration) -> result<_, string>;
+
+    /// Start LiDAR scanning
+    start-scanning: func() -> result<_, string>;
+
+    /// Stop LiDAR scanning
+    stop-scanning: func() -> result<_, string>;
+
+    /// Get latest point cloud
+    get-point-cloud: func() -> result<point-cloud, string>;
+
+    /// Detect objects in point cloud
+    detect-objects: func(cloud: point-cloud) -> result<list<lidar-object>, string>;
+
+    /// Detect ground plane
+    detect-ground-plane: func(cloud: point-cloud) -> result<ground-plane, string>;
+
+    /// Detect road boundaries
+    detect-road-boundaries: func(cloud: point-cloud) -> result<road-boundary, string>;
+
+    /// Perform point cloud segmentation
+    segment-point-cloud: func(cloud: point-cloud) -> result<list<point-cluster>, string>;
+
+    record point-cluster {
+        cluster-id: u32,
+        points: list<point3d>,
+        cluster-type: object-classification,
+        confidence: f32,
+    }
+
+    /// Get system status
+    get-status: func() -> lidar-status;
+
+    /// Get performance metrics
+    get-performance: func() -> performance-status;
+
+    /// Update configuration
+    update-config: func(config: lidar-config) -> result<_, string>;
+
+    /// Set environment conditions for adaptive processing
+    set-environment-impact: func(impact: environment-impact) -> result<_, string>;
+
+    /// Perform self-diagnostic
+    run-diagnostic: func() -> result<diagnostic-report, string>;
+
+    record diagnostic-report {
+        laser-alignment: bool,
+        motor-health: f32,
+        optical-cleanliness: f32,
+        calibration-validity: bool,
+        data-quality: f32,
+        thermal-status: bool,
+    }
+
+    /// Filter point cloud by region of interest
+    filter-roi: func(cloud: point-cloud, roi: region-of-interest) -> result<point-cloud, string>;
+
+    record region-of-interest {
+        min-range: f32,
+        max-range: f32,
+        min-angle: f32,
+        max-angle: f32,
+        min-height: f32,
+        max-height: f32,
+    }
+}
+
+world lidar-component {
+    export lidar;
+}

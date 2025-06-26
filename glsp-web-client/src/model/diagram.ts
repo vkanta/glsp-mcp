@@ -6,6 +6,7 @@
 export interface DiagramModel {
     id: string;
     diagramType: string;
+    diagram_type?: string; // Rust uses snake_case
     revision: number;
     root: ModelElement;
     elements: Record<string, ModelElement>;
@@ -13,10 +14,12 @@ export interface DiagramModel {
 
 export interface ModelElement {
     id: string;
-    type: string;
+    type?: string;
+    element_type?: string; // Rust uses element_type
     children?: string[];
     bounds?: Bounds;
     layoutOptions?: Record<string, any>;
+    properties?: Record<string, any>; // Explicit properties field
     [key: string]: any; // For additional properties
 }
 
@@ -38,7 +41,7 @@ export interface Size {
 }
 
 export interface Node extends ModelElement {
-    position: Position;
+    position?: Position;
     size?: Size;
     label?: string;
 }
@@ -195,7 +198,10 @@ export class DiagramState {
         if (!diagram) return [];
         
         return Object.values(diagram.elements)
-            .filter(element => element.type !== 'graph' && !element.type.includes('edge'))
+            .filter(element => {
+                const elementType = element.type || element.element_type || '';
+                return elementType !== 'graph' && !elementType.includes('edge');
+            })
             .map(element => element as Node);
     }
 
@@ -204,7 +210,16 @@ export class DiagramState {
         if (!diagram) return [];
         
         return Object.values(diagram.elements)
-            .filter(element => element.type.includes('edge'))
+            .filter(element => {
+                const elementType = element.type || element.element_type || '';
+                return elementType.includes('edge') || 
+                       elementType === 'flow' || 
+                       elementType === 'association' || 
+                       elementType === 'dependency' ||
+                       elementType === 'sequence-flow' ||
+                       elementType === 'message-flow' ||
+                       elementType === 'conditional-flow';
+            })
             .map(element => element as Edge);
     }
 }

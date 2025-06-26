@@ -1,0 +1,21 @@
+[package]
+name = "adas-sensor-fusion-ecu"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-modal sensor fusion ECU with Kalman filtering"
+license = "Apache-2.0"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.33"
+
+# Configuration for building WASM components
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

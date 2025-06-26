@@ -1,0 +1,212 @@
+package adas:camera-surround@0.1.0;
+
+/// Surround-view camera system with 360-degree coverage
+interface camera-surround {
+    /// Camera position in surround system
+    enum camera-position {
+        front-left,
+        front-right,
+        rear-left,
+        rear-right,
+        front-center,
+        rear-center,
+    }
+
+    /// Surround view frame containing multiple camera inputs
+    record surround-frame {
+        timestamp: u64,
+        frame-id: u32,
+        camera-frames: list<positioned-frame>,
+        stitched-frame: option<camera-frame>,
+        top-down-view: option<camera-frame>,
+    }
+
+    record positioned-frame {
+        position: camera-position,
+        frame: camera-frame,
+        calibration: camera-calibration,
+    }
+
+    /// Standard camera frame
+    record camera-frame {
+        width: u32,
+        height: u32,
+        pixel-format: pixel-format,
+        data: list<u8>,
+        exposure-time: f32,
+        gain: f32,
+    }
+
+    enum pixel-format {
+        rgb888,
+        bgr888,
+        yuv420,
+        nv12,
+    }
+
+    /// Camera calibration for each position
+    record camera-calibration {
+        focal-length-x: f64,
+        focal-length-y: f64,
+        principal-point-x: f64,
+        principal-point-y: f64,
+        distortion-coefficients: list<f64>,
+        extrinsic-matrix: list<f64>,
+    }
+
+    /// Parking assistance detection
+    record parking-detection {
+        available-spaces: list<parking-space>,
+        obstacles: list<obstacle>,
+        guidance-lines: list<guidance-line>,
+        safety-clearance: f32,
+    }
+
+    record parking-space {
+        space-id: u32,
+        corners: list<point2d>,
+        space-type: parking-type,
+        accessibility: accessibility-type,
+        confidence: f32,
+    }
+
+    enum parking-type {
+        parallel,
+        perpendicular,
+        angled,
+    }
+
+    enum accessibility-type {
+        accessible,
+        tight-fit,
+        inaccessible,
+    }
+
+    record obstacle {
+        obstacle-id: u32,
+        position: point2d,
+        size: size2d,
+        obstacle-type: obstacle-type,
+        distance: f32,
+        confidence: f32,
+    }
+
+    enum obstacle-type {
+        static-object,
+        vehicle,
+        pedestrian,
+        pole,
+        curb,
+        unknown,
+    }
+
+    record guidance-line {
+        points: list<point2d>,
+        line-type: guidance-type,
+        color: line-color,
+    }
+
+    enum guidance-type {
+        trajectory,
+        boundary,
+        warning,
+    }
+
+    enum line-color {
+        green,
+        yellow,
+        red,
+        blue,
+    }
+
+    record point2d {
+        x: f32,
+        y: f32,
+    }
+
+    record size2d {
+        width: f32,
+        height: f32,
+    }
+
+    /// System status
+    enum system-status {
+        offline,
+        initializing,
+        active,
+        calibrating,
+        error,
+        camera-blocked,
+    }
+
+    /// Surround view configuration
+    record surround-config {
+        enabled-cameras: list<camera-position>,
+        output-resolution: camera-resolution,
+        stitching-enabled: bool,
+        top-down-enabled: bool,
+        parking-assist-enabled: bool,
+        frame-rate: u32,
+    }
+
+    enum camera-resolution {
+        low-resolution,
+        medium-resolution,
+        high-resolution,
+    }
+
+    /// Initialize surround view system
+    initialize: func(config: surround-config) -> result<_, string>;
+
+    /// Start surround view capture
+    start-capture: func() -> result<_, string>;
+
+    /// Stop surround view capture
+    stop-capture: func() -> result<_, string>;
+
+    /// Get latest surround frame
+    get-surround-frame: func() -> result<surround-frame, string>;
+
+    /// Generate top-down view
+    generate-top-down-view: func(surround-frame: surround-frame) -> result<camera-frame, string>;
+
+    /// Detect parking opportunities
+    detect-parking-spaces: func(surround-frame: surround-frame) -> result<parking-detection, string>;
+
+    /// Get system status
+    get-status: func() -> system-status;
+
+    /// Calibrate camera positions
+    calibrate-cameras: func() -> result<list<camera-calibration>, string>;
+
+    /// Update configuration
+    update-config: func(config: surround-config) -> result<_, string>;
+
+    /// Run system diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        camera-status: list<camera-health>,
+        stitching-quality: f32,
+        calibration-accuracy: f32,
+        processing-latency: u32,
+    }
+
+    record camera-health {
+        position: camera-position,
+        operational: bool,
+        image-quality: f32,
+        lens-condition: lens-condition,
+    }
+
+    enum lens-condition {
+        clean,
+        dirty,
+        blocked,
+        damaged,
+    }
+}
+
+world camera-surround-component {
+    export camera-surround;
+}

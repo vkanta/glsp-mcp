@@ -36,7 +36,38 @@ impl DiagramResources {
                 description: Some("List of all available diagrams".to_string()),
                 mime_type: Some("application/json".to_string()),
             },
+            // WASM component resources
+            Resource {
+                uri: "wasm://components/list".to_string(),
+                name: "WASM Components List".to_string(),
+                description: Some("List of all available WASM components".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://components/missing".to_string(),
+                name: "Missing WASM Components".to_string(),
+                description: Some("List of components with missing files".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://components/status".to_string(),
+                name: "WASM Components Status".to_string(),
+                description: Some("Overall status of WASM components".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
         ];
+
+        // Add resources for individual WASM components
+        // TODO: Get actual WASM components from the file watcher
+        let wasm_components = tools.get_wasm_components(); // This method needs to be added
+        for component in wasm_components {
+            resources.push(Resource {
+                uri: format!("wasm://component/{}", component.name),
+                name: format!("WASM Component: {}", component.name),
+                description: Some(format!("Details for {} component", component.name)),
+                mime_type: Some("application/json".to_string()),
+            });
+        }
 
         // Add resources for each diagram
         for diagram in tools.list_diagrams() {
@@ -98,6 +129,24 @@ impl DiagramResources {
                 text: Some(self.get_diagram_list(tools)),
                 blob: None,
             }),
+            "wasm://components/list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_wasm_components_list(tools)),
+                blob: None,
+            }),
+            "wasm://components/missing" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_missing_components(tools)),
+                blob: None,
+            }),
+            "wasm://components/status" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_wasm_status(tools)),
+                blob: None,
+            }),
             _ => {
                 if uri.starts_with("diagram://model/") {
                     let diagram_id = uri.strip_prefix("diagram://model/").unwrap();
@@ -111,6 +160,9 @@ impl DiagramResources {
                 } else if uri.starts_with("diagram://validation/") {
                     let diagram_id = uri.strip_prefix("diagram://validation/").unwrap();
                     self.get_validation_results(diagram_id, tools)
+                } else if uri.starts_with("wasm://component/") {
+                    let component_name = uri.strip_prefix("wasm://component/").unwrap();
+                    self.get_wasm_component_details(component_name, tools)
                 } else {
                     Err(anyhow::anyhow!("Resource not found: {}", uri))
                 }
@@ -384,6 +436,88 @@ impl DiagramResources {
                     "warnings": issues.iter().filter(|i| i["severity"] == "warning").count(),
                     "info": issues.iter().filter(|i| i["severity"] == "info").count()
                 }
+            }).to_string()),
+            blob: None,
+        })
+    }
+
+    fn get_wasm_components_list(&self, tools: &DiagramTools) -> String {
+        // TODO: Get actual WASM components from file watcher
+        let components = tools.get_wasm_components();
+        
+        let component_list: Vec<Value> = components.iter()
+            .map(|component| json!({
+                "name": component.name,
+                "path": component.path,
+                "description": component.description,
+                "status": if component.file_exists { "available" } else { "missing" },
+                "interfaces": component.interfaces.len(),
+                "uri": format!("wasm://component/{}", component.name)
+            }))
+            .collect();
+
+        json!({
+            "components": component_list,
+            "total": component_list.len(),
+            "available": components.iter().filter(|c| c.file_exists).count(),
+            "missing": components.iter().filter(|c| !c.file_exists).count()
+        }).to_string()
+    }
+
+    fn get_missing_components(&self, tools: &DiagramTools) -> String {
+        let components = tools.get_wasm_components();
+        let missing: Vec<Value> = components.iter()
+            .filter(|c| !c.file_exists)
+            .map(|component| json!({
+                "name": component.name,
+                "path": component.path,
+                "description": component.description,
+                "lastSeen": component.last_seen,
+                "removedAt": component.removed_at
+            }))
+            .collect();
+
+        json!({
+            "missingComponents": missing,
+            "count": missing.len()
+        }).to_string()
+    }
+
+    fn get_wasm_status(&self, tools: &DiagramTools) -> String {
+        let components = tools.get_wasm_components();
+        let total = components.len();
+        let available = components.iter().filter(|c| c.file_exists).count();
+        let missing = total - available;
+
+        json!({
+            "watchPath": tools.get_wasm_watch_path(),
+            "totalComponents": total,
+            "availableComponents": available,
+            "missingComponents": missing,
+            "healthPercentage": if total > 0 { (available as f64 / total as f64) * 100.0 } else { 100.0 },
+            "lastScan": tools.get_last_wasm_scan_time(),
+            "status": if missing == 0 { "healthy" } else if missing < total / 2 { "degraded" } else { "critical" }
+        }).to_string()
+    }
+
+    fn get_wasm_component_details(&self, component_name: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let component = tools.get_wasm_component(component_name)
+            .ok_or_else(|| anyhow::anyhow!("WASM component not found: {}", component_name))?;
+
+        Ok(ResourceContent {
+            uri: format!("wasm://component/{}", component_name),
+            mime_type: Some("application/json".to_string()),
+            text: Some(json!({
+                "name": component.name,
+                "path": component.path,
+                "description": component.description,
+                "fileExists": component.file_exists,
+                "lastSeen": component.last_seen,
+                "removedAt": component.removed_at,
+                "interfaces": component.interfaces,
+                "metadata": component.metadata,
+                "witInterfaces": component.wit_interfaces,
+                "dependencies": component.dependencies
             }).to_string()),
             blob: None,
         })

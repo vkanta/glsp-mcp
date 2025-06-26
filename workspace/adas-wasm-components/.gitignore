@@ -1,0 +1,259 @@
+# ADAS WebAssembly Components - Generated Files
+# ==============================================
+
+# Rust build artifacts
+/target/
+**/target/
+Cargo.lock
+
+# WebAssembly build outputs
+/build/
+*.wasm
+*.wasm.map
+
+# Component build directories
+components/*/target/
+components/*/Cargo.lock
+
+# Generated WIT bindings
+components/*/src/bindings/
+**/bindings/
+**/*_bindings.rs
+
+# WebAssembly Component Model artifacts
+*.wit.wasm
+*.component.wasm
+*.core.wasm
+
+# wasm-tools generated files
+*.embed.wasm
+*.component.validated
+*.wit.json
+
+# Build and output directories
+/output/
+/dist/
+/artifacts/
+/generated/
+
+# Component packaging
+*.tar.gz
+*.tar.bz2
+*.zip
+/pkg/
+
+# Documentation generation
+/docs/generated/
+/api-docs/
+*.html.generated
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Rust-specific
+**/*.rs.bk
+*.pdb
+
+# Environment and configuration
+.env
+.env.local
+.env.production
+.env.staging
+*.local
+
+# Testing artifacts
+/test-results/
+/coverage/
+*.profraw
+*.gcda
+*.gcno
+
+# Benchmark results
+/bench-results/
+/flamegraph.svg
+*.perf
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+.cache/
+
+# Logs
+*.log
+/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node.js (if using for tooling)
+node_modules/
+.npm
+.yarn/
+package-lock.json
+yarn.lock
+
+# Python (if using for tooling)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Docker
+Dockerfile.generated
+docker-compose.override.yml
+.dockerignore.generated
+
+# CI/CD generated files
+.github/workflows/generated/
+/.gitlab-ci-generated.yml
+
+# Security and keys
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+.secrets/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Rust analyzer
+rust-project.json
+
+# ADAS-specific generated content
+# ================================
+
+# Component metadata generated files
+metadata/*.generated.toml
+metadata/generated/
+
+# WIT interface generated files  
+wit/generated/
+wit/*.generated.wit
+
+# Sensor data recordings
+/sensor-data/
+*.bag
+*.rosbag
+*.mcap
+
+# AI model files
+*.onnx
+*.pb
+*.tflite
+*.pytorch
+*.safetensors
+/models/
+/checkpoints/
+
+# Calibration data
+/calibration/
+*.cal
+*.yaml.bak
+
+# Test data
+/test-data/
+/fixtures/
+*.test.json
+
+# Performance profiling
+*.perf_data
+*.speedscope
+perf.data*
+
+# Memory dumps
+*.core
+core.*
+*.dump
+
+# ADAS simulation outputs
+/simulation-results/
+*.sim
+*.scenario.out
+
+# CAN trace files
+*.asc
+*.blf
+*.log.can
+
+# Vehicle configuration generated files
+*.veh.generated
+/vehicle-configs/generated/
+
+# License files that might be auto-generated
+LICENSE.generated
+THIRD_PARTY_LICENSES.generated
+
+# Documentation that gets auto-generated
+README.generated.md
+CHANGELOG.generated.md
+
+# Build metadata
+.build-info
+.build-timestamp
+.version-info
+
+# Dependency graphs
+*.dot
+*.svg.deps
+
+# Coverage reports
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Flamegraph outputs
+*.svg.flame
+/flamegraphs/
+
+# Fuzzing outputs
+/fuzz/artifacts/
+/fuzz/corpus/
+crash-*
+leak-*
+timeout-*
+
+# Static analysis outputs
+/clippy-output/
+/audit-output/
+
+# Component validation results
+*.validation.log
+/validation-reports/

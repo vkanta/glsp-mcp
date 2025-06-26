@@ -1,0 +1,190 @@
+package adas:perception@0.1.0;
+
+/// Perception module for object detection, tracking, and scene understanding
+interface perception {
+    use adas:sensor-fusion/types.{
+        timestamp, confidence, position, velocity, pose,
+        camera-data, lidar-data, radar-data,
+        detected-object, object-class, bounding-box,
+        lane, lane-type, traffic-light-state
+    };
+
+    /// Tracking state of an object
+    enum tracking-state {
+        new,
+        tracked,
+        lost,
+        occluded,
+    }
+
+    /// Tracked object with history
+    record tracked-object {
+        object: detected-object,
+        tracking-id: u64,
+        state: tracking-state,
+        age: u32, // Number of frames tracked
+        trajectory: list<position>, // Historical positions
+        predicted-path: list<position>, // Future predictions
+    }
+
+    /// Occupancy grid cell state
+    enum occupancy-state {
+        free,
+        occupied,
+        unknown,
+    }
+
+    /// Occupancy grid for environment representation
+    record occupancy-grid {
+        origin: position,
+        resolution: f32, // meters per cell
+        width: u32,
+        height: u32,
+        cells: list<occupancy-state>,
+        timestamp: timestamp,
+    }
+
+    /// Drivable area detection
+    record drivable-area {
+        boundary-points: list<position>,
+        surface-kind: surface-type,
+        confidence: confidence,
+    }
+
+    enum surface-type {
+        asphalt,
+        concrete,
+        gravel,
+        grass,
+        snow,
+        unknown,
+    }
+
+    /// Traffic sign detection
+    record traffic-sign {
+        kind: traffic-sign-type,
+        position: position,
+        text: option<string>,
+        confidence: confidence,
+    }
+
+    enum traffic-sign-type {
+        stop,
+        yield,
+        speed-limit,
+        no-entry,
+        one-way,
+        pedestrian-crossing,
+        school-zone,
+        construction,
+        other,
+    }
+
+    /// Scene understanding result
+    record scene-understanding {
+        timestamp: timestamp,
+        tracked-objects: list<tracked-object>,
+        static-objects: list<detected-object>,
+        lanes: list<lane>,
+        drivable-areas: list<drivable-area>,
+        traffic-signs: list<traffic-sign>,
+        traffic-lights: list<traffic-light>,
+        occupancy-grid: option<occupancy-grid>,
+        weather-condition: weather-condition,
+        visibility: f32, // 0.0 to 1.0
+    }
+
+    record traffic-light {
+        id: u32,
+        position: position,
+        state: traffic-light-state,
+        time-to-change: option<f32>, // seconds
+        confidence: confidence,
+    }
+
+    enum weather-condition {
+        clear,
+        rain,
+        snow,
+        fog,
+        unknown,
+    }
+
+    /// Sensor calibration data
+    record calibration {
+        sensor-id: string,
+        intrinsic-matrix: list<f64>, // 3x3 for cameras
+        extrinsic-matrix: list<f64>, // 4x4 transformation
+        distortion-coefficients: list<f64>,
+    }
+
+    /// Process camera data for object detection
+    process-camera: func(
+        camera: camera-data,
+        calibration: calibration,
+        vehicle-pose: pose
+    ) -> result<list<detected-object>, string>;
+
+    /// Process LiDAR data for object detection
+    process-lidar: func(
+        lidar: lidar-data,
+        calibration: calibration,
+        vehicle-pose: pose
+    ) -> result<list<detected-object>, string>;
+
+    /// Process radar data for object detection
+    process-radar: func(
+        radar: radar-data,
+        calibration: calibration,
+        vehicle-pose: pose
+    ) -> result<list<detected-object>, string>;
+
+    /// Fuse detections from multiple sensors
+    fuse-detections: func(
+        camera-objects: list<detected-object>,
+        lidar-objects: list<detected-object>,
+        radar-objects: list<detected-object>
+    ) -> list<detected-object>;
+
+    /// Update object tracking
+    update-tracking: func(
+        current-objects: list<detected-object>,
+        previous-tracked: list<tracked-object>,
+        time-delta: f32
+    ) -> list<tracked-object>;
+
+    /// Detect lanes from sensor data
+    detect-lanes: func(
+        camera: camera-data,
+        lidar: option<lidar-data>
+    ) -> result<list<lane>, string>;
+
+    /// Build occupancy grid from sensor data
+    build-occupancy-grid: func(
+        lidar: lidar-data,
+        tracked-objects: list<tracked-object>,
+        grid-params: grid-parameters
+    ) -> occupancy-grid;
+
+    record grid-parameters {
+        resolution: f32,
+        width: u32,
+        height: u32,
+        origin-offset: position,
+    }
+
+    /// Get complete scene understanding
+    understand-scene: func(
+        camera: option<camera-data>,
+        lidar: option<lidar-data>,
+        radar: option<radar-data>,
+        vehicle-pose: pose,
+        previous-scene: option<scene-understanding>
+    ) -> result<scene-understanding, string>;
+
+    /// Predict future object positions
+    predict-trajectories: func(
+        tracked-objects: list<tracked-object>,
+        prediction-horizon: f32 // seconds
+    ) -> list<list<position>>;
+}

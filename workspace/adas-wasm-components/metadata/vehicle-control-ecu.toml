@@ -1,0 +1,60 @@
+[component]
+name = "adas-camera-front-ecu"
+version = "0.1.0"
+description = "Front-facing camera ECU with AI vision processing for lane detection, object recognition, and traffic sign detection"
+author = "ADAS Development Team"
+license = "Apache-2.0"
+created = "2025-06-26"
+
+[interfaces]
+exports = ["adas:camera-front/camera-front"]
+imports = []
+
+[dependencies]
+external = []
+
+[hardware_requirements]
+min_cpu_cores = 2
+min_memory_mb = 1024
+min_storage_mb = 500
+requires_gpu = true
+supported_architectures = ["x86_64", "aarch64", "wasm32"]
+
+[real_time_constraints]
+max_processing_latency_ms = 33    # 30 FPS
+update_frequency_hz = 30
+priority_level = "high"
+deadline_type = "soft"
+
+[safety_certification]
+iso26262_asil = "B"
+functional_safety_tested = true
+fail_safe_behavior = "maintain_last_detection"
+redundancy_required = false
+
+[performance_characteristics]
+typical_detection_range_meters = 100.0
+max_detection_range_meters = 200.0
+angular_coverage_degrees = 120.0
+resolution_pixels = "1920x1080"
+frame_rate_fps = 30
+
+[ai_models]
+object_detection_model = "YOLOv8"
+lane_detection_model = "LaneNet"
+traffic_sign_model = "CNN-Classifier"
+model_size_mb = 50
+inference_time_ms = 15
+
+[configuration]
+supported_resolutions = ["1280x720", "1920x1080", "3840x2160"]
+pixel_formats = ["RGB888", "YUV420", "NV12"]
+auto_exposure = true
+auto_white_balance = true
+hdr_support = true
+
+[testing]
+unit_tests_coverage = 95
+integration_tests = true
+hardware_in_loop_tested = true
+ai_model_accuracy = 0.95

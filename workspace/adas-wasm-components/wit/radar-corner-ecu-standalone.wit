@@ -1,0 +1,122 @@
+package adas:radar-corner@0.1.0;
+
+/// Corner radar for blind spot detection and cross-traffic alert
+interface radar-corner {
+    /// Radar detection target
+    record radar-target {
+        target-id: u32,
+        range: f32,
+        azimuth: f32,
+        elevation: f32,
+        range-rate: f32,
+        radar-cross-section: f32,
+        confidence: f32,
+        target-type: target-type,
+    }
+
+    enum target-type {
+        vehicle,
+        pedestrian,
+        cyclist,
+        stationary-object,
+        clutter,
+        unknown,
+    }
+
+    /// Corner radar positioning
+    enum corner-position {
+        front-left,
+        front-right,
+        rear-left,
+        rear-right,
+    }
+
+    /// Radar configuration
+    record radar-config {
+        position: corner-position,
+        max-range: f32,
+        azimuth-fov: f32,
+        elevation-fov: f32,
+        update-rate: u32,
+        sensitivity: sensitivity-level,
+    }
+
+    enum sensitivity-level {
+        low,
+        medium,
+        high,
+        adaptive,
+    }
+
+    /// Blind spot detection result
+    record blind-spot-detection {
+        targets-detected: list<radar-target>,
+        blind-spot-warning: bool,
+        approaching-warning: bool,
+        safe-to-change-lanes: bool,
+    }
+
+    /// Cross traffic alert
+    record cross-traffic-alert {
+        left-traffic: list<radar-target>,
+        right-traffic: list<radar-target>,
+        collision-risk: risk-level,
+        estimated-time-to-collision: option<f32>,
+    }
+
+    enum risk-level {
+        none,
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    enum radar-status {
+        offline,
+        initializing,
+        active,
+        error,
+        blocked,
+        degraded,
+    }
+
+    /// Initialize corner radar
+    initialize: func(config: radar-config) -> result<_, string>;
+
+    /// Start radar scanning
+    start-scanning: func() -> result<_, string>;
+
+    /// Stop radar scanning
+    stop-scanning: func() -> result<_, string>;
+
+    /// Get detected targets
+    get-targets: func() -> result<list<radar-target>, string>;
+
+    /// Perform blind spot detection
+    detect-blind-spot: func() -> result<blind-spot-detection, string>;
+
+    /// Cross traffic monitoring
+    monitor-cross-traffic: func() -> result<cross-traffic-alert, string>;
+
+    /// Get radar status
+    get-status: func() -> radar-status;
+
+    /// Update configuration
+    update-config: func(config: radar-config) -> result<_, string>;
+
+    /// Run self-diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        antenna-status: bool,
+        signal-quality: f32,
+        noise-level: f32,
+        temperature: f32,
+        power-consumption: f32,
+    }
+}
+
+world radar-corner-component {
+    export radar-corner;
+}

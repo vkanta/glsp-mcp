@@ -1,0 +1,43 @@
+package adas:localization@0.1.0;
+
+/// Simplified localization interface for testing wasm-tools workflow
+interface localization {
+    /// Basic types
+    record position {
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    record orientation {
+        w: f64, // quaternion w
+        x: f64, // quaternion x
+        y: f64, // quaternion y
+        z: f64, // quaternion z
+    }
+
+    record pose {
+        position: position,
+        orientation: orientation,
+    }
+
+    /// Localization status
+    enum status {
+        uninitialized,
+        initializing,
+        good,
+        degraded,
+        lost,
+    }
+
+    /// Basic localization functions
+    initialize: func() -> result<_, string>;
+    update-localization: func() -> result<_, string>;
+    get-current-pose: func() -> result<pose, string>;
+    get-status: func() -> status;
+    reset-pose: func(new-pose: pose) -> result<_, string>;
+}
+
+world localization-component {
+    export localization;
+}

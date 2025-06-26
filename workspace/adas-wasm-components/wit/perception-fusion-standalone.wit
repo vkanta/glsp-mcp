@@ -1,0 +1,640 @@
+package adas:perception-fusion@0.1.0;
+
+/// High-level perception fusion combining all sensor and AI outputs
+interface perception-fusion {
+    /// Fused perception model of the environment
+    record perception-model {
+        timestamp: u64,
+        model-id: u32,
+        ego-vehicle: ego-vehicle-state,
+        dynamic-objects: list<dynamic-object>,
+        static-environment: static-environment,
+        road-model: road-model,
+        confidence: f32,
+        uncertainty: uncertainty-estimate,
+    }
+
+    record ego-vehicle-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        orientation: orientation3d,
+        lane-position: lane-position,
+        vehicle-dynamics: vehicle-dynamics,
+    }
+
+    record position3d {
+        x: f64,
+        y: f64,
+        z: f64,
+        coordinate-frame: coordinate-frame,
+    }
+
+    enum coordinate-frame {
+        local,
+        utm,
+        wgs84,
+        vehicle-centric,
+    }
+
+    record velocity3d {
+        vx: f32,
+        vy: f32,
+        vz: f32,
+    }
+
+    record acceleration3d {
+        ax: f32,
+        ay: f32,
+        az: f32,
+    }
+
+    record orientation3d {
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+    }
+
+    record lane-position {
+        lane-id: option<u32>,
+        lateral-offset: f32,
+        heading-offset: f32,
+        lane-confidence: f32,
+    }
+
+    record vehicle-dynamics {
+        steering-angle: f32,
+        wheel-speeds: list<f32>,
+        yaw-rate: f32,
+        lateral-acceleration: f32,
+    }
+
+    /// Dynamic objects in the environment
+    record dynamic-object {
+        object-id: u32,
+        object-type: object-type,
+        state: object-state,
+        trajectory: trajectory,
+        behavior: behavior-assessment,
+        threat-level: threat-level,
+        tracking-quality: tracking-quality,
+        sensor-sources: list<sensor-source>,
+    }
+
+    enum object-type {
+        vehicle,
+        truck,
+        bus,
+        motorcycle,
+        bicycle,
+        pedestrian,
+        animal,
+        emergency-vehicle,
+        construction-vehicle,
+        unknown,
+    }
+
+    record object-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        orientation: orientation3d,
+        dimensions: dimensions3d,
+        confidence: f32,
+    }
+
+    record dimensions3d {
+        length: f32,
+        width: f32,
+        height: f32,
+    }
+
+    record trajectory {
+        current-path: list<trajectory-point>,
+        predicted-path: list<trajectory-point>,
+        trajectory-type: trajectory-type,
+    }
+
+    record trajectory-point {
+        position: position3d,
+        velocity: velocity3d,
+        timestamp: u64,
+        confidence: f32,
+    }
+
+    enum trajectory-type {
+        straight,
+        turning,
+        lane-change,
+        merging,
+        stopping,
+        reversing,
+        unknown,
+    }
+
+    record behavior-assessment {
+        behavior-type: behavior-type,
+        intention: intention-type,
+        aggressiveness: aggressiveness-level,
+        predictability: predictability-level,
+        compliance: compliance-level,
+    }
+
+    enum behavior-type {
+        normal-driving,
+        aggressive-driving,
+        defensive-driving,
+        distracted,
+        impaired,
+        emergency-response,
+        unknown,
+    }
+
+    enum intention-type {
+        continue,
+        turn-left,
+        turn-right,
+        change-lane-left,
+        change-lane-right,
+        stop,
+        merge,
+        exit,
+        u-turn,
+        park,
+        unknown,
+    }
+
+    enum aggressiveness-level {
+        passive,
+        normal,
+        aggressive,
+        very-aggressive,
+    }
+
+    enum predictability-level {
+        highly-predictable,
+        predictable,
+        somewhat-predictable,
+        unpredictable,
+    }
+
+    enum compliance-level {
+        compliant,
+        mostly-compliant,
+        non-compliant,
+        reckless,
+    }
+
+    enum threat-level {
+        none,
+        low,
+        medium,
+        high,
+        critical,
+        imminent,
+    }
+
+    record tracking-quality {
+        track-age: u32,
+        update-frequency: f32,
+        position-accuracy: f32,
+        velocity-accuracy: f32,
+        occlusion-level: occlusion-level,
+    }
+
+    enum occlusion-level {
+        none,
+        partial,
+        significant,
+        severe,
+    }
+
+    record sensor-source {
+        sensor-type: sensor-type,
+        sensor-id: string,
+        contribution: f32,
+        quality: f32,
+    }
+
+    enum sensor-type {
+        camera,
+        radar,
+        lidar,
+        ultrasonic,
+        v2x,
+        gnss,
+        imu,
+        wheel-speed,
+    }
+
+    /// Static environment model
+    record static-environment {
+        road-boundaries: list<boundary>,
+        lane-markings: list<lane-marking>,
+        traffic-signs: list<traffic-sign>,
+        traffic-lights: list<traffic-light>,
+        road-surface: road-surface-info,
+        infrastructure: list<infrastructure-element>,
+    }
+
+    record boundary {
+        points: list<position3d>,
+        boundary-type: boundary-type,
+        confidence: f32,
+    }
+
+    enum boundary-type {
+        curb,
+        guardrail,
+        wall,
+        fence,
+        vegetation,
+        building,
+    }
+
+    record lane-marking {
+        points: list<position3d>,
+        marking-type: marking-type,
+        color: marking-color,
+        confidence: f32,
+    }
+
+    enum marking-type {
+        solid,
+        dashed,
+        double-solid,
+        double-dashed,
+        botts-dots,
+        catseyes,
+    }
+
+    enum marking-color {
+        white,
+        yellow,
+        blue,
+        red,
+    }
+
+    record traffic-sign {
+        position: position3d,
+        sign-type: sign-type,
+        content: option<string>,
+        confidence: f32,
+        visibility: f32,
+    }
+
+    enum sign-type {
+        regulatory,
+        warning,
+        guide,
+        construction,
+        school,
+        emergency,
+    }
+
+    record traffic-light {
+        position: position3d,
+        light-state: light-state,
+        applicable-lanes: list<u32>,
+        confidence: f32,
+        time-remaining: option<f32>,
+    }
+
+    enum light-state {
+        red,
+        yellow,
+        green,
+        red-yellow,
+        flashing-red,
+        flashing-yellow,
+        off,
+        unknown,
+    }
+
+    record road-surface-info {
+        surface-type: surface-type,
+        condition: surface-condition,
+        friction-coefficient: f32,
+        grade: f32,
+        banking: f32,
+    }
+
+    enum surface-type {
+        asphalt,
+        concrete,
+        gravel,
+        dirt,
+        snow,
+        ice,
+        water,
+    }
+
+    enum surface-condition {
+        dry,
+        wet,
+        slippery,
+        rough,
+        damaged,
+        under-construction,
+    }
+
+    record infrastructure-element {
+        element-type: infrastructure-type,
+        position: position3d,
+        dimensions: dimensions3d,
+        properties: list<string>,
+    }
+
+    enum infrastructure-type {
+        bridge,
+        tunnel,
+        toll-booth,
+        gas-station,
+        rest-area,
+        construction-zone,
+        accident-site,
+    }
+
+    /// Road topology and geometry
+    record road-model {
+        current-road: road-segment,
+        connected-roads: list<road-connection>,
+        intersections: list<intersection>,
+        lane-topology: lane-topology,
+    }
+
+    record road-segment {
+        road-id: u32,
+        road-type: road-type,
+        speed-limit: f32,
+        number-of-lanes: u32,
+        road-geometry: road-geometry,
+    }
+
+    enum road-type {
+        highway,
+        arterial,
+        collector,
+        local,
+        ramp,
+        service-road,
+        parking,
+    }
+
+    record road-geometry {
+        centerline: list<position3d>,
+        curvature: f32,
+        elevation-profile: list<f32>,
+        lane-width: f32,
+    }
+
+    record road-connection {
+        to-road-id: u32,
+        connection-type: connection-type,
+        merge-point: position3d,
+        priority: priority-level,
+    }
+
+    enum connection-type {
+        merge,
+        diverge,
+        intersection,
+        roundabout,
+        overpass,
+        underpass,
+    }
+
+    enum priority-level {
+        yield,
+        stop,
+        right-of-way,
+        traffic-controlled,
+    }
+
+    record intersection {
+        intersection-id: u32,
+        center-point: position3d,
+        approach-lanes: list<lane-approach>,
+        traffic-control: traffic-control-type,
+        turning-restrictions: list<turn-restriction>,
+    }
+
+    record lane-approach {
+        lane-id: u32,
+        approach-angle: f32,
+        allowed-movements: list<movement-type>,
+    }
+
+    enum movement-type {
+        straight,
+        left-turn,
+        right-turn,
+        u-turn,
+        left-merge,
+        right-merge,
+    }
+
+    enum traffic-control-type {
+        none,
+        stop-signs,
+        traffic-lights,
+        roundabout,
+        yield-signs,
+        police-directed,
+    }
+
+    record turn-restriction {
+        from-lane: u32,
+        to-lane: u32,
+        restriction-type: restriction-type,
+        time-restriction: option<time-restriction>,
+    }
+
+    enum restriction-type {
+        no-turn,
+        yield-turn,
+        stop-turn,
+        signal-controlled,
+    }
+
+    record time-restriction {
+        start-time: u32,
+        end-time: u32,
+        days-of-week: list<day-of-week>,
+    }
+
+    enum day-of-week {
+        monday,
+        tuesday,
+        wednesday,
+        thursday,
+        friday,
+        saturday,
+        sunday,
+    }
+
+    record lane-topology {
+        current-lane: lane-info,
+        adjacent-lanes: list<adjacent-lane>,
+        lane-connections: list<lane-connection>,
+    }
+
+    record lane-info {
+        lane-id: u32,
+        lane-type: lane-type,
+        direction: direction,
+        speed-limit: f32,
+        lane-width: f32,
+        centerline: list<position3d>,
+    }
+
+    enum lane-type {
+        driving,
+        passing,
+        acceleration,
+        deceleration,
+        auxiliary,
+        hov,
+        bus,
+        bike,
+        parking,
+        shoulder,
+    }
+
+    enum direction {
+        forward,
+        reverse,
+        bidirectional,
+    }
+
+    record adjacent-lane {
+        lane-id: u32,
+        relative-position: relative-position,
+        lane-change-allowed: bool,
+        lane-change-urgency: urgency-level,
+    }
+
+    enum relative-position {
+        left,
+        right,
+        parallel,
+    }
+
+    enum urgency-level {
+        none,
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    record lane-connection {
+        from-lane: u32,
+        to-lane: u32,
+        connection-distance: f32,
+        connection-type: lane-connection-type,
+    }
+
+    enum lane-connection-type {
+        continuation,
+        merge,
+        split,
+        exit,
+        entrance,
+    }
+
+    record uncertainty-estimate {
+        position-uncertainty: position3d,
+        velocity-uncertainty: velocity3d,
+        object-existence-probability: f32,
+        classification-confidence: f32,
+        temporal-consistency: f32,
+    }
+
+    /// Fusion system configuration
+    record fusion-config {
+        update-frequency: u32,
+        confidence-threshold: f32,
+        object-lifetime: u32,
+        track-association-threshold: f32,
+        sensor-weights: list<sensor-weight>,
+        fusion-algorithm: fusion-algorithm,
+    }
+
+    record sensor-weight {
+        sensor-type: sensor-type,
+        weight: f32,
+        reliability: f32,
+    }
+
+    enum fusion-algorithm {
+        kalman-filter,
+        particle-filter,
+        grid-based,
+        neural-network,
+        hybrid,
+    }
+
+    enum fusion-status {
+        offline,
+        initializing,
+        active,
+        error,
+        degraded,
+        sensor-failure,
+    }
+
+    /// Initialize perception fusion system
+    initialize: func(config: fusion-config) -> result<_, string>;
+
+    /// Start perception fusion
+    start-fusion: func() -> result<_, string>;
+
+    /// Stop perception fusion
+    stop-fusion: func() -> result<_, string>;
+
+    /// Get current perception model
+    get-perception-model: func() -> result<perception-model, string>;
+
+    /// Update with sensor data
+    update-sensor-data: func(sensor-type: sensor-type, data: list<u8>) -> result<_, string>;
+
+    /// Get dynamic objects
+    get-dynamic-objects: func() -> result<list<dynamic-object>, string>;
+
+    /// Get static environment
+    get-static-environment: func() -> result<static-environment, string>;
+
+    /// Get road model
+    get-road-model: func() -> result<road-model, string>;
+
+    /// Get fusion status
+    get-status: func() -> fusion-status;
+
+    /// Update configuration
+    update-config: func(config: fusion-config) -> result<_, string>;
+
+    /// Run system diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        fusion-accuracy: f32,
+        processing-latency: u32,
+        memory-usage: u32,
+        active-objects: u32,
+        sensor-health: list<sensor-health>,
+        model-consistency: f32,
+    }
+
+    record sensor-health {
+        sensor-type: sensor-type,
+        operational: bool,
+        data-quality: f32,
+        update-rate: f32,
+        latency: u32,
+    }
+}
+
+world perception-fusion-component {
+    export perception-fusion;
+}

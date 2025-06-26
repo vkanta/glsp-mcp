@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolbarContainer = document.getElementById('toolbar-container');
     const statusContainer = document.getElementById('status-container');
     const diagramListContainer = document.getElementById('diagram-list-container');
+    const wasmPaletteContainer = document.getElementById('wasm-palette-container');
 
     if (toolbarContainer) {
         toolbarContainer.appendChild(app.getToolbar());
@@ -32,6 +33,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (diagramListContainer) {
         diagramListContainer.appendChild(app.getDiagramList());
         diagramListContainer.appendChild(app.getAIPanel());
+    }
+
+    if (wasmPaletteContainer) {
+        wasmPaletteContainer.appendChild(app.getWasmPalette());
     }
 
     // Make app globally available for HTML onclick handlers

@@ -1,18 +1,32 @@
 use crate::model::{DiagramModel, Node, Edge, Position};
 use crate::mcp::protocol::{Tool, CallToolParams, CallToolResult, TextContent};
 use crate::selection::SelectionMode;
+use crate::wasm::{WasmFileWatcher, WasmComponent};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use chrono::{DateTime, Utc};
 use anyhow::Result;
 
 pub struct DiagramTools {
     models: HashMap<String, DiagramModel>,
+    wasm_watcher: WasmFileWatcher,
 }
 
 impl DiagramTools {
     pub fn new() -> Self {
+        // Default WASM watch path - can be configured via CLI args
+        let wasm_path = std::env::args()
+            .find(|arg| arg.starts_with("--wasm-path="))
+            .map(|arg| PathBuf::from(arg.strip_prefix("--wasm-path=").unwrap()))
+            .or_else(|| std::env::var("WASM_WATCH_PATH").ok().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("../workspace/adas-wasm-components"));
+
+        println!("WASM watch path: {:?}", wasm_path);
+
         Self {
             models: HashMap::new(),
+            wasm_watcher: WasmFileWatcher::new(wasm_path),
         }
     }
 
@@ -319,6 +333,70 @@ impl DiagramTools {
                     "required": ["diagramId", "x", "y"]
                 }),
             },
+            // WASM component tools
+            Tool {
+                name: "scan_wasm_components".to_string(),
+                description: Some("Scan for WASM components in the watch directory".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }),
+            },
+            Tool {
+                name: "check_wasm_component_status".to_string(),
+                description: Some("Check the status of a specific WASM component".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the WASM component to check"
+                        }
+                    },
+                    "required": ["componentName"]
+                }),
+            },
+            Tool {
+                name: "remove_missing_component".to_string(),
+                description: Some("Permanently remove a missing WASM component from tracking".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the missing component to remove"
+                        }
+                    },
+                    "required": ["componentName"]
+                }),
+            },
+            Tool {
+                name: "load_wasm_component".to_string(),
+                description: Some("Load a WASM component into a diagram".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram to load the component into"
+                        },
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the WASM component to load"
+                        },
+                        "position": {
+                            "type": "object",
+                            "properties": {
+                                "x": {"type": "number"},
+                                "y": {"type": "number"}
+                            },
+                            "required": ["x", "y"]
+                        }
+                    },
+                    "required": ["diagramId", "componentName", "position"]
+                }),
+            },
         ]
     }
 
@@ -338,6 +416,11 @@ impl DiagramTools {
             "get_selection" => self.get_selection(params.arguments).await,
             "hover_element" => self.hover_element(params.arguments).await,
             "get_element_at_position" => self.get_element_at_position(params.arguments).await,
+            // WASM component tools
+            "scan_wasm_components" => self.scan_wasm_components().await,
+            "check_wasm_component_status" => self.check_wasm_component_status(params.arguments).await,
+            "remove_missing_component" => self.remove_missing_component(params.arguments).await,
+            "load_wasm_component" => self.load_wasm_component(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -440,7 +523,12 @@ impl DiagramTools {
         let edge = Edge::new(edge_type, source_id.to_string(), target_id.to_string(), label);
         let edge_id = edge.base.id.clone();
         
-        diagram.add_element(edge.base);
+        // Convert Edge to ModelElement with sourceId and targetId in properties
+        let mut edge_element = edge.base;
+        edge_element.properties.insert("sourceId".to_string(), serde_json::Value::String(source_id.to_string()));
+        edge_element.properties.insert("targetId".to_string(), serde_json::Value::String(target_id.to_string()));
+        
+        diagram.add_element(edge_element);
         diagram.add_child_to_root(&edge_id);
 
         Ok(CallToolResult {
@@ -907,5 +995,190 @@ impl DiagramTools {
                 })
             }
         }
+    }
+
+    // WASM component methods
+    pub fn get_wasm_components(&self) -> Vec<&WasmComponent> {
+        self.wasm_watcher.get_components()
+    }
+
+    pub fn get_wasm_component(&self, name: &str) -> Option<&WasmComponent> {
+        self.wasm_watcher.get_component(name)
+    }
+
+    pub fn get_wasm_watch_path(&self) -> String {
+        self.wasm_watcher.get_watch_path().to_string_lossy().to_string()
+    }
+
+    pub fn get_last_wasm_scan_time(&self) -> DateTime<Utc> {
+        self.wasm_watcher.get_last_scan_time()
+    }
+
+    pub async fn scan_wasm_components_internal(&mut self) -> Result<()> {
+        self.wasm_watcher.scan_components().await
+    }
+
+    pub fn remove_missing_wasm_component(&mut self, name: &str) -> bool {
+        self.wasm_watcher.remove_missing_component(name)
+    }
+
+    // WASM tool handlers
+    async fn scan_wasm_components(&mut self) -> Result<CallToolResult> {
+        match self.wasm_watcher.scan_components().await {
+            Ok(()) => {
+                let components = self.wasm_watcher.get_components();
+                let available = components.iter().filter(|c| c.file_exists).count();
+                let missing = components.len() - available;
+
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: format!(
+                            "WASM component scan completed.\nFound {} components: {} available, {} missing",
+                            components.len(), available, missing
+                        ),
+                    }],
+                    is_error: None,
+                })
+            }
+            Err(err) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to scan WASM components: {}", err),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+
+    async fn check_wasm_component_status(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let component_name = args["componentName"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+
+        match self.wasm_watcher.get_component(component_name) {
+            Some(component) => {
+                let status = json!({
+                    "name": component.name,
+                    "path": component.path,
+                    "fileExists": component.file_exists,
+                    "status": if component.file_exists { "available" } else { "missing" },
+                    "lastSeen": component.last_seen,
+                    "removedAt": component.removed_at,
+                    "interfaces": component.interfaces.len(),
+                    "description": component.description
+                });
+
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&status)?,
+                    }],
+                    is_error: None,
+                })
+            }
+            None => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("WASM component '{}' not found", component_name),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+
+    async fn remove_missing_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let component_name = args["componentName"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+
+        if self.wasm_watcher.remove_missing_component(component_name) {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Successfully removed missing component: {}", component_name),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Component '{}' not found or not missing", component_name),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn load_wasm_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
+        let component_name = args["componentName"].as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+        
+        let position = Position {
+            x: args["position"]["x"].as_f64().unwrap_or(100.0),
+            y: args["position"]["y"].as_f64().unwrap_or(100.0),
+        };
+
+        // Check if component exists and is available
+        let component = self.wasm_watcher.get_component(component_name)
+            .ok_or_else(|| anyhow::anyhow!("WASM component '{}' not found", component_name))?;
+
+        if !component.file_exists {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Cannot load component '{}': file is missing at {}", component_name, component.path),
+                }],
+                is_error: Some(true),
+            });
+        }
+
+        // Get the diagram
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram '{}' not found", diagram_id))?;
+
+        // Create a WASM component node with appropriate size for metadata and interfaces
+        let pos_x = position.x;
+        let pos_y = position.y;
+        let mut node = Node::new("wasm-component", position, Some(component.name.clone()));
+        
+        // Calculate dynamic size based on content
+        let interface_count = component.interfaces.len() as f64;
+        let description_lines = component.description.len() as f64 / 50.0; // Rough estimate
+        
+        // Base size + space for interfaces + metadata
+        let width = 220.0_f64.max(component.name.len() as f64 * 8.0); // Minimum width based on name
+        let height = 120.0_f64.max(80.0 + (interface_count * 25.0) + (description_lines * 15.0));
+        
+        // Update the bounds and size for proper rendering
+        node.base.bounds = Some(crate::model::Bounds {
+            x: pos_x,
+            y: pos_y,
+            width,
+            height,
+        });
+        node.size = Some(crate::model::Size { width, height });
+        
+        // Add component-specific properties
+        node.base.properties.insert("componentName".to_string(), json!(component.name));
+        node.base.properties.insert("componentPath".to_string(), json!(component.path));
+        node.base.properties.insert("description".to_string(), json!(component.description));
+        node.base.properties.insert("interfaces".to_string(), json!(component.interfaces));
+
+        let node_id = node.base.id.clone();
+        diagram.add_element(node.base);
+        diagram.add_child_to_root(&node_id);
+
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("Loaded WASM component '{}' into diagram with ID: {}", component_name, node_id),
+            }],
+            is_error: None,
+        })
     }
 }

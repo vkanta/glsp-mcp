@@ -1,0 +1,280 @@
+package adas:tracking-prediction@0.1.0;
+
+/// AI-powered object tracking and trajectory prediction
+interface tracking-prediction {
+    /// WASI-NN compatible types for neural network inference
+    /// (Local definitions until WASI-NN runtime support is available)
+    type nn-tensor-dimensions = list<u32>;
+    
+    enum nn-tensor-type {
+        fp16, fp32, fp64, bf16, uint8, int32, int64
+    }
+    
+    type nn-tensor-data = list<u8>;
+    
+    record nn-tensor {
+        dimensions: nn-tensor-dimensions,
+        tensor-type: nn-tensor-type,
+        data: nn-tensor-data,
+    }
+    
+    enum nn-graph-encoding {
+        openvino, onnx, tensorflow, pytorch,
+        tensorflowlite, ggml, autodetect
+    }
+    
+    enum nn-execution-target {
+        cpu, gpu, tpu
+    }
+    
+    /// Common timestamp type
+    type timestamp = u64;
+    
+    /// Standard coordinate frame reference
+    enum coordinate-frame {
+        local,        // Vehicle body frame
+        utm,          // Universal Transverse Mercator
+        wgs84,        // World Geodetic System 1984
+        map,          // Local map frame
+        camera,       // Camera frame
+        lidar,        // LiDAR frame
+    }
+    /// Tracked object state
+    record tracked-object {
+        object-id: u32,
+        object-type: object-type,
+        state: object-state,
+        trajectory: trajectory,
+        prediction: trajectory-prediction,
+        confidence: f32,
+        tracking-duration: u32,
+    }
+
+    enum object-type {
+        unknown,
+        // Vehicles
+        vehicle,
+        car,
+        truck,
+        bus,
+        motorcycle,
+        bicycle,
+        emergency-vehicle,
+        construction-vehicle,
+        // Vulnerable road users
+        pedestrian,
+        cyclist,
+        // Infrastructure
+        traffic-sign,
+        traffic-light,
+        road-marking,
+        construction-cone,
+        barrier,
+        pole,
+        // Hazards
+        debris,
+        animal,
+        stationary-object,
+    }
+
+    record object-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        orientation: orientation3d,
+        bounding-box: bounding-box3d,
+        timestamp: timestamp,
+    }
+
+    record position3d {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record velocity3d {
+        vx: f32,
+        vy: f32,
+        vz: f32,
+        speed: f32, // Magnitude for convenience
+    }
+
+    record acceleration3d {
+        ax: f32,
+        ay: f32,
+        az: f32,
+        magnitude: f32, // Magnitude for convenience
+    }
+
+    record orientation3d {
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+    }
+
+    record bounding-box3d {
+        center: position3d,
+        dimensions: dimensions3d,
+        orientation: orientation3d,
+    }
+
+    record dimensions3d {
+        length: f32,
+        width: f32,
+        height: f32,
+    }
+
+    /// Object trajectory over time
+    record trajectory {
+        points: list<trajectory-point>,
+        trajectory-type: trajectory-type,
+        confidence: f32,
+    }
+
+    record trajectory-point {
+        position: position3d,
+        velocity: velocity3d,
+        timestamp: timestamp,
+        uncertainty: position3d,
+    }
+
+    enum trajectory-type {
+        linear,
+        curved,
+        stationary,
+        erratic,
+        unknown,
+    }
+
+    /// Future trajectory prediction
+    record trajectory-prediction {
+        predicted-points: list<predicted-point>,
+        prediction-horizon: f32,
+        confidence: f32,
+        risk-assessment: risk-assessment,
+    }
+
+    record predicted-point {
+        position: position3d,
+        velocity: velocity3d,
+        timestamp: timestamp,
+        probability: f32,
+        uncertainty: position3d,
+    }
+
+    record risk-assessment {
+        collision-probability: f32,
+        time-to-collision: option<f32>,
+        risk-level: risk-level,
+        recommended-action: action-recommendation,
+    }
+
+    enum risk-level {
+        none,
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    enum action-recommendation {
+        none,
+        monitor,
+        prepare-brake,
+        brake,
+        steer,
+        emergency-stop,
+    }
+
+    /// Tracking configuration
+    record tracking-config {
+        max-tracked-objects: u32,
+        prediction-horizon: f32,
+        update-rate: u32,
+        confidence-threshold: f32,
+        kalman-filter-params: kalman-params,
+    }
+
+    record kalman-params {
+        process-noise: f32,
+        measurement-noise: f32,
+        initial-uncertainty: f32,
+    }
+
+    /// Detection input from sensors
+    record detection-input {
+        sensor-id: string,
+        sensor-type: sensor-type,
+        detections: list<object-detection>,
+        timestamp: timestamp,
+    }
+
+    enum sensor-type {
+        camera,
+        radar,
+        lidar,
+        ultrasonic,
+        fusion,
+    }
+
+    record object-detection {
+        bounding-box: bounding-box3d,
+        object-type: object-type,
+        confidence: f32,
+        distance: f32,
+        relative-velocity: velocity3d,
+    }
+
+    enum tracking-status {
+        offline,
+        initializing,
+        active,
+        error,
+        degraded,
+    }
+
+    /// Initialize tracking system
+    initialize: func(config: tracking-config) -> result<_, string>;
+
+    /// Start tracking
+    start-tracking: func() -> result<_, string>;
+
+    /// Stop tracking
+    stop-tracking: func() -> result<_, string>;
+
+    /// Update with new detection data
+    update-detections: func(input: detection-input) -> result<_, string>;
+
+    /// Get all tracked objects
+    get-tracked-objects: func() -> result<list<tracked-object>, string>;
+
+    /// Get trajectory predictions
+    get-predictions: func(object-id: u32, horizon: f32) -> result<trajectory-prediction, string>;
+
+    /// Assess collision risk
+    assess-collision-risk: func(ego-state: object-state) -> result<list<risk-assessment>, string>;
+
+    /// Get tracking status
+    get-status: func() -> tracking-status;
+
+    /// Update configuration
+    update-config: func(config: tracking-config) -> result<_, string>;
+
+    /// Run diagnostic
+    run-diagnostic: func() -> result<diagnostic-result, string>;
+
+    record diagnostic-result {
+        tracking-accuracy: f32,
+        prediction-accuracy: f32,
+        processing-latency: u32,
+        memory-usage: u32,
+        active-tracks: u32,
+    }
+
+}
+
+world tracking-prediction-component {
+    /// WASI-NN support prepared for future integration
+    /// Currently using local type definitions
+    export tracking-prediction;
+}

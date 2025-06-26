@@ -1,0 +1,223 @@
+package adas:planning@0.1.0;
+
+/// Planning module for path planning, motion planning, and decision making
+interface planning {
+    use adas:sensor-fusion/types.{
+        position, velocity, pose, timestamp, confidence
+    };
+    use adas:perception/perception.{
+        tracked-object, scene-understanding, lane, drivable-area
+    };
+
+    /// Waypoint in a planned path
+    record waypoint {
+        position: position,
+        heading: f32, // radians
+        curvature: f32,
+        velocity: f32, // target velocity m/s
+        acceleration: f32, // target acceleration m/s²
+        timestamp: timestamp,
+    }
+
+    /// Complete planned trajectory
+    record trajectory {
+        waypoints: list<waypoint>,
+        total-distance: f32,
+        total-time: f32,
+        confidence: confidence,
+        cost: f32,
+    }
+
+    /// Planning status
+    enum planning-status {
+        idle,
+        planning,
+        following-path,
+        replanning,
+        emergency-stop,
+        failure,
+    }
+
+    /// Driving behavior mode
+    enum behavior-mode {
+        conservative,
+        normal,
+        aggressive,
+        eco,
+        emergency,
+    }
+
+    /// Maneuver types
+    enum maneuver-type {
+        lane-follow,
+        lane-change-left,
+        lane-change-right,
+        turn-left,
+        turn-right,
+        u-turn,
+        merge,
+        overtake,
+        park,
+        emergency-stop,
+    }
+
+    /// Planned maneuver
+    record maneuver {
+        kind: maneuver-type,
+        start-position: position,
+        end-position: position,
+        duration: f32,
+        safety-margin: f32,
+        required-gap: f32,
+    }
+
+    /// Route from origin to destination
+    record route {
+        origin: position,
+        destination: position,
+        waypoints: list<position>,
+        distance: f32,
+        estimated-time: f32,
+        road-segments: list<road-segment>,
+    }
+
+    record road-segment {
+        id: string,
+        start: position,
+        end: position,
+        speed-limit: f32,
+        road-kind: road-type,
+        traffic-density: traffic-density,
+    }
+
+    enum road-type {
+        highway,
+        arterial,
+        residential,
+        parking-lot,
+        off-road,
+    }
+
+    enum traffic-density {
+        light,
+        moderate,
+        heavy,
+        congested,
+    }
+
+    /// Cost function parameters
+    record cost-parameters {
+        safety-weight: f32,
+        comfort-weight: f32,
+        efficiency-weight: f32,
+        progress-weight: f32,
+        time-weight: f32,
+    }
+
+    /// Safety constraints
+    record safety-constraints {
+        min-following-distance: f32,
+        max-acceleration: f32,
+        max-deceleration: f32,
+        max-lateral-acceleration: f32,
+        max-velocity: f32,
+        reaction-time: f32,
+    }
+
+    /// Mission planning goal
+    record mission-goal {
+        destination: position,
+        arrival-time: option<timestamp>,
+        behavior-mode: behavior-mode,
+        constraints: safety-constraints,
+    }
+
+    /// Initialize planning system with map and constraints
+    initialize: func(
+        vehicle-constraints: safety-constraints,
+        cost-params: cost-parameters,
+        map-data: option<list<u8>>
+    ) -> result<_, string>;
+
+    /// Plan route from current position to destination
+    plan-route: func(
+        start: position,
+        goal: position,
+        preferences: behavior-mode
+    ) -> result<route, string>;
+
+    /// Plan detailed trajectory for near-term execution
+    plan-trajectory: func(
+        current-pose: pose,
+        current-velocity: velocity,
+        route: route,
+        scene: scene-understanding,
+        planning-horizon: f32 // seconds
+    ) -> result<trajectory, string>;
+
+    /// Plan specific maneuver (lane change, turn, etc.)
+    plan-maneuver: func(
+        maneuver: maneuver-type,
+        current-pose: pose,
+        current-velocity: velocity,
+        target-lane: lane,
+        obstacles: list<tracked-object>
+    ) -> result<trajectory, string>;
+
+    /// Emergency trajectory planning
+    plan-emergency-stop: func(
+        current-pose: pose,
+        current-velocity: velocity,
+        obstacles: list<tracked-object>,
+        drivable-area: drivable-area
+    ) -> result<trajectory, string>;
+
+    /// Validate trajectory for safety
+    validate-trajectory: func(
+        trajectory: trajectory,
+        obstacles: list<tracked-object>,
+        constraints: safety-constraints
+    ) -> result<bool, string>;
+
+    /// Update planning with new perception data
+    update-planning: func(
+        scene: scene-understanding,
+        current-pose: pose,
+        current-velocity: velocity,
+        current-trajectory: option<trajectory>
+    ) -> result<trajectory, string>;
+
+    /// Get current planning status
+    get-status: func() -> planning-status;
+
+    /// Set behavior mode
+    set-behavior-mode: func(mode: behavior-mode) -> result<_, string>;
+
+    /// Check if maneuver is safe to execute
+    check-maneuver-safety: func(
+        maneuver: maneuver,
+        obstacles: list<tracked-object>,
+        safety-margin: f32
+    ) -> bool;
+
+    /// Calculate optimal speed for current conditions
+    calculate-target-speed: func(
+        current-velocity: velocity,
+        lane: lane,
+        obstacles: list<tracked-object>,
+        speed-limit: f32
+    ) -> f32;
+
+    /// Find safe gap for lane change
+    find-lane-change-gap: func(
+        target-lane: lane,
+        obstacles: list<tracked-object>,
+        required-gap-length: f32
+    ) -> option<position>;
+
+    /// Smooth trajectory for comfort
+    smooth-trajectory: func(
+        raw-trajectory: trajectory,
+        comfort-constraints: safety-constraints
+    ) -> trajectory;
+}

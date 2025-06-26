@@ -1,0 +1,200 @@
+package adas:sensor-fusion@0.1.0;
+
+/// Common types and interfaces for sensor data fusion in ADAS
+interface types {
+    /// 3D position in global coordinates (meters)
+    record position {
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    /// 3D velocity vector (m/s)
+    record velocity {
+        vx: f64,
+        vy: f64,
+        vz: f64,
+    }
+
+    /// Orientation using quaternion representation
+    record orientation {
+        w: f64,
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    /// Complete pose information
+    record pose {
+        position: position,
+        orientation: orientation,
+    }
+
+    /// Timestamp in nanoseconds since epoch
+    type timestamp = u64;
+
+    /// Confidence level (0.0 to 1.0)
+    type confidence = f32;
+
+    /// Generic sensor reading with timestamp
+    record sensor-reading {
+        timestamp: timestamp,
+        sensor-id: string,
+        confidence: confidence,
+    }
+
+    /// IMU (Inertial Measurement Unit) data
+    record imu-data {
+        reading: sensor-reading,
+        linear-acceleration: velocity,
+        angular-velocity: velocity,
+    }
+
+    /// GNSS (Global Navigation Satellite System) data
+    record gnss-data {
+        reading: sensor-reading,
+        position: position,
+        horizontal-accuracy: f32,
+        vertical-accuracy: f32,
+        satellites-used: u8,
+    }
+
+    /// LiDAR point cloud data
+    record lidar-point {
+        x: f32,
+        y: f32,
+        z: f32,
+        intensity: u8,
+    }
+
+    record lidar-data {
+        reading: sensor-reading,
+        points: list<lidar-point>,
+        horizontal-fov: f32,
+        vertical-fov: f32,
+    }
+
+    /// Camera image data
+    record camera-data {
+        reading: sensor-reading,
+        width: u32,
+        height: u32,
+        format: image-format,
+        data: list<u8>,
+    }
+
+    enum image-format {
+        rgb8,
+        bgr8,
+        grayscale8,
+        yuv422,
+    }
+
+    /// Radar detection
+    record radar-detection {
+        range: f32,
+        azimuth: f32,
+        elevation: f32,
+        range-rate: f32,
+        rcs: f32, // Radar Cross Section
+    }
+
+    record radar-data {
+        reading: sensor-reading,
+        detections: list<radar-detection>,
+    }
+
+    /// Object detection result
+    record detected-object {
+        id: u64,
+        class: object-class,
+        confidence: confidence,
+        bounding-box: bounding-box,
+        velocity: option<velocity>,
+    }
+
+    enum object-class {
+        unknown,
+        car,
+        truck,
+        bus,
+        motorcycle,
+        bicycle,
+        pedestrian,
+        animal,
+        debris,
+        traffic-sign,
+        traffic-light,
+        road-marking,
+    }
+
+    record bounding-box {
+        center: position,
+        dimensions: position, // width, height, depth
+        orientation: orientation,
+    }
+
+    /// Lane information
+    record lane {
+        id: u32,
+        left-boundary: list<position>,
+        right-boundary: list<position>,
+        center-line: list<position>,
+        lane-kind: lane-type,
+    }
+
+    enum lane-type {
+        driving,
+        parking,
+        bike,
+        sidewalk,
+        shoulder,
+    }
+
+    /// Traffic light state
+    enum traffic-light-state {
+        unknown,
+        red,
+        yellow,
+        green,
+        red-arrow,
+        yellow-arrow,
+        green-arrow,
+    }
+
+    /// Vehicle state
+    record vehicle-state {
+        pose: pose,
+        velocity: velocity,
+        acceleration: velocity,
+        steering-angle: f32,
+        wheel-speeds: list<f32>,
+    }
+}
+
+/// Interface for sensor data fusion operations
+interface fusion {
+    use types.{sensor-reading, pose, confidence, timestamp, imu-data, gnss-data, lidar-data};
+
+    /// Fuse multiple sensor readings to estimate pose
+    fuse-pose: func(
+        imu: option<imu-data>,
+        gnss: option<gnss-data>,
+        lidar-pose: option<pose>,
+        previous-pose: option<pose>
+    ) -> result<pose, string>;
+
+    /// Kalman filter update step
+    kalman-update: func(
+        prediction: pose,
+        measurement: pose,
+        process-noise: f32,
+        measurement-noise: f32
+    ) -> pose;
+
+    /// Time synchronization for sensor data
+    synchronize-sensors: func(
+        readings: list<sensor-reading>,
+        target-timestamp: timestamp
+    ) -> list<sensor-reading>;
+}

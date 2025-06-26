@@ -1,0 +1,53 @@
+package adas:sensor-fusion@0.1.0;
+
+/// Simplified sensor fusion interface for ADAS systems
+interface fusion {
+    /// Sensor types
+    enum sensor-type {
+        camera,
+        lidar,
+        radar,
+        imu,
+        gnss,
+    }
+
+    /// Raw sensor data
+    record sensor-data {
+        sensor-type: sensor-type,
+        confidence: f32,
+        timestamp: u64,
+        data: list<f32>,
+    }
+
+    /// Fused sensor data output
+    record fused-data {
+        position-x: f64,
+        position-y: f64,
+        velocity: f64,
+        heading: f64,
+        confidence: f32,
+        timestamp: u64,
+    }
+
+    /// Initialize sensor fusion system
+    initialize: func() -> result<_, string>;
+
+    /// Add raw sensor data for fusion
+    add-sensor-data: func(sensor-data: sensor-data) -> result<_, string>;
+
+    /// Perform sensor fusion and return result
+    fuse-sensors: func() -> result<fused-data, string>;
+
+    /// Get last fused data
+    get-last-fused-data: func() -> option<fused-data>;
+
+    /// Reset fusion system
+    reset: func() -> result<_, string>;
+
+    /// Get number of sensors providing data
+    get-sensor-count: func() -> u32;
+}
+
+world sensor-fusion-component {
+    export fusion;
+}

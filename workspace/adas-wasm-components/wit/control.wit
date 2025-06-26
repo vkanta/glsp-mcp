@@ -1,0 +1,226 @@
+package adas:control@0.1.0;
+
+/// Control module for vehicle actuation and low-level control
+interface control {
+    use adas:sensor-fusion/types.{
+        position, velocity, pose, timestamp, vehicle-state
+    };
+    use adas:planning/planning.{trajectory, waypoint};
+
+    /// Control command to be sent to vehicle actuators
+    record control-command {
+        timestamp: timestamp,
+        steering-angle: f32, // radians, positive = left
+        steering-rate: f32, // rad/s
+        throttle: f32, // 0.0 to 1.0
+        brake: f32, // 0.0 to 1.0
+        gear: gear-state,
+        parking-brake: bool,
+        emergency-stop: bool,
+    }
+
+    enum gear-state {
+        park,
+        reverse,
+        neutral,
+        drive,
+        sport,
+        manual,
+    }
+
+    /// Controller type being used
+    enum controller-type {
+        pid,
+        mpc, // Model Predictive Control
+        lqr, // Linear Quadratic Regulator
+        pure-pursuit,
+        stanley,
+        adaptive,
+    }
+
+    /// Control system status
+    enum control-status {
+        offline,
+        standby,
+        active,
+        error,
+        emergency,
+        manual-override,
+    }
+
+    /// PID controller parameters
+    record pid-parameters {
+        kp: f32, // Proportional gain
+        ki: f32, // Integral gain
+        kd: f32, // Derivative gain
+        integral-limit: f32,
+        output-limit: f32,
+    }
+
+    /// MPC (Model Predictive Control) parameters
+    record mpc-parameters {
+        prediction-horizon: u32, // steps
+        control-horizon: u32, // steps
+        sample-time: f32, // seconds
+        state-weights: list<f32>, // Q matrix diagonal
+        control-weights: list<f32>, // R matrix diagonal
+        terminal-weights: list<f32>, // P matrix diagonal
+    }
+
+    /// Vehicle dynamics model
+    record vehicle-model {
+        wheelbase: f32, // meters
+        front-overhang: f32,
+        rear-overhang: f32,
+        width: f32,
+        height: f32,
+        mass: f32, // kg
+        inertia: f32, // kg⋅m²
+        max-steering-angle: f32, // radians
+        max-acceleration: f32, // m/s²
+        max-deceleration: f32, // m/s²
+    }
+
+    /// Control error metrics
+    record control-error {
+        lateral-error: f32, // meters
+        heading-error: f32, // radians
+        velocity-error: f32, // m/s
+        cross-track-error: f32, // meters
+        timestamp: timestamp,
+    }
+
+    /// Safety limits for control
+    record safety-limits {
+        max-lateral-acceleration: f32, // m/s²
+        max-longitudinal-acceleration: f32, // m/s²
+        max-steering-rate: f32, // rad/s
+        max-velocity: f32, // m/s
+        emergency-brake-threshold: f32, // m/s²
+    }
+
+    /// Control system configuration
+    record control-config {
+        controller-kind: controller-type,
+        vehicle-model: vehicle-model,
+        safety-limits: safety-limits,
+        pid-lateral: option<pid-parameters>,
+        pid-longitudinal: option<pid-parameters>,
+        mpc-params: option<mpc-parameters>,
+        control-frequency: f32, // Hz
+    }
+
+    /// Initialize the control system
+    initialize: func(config: control-config) -> result<_, string>;
+
+    /// Execute control based on trajectory and current state
+    execute-control: func(
+        target-trajectory: trajectory,
+        current-state: vehicle-state,
+        current-waypoint-index: u32
+    ) -> result<control-command, string>;
+
+    /// Pure pursuit lateral control
+    pure-pursuit: func(
+        current-pose: pose,
+        current-velocity: velocity,
+        target-waypoint: waypoint,
+        lookahead-distance: f32
+    ) -> f32; // steering angle
+
+    /// Stanley lateral control
+    stanley-control: func(
+        current-pose: pose,
+        current-velocity: velocity,
+        target-waypoint: waypoint,
+        cross-track-error: f32
+    ) -> f32; // steering angle
+
+    /// PID longitudinal control
+    pid-longitudinal: func(
+        target-velocity: f32,
+        current-velocity: f32,
+        pid-params: pid-parameters,
+        dt: f32
+    ) -> result<longitudinal-command, string>;
+
+    record longitudinal-command {
+        throttle: f32,
+        brake: f32,
+    }
+
+    /// Model Predictive Control
+    mpc-control: func(
+        current-state: vehicle-state,
+        reference-trajectory: trajectory,
+        mpc-params: mpc-parameters
+    ) -> result<control-command, string>;
+
+    /// Emergency brake control
+    emergency-brake: func(
+        current-velocity: velocity,
+        stopping-distance: f32
+    ) -> control-command;
+
+    /// Validate control command for safety
+    validate-command: func(
+        command: control-command,
+        current-state: vehicle-state,
+        safety-limits: safety-limits
+    ) -> result<control-command, string>;
+
+    /// Calculate control errors
+    calculate-errors: func(
+        target: waypoint,
+        current-state: vehicle-state
+    ) -> control-error;
+
+    /// Update controller parameters
+    update-controller-params: func(
+        controller-kind: controller-type,
+        params: list<f32>
+    ) -> result<_, string>;
+
+    /// Get current control status
+    get-status: func() -> control-status;
+
+    /// Enable/disable manual override
+    set-manual-override: func(enabled: bool) -> result<_, string>;
+
+    /// Adaptive control parameter tuning
+    adapt-parameters: func(
+        error-history: list<control-error>,
+        performance-metric: f32
+    ) -> result<_, string>;
+
+    /// Low-level actuator interface
+    send-actuator-command: func(
+        command: control-command,
+        safety-check: bool
+    ) -> result<_, string>;
+
+    /// Read actuator feedback
+    read-actuator-feedback: func() -> result<actuator-feedback, string>;
+
+    record actuator-feedback {
+        actual-steering-angle: f32,
+        actual-throttle: f32,
+        actual-brake: f32,
+        gear-position: gear-state,
+        actuator-health: list<bool>, // health status for each actuator
+        timestamp: timestamp,
+    }
+
+    /// Failsafe control mode
+    activate-failsafe: func(
+        current-state: vehicle-state,
+        failsafe-kind: failsafe-type
+    ) -> control-command;
+
+    enum failsafe-type {
+        gentle-stop,
+        emergency-stop,
+        maintain-lane,
+        pull-over,
+    }
+}

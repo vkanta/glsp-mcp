@@ -1,0 +1,81 @@
+package adas:localization@0.1.0;
+
+/// Localization module for accurate position and orientation estimation
+interface localization {
+    use adas:sensor-fusion/types.{
+        pose, position, velocity, timestamp, confidence,
+        imu-data, gnss-data, lidar-data, vehicle-state
+    };
+
+    /// Localization method being used
+    enum localization-method {
+        gnss-only,
+        gnss-imu,
+        lidar-map,
+        visual-odometry,
+        sensor-fusion,
+    }
+
+    /// Status of the localization system
+    enum localization-status {
+        uninitialized,
+        initializing,
+        converging,
+        good,
+        degraded,
+        lost,
+    }
+
+    /// Map data for localization
+    record map-data {
+        map-id: string,
+        origin: position,
+        resolution: f32,
+        data: list<u8>, // Compressed point cloud or grid map
+    }
+
+    /// Localization result with uncertainty
+    record localization-result {
+        timestamp: timestamp,
+        pose: pose,
+        velocity: velocity,
+        position-covariance: list<f64>, // 3x3 matrix, row-major
+        velocity-covariance: list<f64>, // 3x3 matrix, row-major
+        method: localization-method,
+        status: localization-status,
+        confidence: confidence,
+    }
+
+    /// Initialize the localization system
+    initialize: func(
+        initial-pose: option<pose>,
+        map-data: option<map-data>
+    ) -> result<_, string>;
+
+    /// Update localization with new sensor data
+    update: func(
+        imu: option<imu-data>,
+        gnss: option<gnss-data>,
+        lidar: option<lidar-data>,
+        vehicle-state: option<vehicle-state>,
+        timestamp: timestamp
+    ) -> result<localization-result, string>;
+
+    /// Get current localization estimate
+    get-current-pose: func() -> result<localization-result, string>;
+
+    /// Reset localization to a known pose
+    reset: func(pose: pose) -> result<_, string>;
+
+    /// Set the map for map-based localization
+    set-map: func(map-data: map-data) -> result<_, string>;
+
+    /// Get localization system status
+    get-status: func() -> localization-status;
+
+    /// Perform loop closure detection
+    detect-loop-closure: func(
+        current-lidar: lidar-data,
+        historical-data: list<lidar-data>
+    ) -> option<pose>;
+}

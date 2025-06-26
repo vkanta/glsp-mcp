@@ -1,0 +1,1126 @@
+package adas:hmi-interface@0.1.0;
+
+/// Human-Machine Interface for ADAS system interaction
+interface hmi-interface {
+    /// Display configuration
+    record display-config {
+        screen-id: u32,
+        resolution: display-resolution,
+        refresh-rate: u32,
+        brightness: f32,
+        contrast: f32,
+        color-temperature: u32,
+        orientation: screen-orientation,
+        touch-enabled: bool,
+        multi-touch: bool,
+    }
+
+    record display-resolution {
+        width: u32,
+        height: u32,
+        pixel-density: u32,
+    }
+
+    enum screen-orientation {
+        landscape,
+        portrait,
+        landscape-inverted,
+        portrait-inverted,
+        auto-rotate,
+    }
+
+    /// User interface elements
+    record ui-element {
+        element-id: u32,
+        element-type: ui-element-type,
+        position: screen-position,
+        size: element-size,
+        style: element-style,
+        content: element-content,
+        interaction: interaction-config,
+        visibility: visibility-state,
+    }
+
+    enum ui-element-type {
+        text-label,
+        button,
+        icon,
+        progress-bar,
+        slider,
+        toggle-switch,
+        dropdown-menu,
+        list-view,
+        map-view,
+        camera-view,
+        gauge,
+        graph,
+        alert-popup,
+        notification,
+    }
+
+    record screen-position {
+        x: u32,
+        y: u32,
+        z-index: u32,
+        anchor: anchor-point,
+    }
+
+    enum anchor-point {
+        top-left,
+        top-center,
+        top-right,
+        center-left,
+        center,
+        center-right,
+        bottom-left,
+        bottom-center,
+        bottom-right,
+    }
+
+    record element-size {
+        width: u32,
+        height: u32,
+        min-width: option<u32>,
+        min-height: option<u32>,
+        max-width: option<u32>,
+        max-height: option<u32>,
+    }
+
+    record element-style {
+        background-color: color,
+        foreground-color: color,
+        border-color: color,
+        border-width: u32,
+        border-radius: u32,
+        font-family: string,
+        font-size: u32,
+        font-weight: font-weight,
+        opacity: f32,
+        shadow: bool,
+    }
+
+    record color {
+        red: u8,
+        green: u8,
+        blue: u8,
+        alpha: u8,
+    }
+
+    enum font-weight {
+        thin,
+        light,
+        normal,
+        medium,
+        bold,
+        extra-bold,
+    }
+
+    record element-content {
+        text: option<string>,
+        image: option<image-data>,
+        value: option<f32>,
+        options: list<string>,
+        data-source: option<data-source>,
+    }
+
+    record image-data {
+        format: image-format,
+        width: u32,
+        height: u32,
+        data: list<u8>,
+        compression: image-compression,
+    }
+
+    enum image-format {
+        png,
+        jpeg,
+        bmp,
+        svg,
+        gif,
+        webp,
+    }
+
+    enum image-compression {
+        none,
+        lossless,
+        lossy,
+        adaptive,
+    }
+
+    record data-source {
+        source-type: data-source-type,
+        source-identifier: string,
+        update-frequency: u32,
+        data-format: data-format,
+    }
+
+    enum data-source-type {
+        stationary,
+        sensor-data,
+        system-status,
+        navigation-data,
+        vehicle-state,
+        external-api,
+        user-preferences,
+    }
+
+    enum data-format {
+        text,
+        number,
+        percentage,
+        boolean,
+        timestamp,
+        coordinates,
+        json,
+        xml,
+    }
+
+    record interaction-config {
+        interactive: bool,
+        gestures: list<gesture-type>,
+        voice-commands: list<voice-command>,
+        keyboard-shortcuts: list<keyboard-shortcut>,
+        haptic-feedback: haptic-config,
+    }
+
+    enum gesture-type {
+        tap,
+        double-tap,
+        long-press,
+        swipe-left,
+        swipe-right,
+        swipe-up,
+        swipe-down,
+        pinch-zoom,
+        rotate,
+        drag,
+    }
+
+    record voice-command {
+        command-phrase: string,
+        language: language-code,
+        confidence-threshold: f32,
+        context-dependent: bool,
+        enabled: bool,
+    }
+
+    enum language-code {
+        en-us,
+        en-gb,
+        de-de,
+        fr-fr,
+        es-es,
+        it-it,
+        ja-jp,
+        ko-kr,
+        zh-cn,
+        pt-br,
+    }
+
+    record keyboard-shortcut {
+        key-combination: string,
+        modifier-keys: list<modifier-key>,
+        action: string,
+        enabled: bool,
+    }
+
+    enum modifier-key {
+        ctrl,
+        alt,
+        shift,
+        meta,
+        fn,
+    }
+
+    record haptic-config {
+        enabled: bool,
+        intensity: haptic-intensity,
+        pattern: haptic-pattern,
+        duration: u32,
+    }
+
+    enum haptic-intensity {
+        light,
+        medium,
+        strong,
+        custom,
+    }
+
+    enum haptic-pattern {
+        single-tap,
+        double-tap,
+        pulse,
+        heartbeat,
+        notification,
+        warning,
+        error,
+        success,
+    }
+
+    enum visibility-state {
+        visible,
+        hidden,
+        fading-in,
+        fading-out,
+        blinking,
+        dimmed,
+    }
+
+    /// ADAS-specific displays
+    record adas-display {
+        display-mode: adas-display-mode,
+        active-warnings: list<warning-display>,
+        status-indicators: list<status-indicator>,
+        navigation-overlay: option<navigation-overlay>,
+        sensor-visualization: option<sensor-visualization>,
+        vehicle-info: vehicle-info-display,
+    }
+
+    enum adas-display-mode {
+        minimal,
+        standard,
+        detailed,
+        debug,
+        maintenance,
+        emergency,
+    }
+
+    record warning-display {
+        warning-id: u32,
+        warning-type: warning-type,
+        severity: warning-severity,
+        message: string,
+        icon: option<image-data>,
+        color: color,
+        blinking: bool,
+        audio-alert: option<audio-alert>,
+        display-duration: option<u32>,
+    }
+
+    enum warning-type {
+        collision-warning,
+        lane-departure,
+        blind-spot,
+        parking-obstacle,
+        traffic-sign,
+        speed-limit,
+        fatigue-detection,
+        system-malfunction,
+        maintenance-required,
+        emergency-brake,
+    }
+
+    enum warning-severity {
+        info,
+        caution,
+        warning,
+        urgent,
+        critical,
+        emergency,
+    }
+
+    record audio-alert {
+        alert-type: audio-alert-type,
+        volume: f32,
+        frequency: f32,
+        duration: u32,
+        repeat-count: u32,
+        spatial-audio: bool,
+    }
+
+    enum audio-alert-type {
+        beep,
+        chime,
+        voice,
+        tone,
+        buzzer,
+        bell,
+        siren,
+    }
+
+    record status-indicator {
+        system-name: string,
+        status: system-status,
+        icon: option<image-data>,
+        color: color,
+        tooltip: option<string>,
+        last-update: u64,
+    }
+
+    enum system-status {
+        active,
+        standby,
+        warning,
+        error,
+        offline,
+        maintenance,
+        updating,
+    }
+
+    record navigation-overlay {
+        route-visualization: route-visualization,
+        turn-instructions: list<turn-instruction>,
+        destination-info: destination-info,
+        traffic-info: traffic-info,
+        points-of-interest: list<poi>,
+    }
+
+    record route-visualization {
+        route-points: list<map-coordinate>,
+        current-position: map-coordinate,
+        route-color: color,
+        route-width: u32,
+        zoom-level: u32,
+        map-style: map-style,
+    }
+
+    record map-coordinate {
+        latitude: f64,
+        longitude: f64,
+        altitude: option<f32>,
+    }
+
+    enum map-style {
+        standard,
+        satellite,
+        hybrid,
+        terrain,
+        night-mode,
+        high-contrast,
+    }
+
+    record turn-instruction {
+        instruction-type: turn-type,
+        distance: f32,
+        street-name: string,
+        icon: option<image-data>,
+        voice-guidance: option<voice-guidance>,
+    }
+
+    enum turn-type {
+        continue-straight,
+        turn-left,
+        turn-right,
+        slight-left,
+        slight-right,
+        sharp-left,
+        sharp-right,
+        u-turn,
+        merge-left,
+        merge-right,
+        exit-left,
+        exit-right,
+        roundabout-enter,
+        roundabout-exit,
+        destination,
+    }
+
+    record voice-guidance {
+        text: string,
+        language: language-code,
+        voice-type: voice-type,
+        speaking-rate: f32,
+        volume: f32,
+        enabled: bool,
+    }
+
+    enum voice-type {
+        male,
+        female,
+        neutral,
+        synthetic,
+        natural,
+    }
+
+    record destination-info {
+        name: string,
+        address: string,
+        coordinates: map-coordinate,
+        estimated-arrival: u64,
+        remaining-distance: f32,
+        remaining-time: u32,
+    }
+
+    record traffic-info {
+        congestion-level: congestion-level,
+        incidents: list<traffic-incident>,
+        construction-zones: list<construction-zone>,
+        alternative-routes: list<alternative-route>,
+    }
+
+    enum congestion-level {
+        free-flow,
+        light,
+        moderate,
+        heavy,
+        stop-and-go,
+        blocked,
+    }
+
+    record traffic-incident {
+        incident-type: incident-type,
+        location: map-coordinate,
+        severity: incident-severity,
+        description: string,
+        estimated-delay: u32,
+        estimated-clearance: option<u64>,
+    }
+
+    enum incident-type {
+        accident,
+        construction,
+        road-closure,
+        weather-hazard,
+        breakdown,
+        emergency-vehicles,
+        event,
+        protest,
+    }
+
+    enum incident-severity {
+        minor,
+        moderate,
+        major,
+        severe,
+    }
+
+    record construction-zone {
+        zone-name: string,
+        boundaries: list<map-coordinate>,
+        lane-closures: u32,
+        speed-reduction: f32,
+        duration: time-range,
+    }
+
+    record time-range {
+        start-time: u64,
+        end-time: u64,
+    }
+
+    record alternative-route {
+        route-name: string,
+        route-points: list<map-coordinate>,
+        distance: f32,
+        estimated-time: u32,
+        fuel-efficiency: f32,
+        toll-cost: option<f32>,
+    }
+
+    record poi {
+        poi-type: poi-type,
+        name: string,
+        location: map-coordinate,
+        distance: f32,
+        rating: option<f32>,
+        description: option<string>,
+    }
+
+    enum poi-type {
+        gas-station,
+        restaurant,
+        hotel,
+        hospital,
+        police-station,
+        shopping-center,
+        tourist-attraction,
+        parking,
+        charging-station,
+        service-center,
+    }
+
+    record sensor-visualization {
+        camera-feeds: list<camera-feed>,
+        radar-overlay: option<radar-overlay>,
+        lidar-visualization: option<lidar-visualization>,
+        object-detection: list<detected-object>,
+        sensor-coverage: sensor-coverage,
+    }
+
+    record camera-feed {
+        camera-id: string,
+        position: camera-position,
+        feed-data: image-data,
+        overlay-elements: list<overlay-element>,
+        recording: bool,
+    }
+
+    enum camera-position {
+        front,
+        rear,
+        left,
+        right,
+        interior,
+        dashboard,
+    }
+
+    record overlay-element {
+        element-type: overlay-type,
+        coordinates: list<screen-position>,
+        color: color,
+        thickness: u32,
+        label: option<string>,
+    }
+
+    enum overlay-type {
+        bounding-box,
+        lane-marking,
+        trajectory,
+        distance-marker,
+        speed-indicator,
+        warning-zone,
+        tracking-line,
+    }
+
+    record radar-overlay {
+        detection-range: f32,
+        detection-angle: f32,
+        targets: list<radar-target>,
+        coverage-area: list<screen-position>,
+    }
+
+    record radar-target {
+        target-id: u32,
+        range: f32,
+        bearing: f32,
+        velocity: f32,
+        target-type: target-type,
+        confidence: f32,
+    }
+
+    enum target-type {
+        vehicle,
+        pedestrian,
+        cyclist,
+        static-object,
+        unknown,
+    }
+
+    record lidar-visualization {
+        point-cloud: list<point3d>,
+        color-map: color-map-type,
+        intensity-range: intensity-range,
+        ground-plane: option<plane>,
+    }
+
+    record point3d {
+        x: f32,
+        y: f32,
+        z: f32,
+        intensity: f32,
+        color: option<color>,
+    }
+
+    enum color-map-type {
+        height-based,
+        intensity-based,
+        distance-based,
+        classification-based,
+        custom,
+    }
+
+    record intensity-range {
+        min-intensity: f32,
+        max-intensity: f32,
+        scale-factor: f32,
+    }
+
+    record plane {
+        normal: vector3d,
+        distance: f32,
+    }
+
+    record vector3d {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record detected-object {
+        object-id: u32,
+        object-type: object-type,
+        position: screen-position,
+        bounding-box: bounding-box,
+        confidence: f32,
+        velocity: option<vector3d>,
+        classification: object-classification,
+    }
+
+    enum object-type {
+        car,
+        truck,
+        bus,
+        motorcycle,
+        bicycle,
+        pedestrian,
+        traffic-light,
+        traffic-sign,
+        lane-marking,
+        barrier,
+        unknown,
+    }
+
+    record bounding-box {
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    }
+
+    record object-classification {
+        primary-class: string,
+        confidence: f32,
+        alternative-classes: list<class-probability>,
+    }
+
+    record class-probability {
+        class-name: string,
+        probability: f32,
+    }
+
+    record sensor-coverage {
+        camera-coverage: list<coverage-zone>,
+        radar-coverage: list<coverage-zone>,
+        lidar-coverage: list<coverage-zone>,
+        ultrasonic-coverage: list<coverage-zone>,
+        blind-spots: list<blind-spot>,
+    }
+
+    record coverage-zone {
+        sensor-type: sensor-type,
+        zone-shape: zone-shape,
+        range: f32,
+        angle: f32,
+        confidence: f32,
+        operational: bool,
+    }
+
+    enum sensor-type {
+        camera,
+        radar,
+        lidar,
+        ultrasonic,
+        infrared,
+        thermal,
+    }
+
+    enum zone-shape {
+        circular,
+        rectangular,
+        triangular,
+        elliptical,
+        custom-polygon,
+    }
+
+    record blind-spot {
+        zone-shape: zone-shape,
+        coordinates: list<screen-position>,
+        severity: blind-spot-severity,
+        mitigation: option<string>,
+    }
+
+    enum blind-spot-severity {
+        minor,
+        moderate,
+        significant,
+        critical,
+    }
+
+    record vehicle-info-display {
+        speed: speed-display,
+        fuel-efficiency: efficiency-display,
+        system-health: health-display,
+        driving-mode: driving-mode-display,
+        eco-score: eco-score-display,
+    }
+
+    record speed-display {
+        current-speed: f32,
+        speed-limit: option<f32>,
+        speed-unit: speed-unit,
+        color-coding: bool,
+        digital-display: bool,
+        analog-gauge: bool,
+    }
+
+    enum speed-unit {
+        kmh,
+        mph,
+        ms,
+    }
+
+    record efficiency-display {
+        fuel-consumption: f32,
+        fuel-level: f32,
+        range-remaining: f32,
+        eco-mode-active: bool,
+        efficiency-trend: trend-direction,
+    }
+
+    enum trend-direction {
+        improving,
+        stable,
+        declining,
+        unknown,
+    }
+
+    record health-display {
+        overall-health: system-health-level,
+        component-status: list<component-status>,
+        maintenance-alerts: list<maintenance-alert>,
+        diagnostic-codes: list<diagnostic-code>,
+    }
+
+    enum system-health-level {
+        excellent,
+        good,
+        fair,
+        poor,
+        critical,
+    }
+
+    record component-status {
+        component-name: string,
+        status: component-health,
+        icon: option<image-data>,
+        last-check: u64,
+        next-service: option<u64>,
+    }
+
+    enum component-health {
+        normal,
+        attention-needed,
+        service-soon,
+        service-now,
+        malfunction,
+    }
+
+    record maintenance-alert {
+        alert-type: maintenance-type,
+        urgency: maintenance-urgency,
+        description: string,
+        due-date: option<u64>,
+        due-mileage: option<u32>,
+    }
+
+    enum maintenance-type {
+        oil-change,
+        tire-rotation,
+        brake-inspection,
+        filter-replacement,
+        fluid-check,
+        battery-service,
+        alignment,
+        general-inspection,
+    }
+
+    enum maintenance-urgency {
+        routine,
+        recommended,
+        soon,
+        overdue,
+        critical,
+    }
+
+    record diagnostic-code {
+        code: string,
+        system: string,
+        severity: diagnostic-severity,
+        description: string,
+        timestamp: u64,
+        cleared: bool,
+    }
+
+    enum diagnostic-severity {
+        info,
+        warning,
+        error,
+        critical,
+    }
+
+    record driving-mode-display {
+        current-mode: driving-mode,
+        available-modes: list<driving-mode>,
+        mode-description: string,
+        mode-icon: option<image-data>,
+        efficiency-impact: f32,
+    }
+
+    enum driving-mode {
+        eco,
+        comfort,
+        normal,
+        sport,
+        individual,
+        snow,
+        off-road,
+        valet,
+    }
+
+    record eco-score-display {
+        current-score: f32,
+        max-score: f32,
+        score-history: list<score-point>,
+        improvement-tips: list<string>,
+        badges: list<achievement-badge>,
+    }
+
+    record score-point {
+        timestamp: u64,
+        score: f32,
+        factors: list<score-factor>,
+    }
+
+    record score-factor {
+        factor-name: string,
+        contribution: f32,
+        improvement-potential: f32,
+    }
+
+    record achievement-badge {
+        badge-name: string,
+        badge-icon: image-data,
+        earned-date: u64,
+        description: string,
+    }
+
+    /// User preferences and personalization
+    record user-preferences {
+        display-preferences: display-preferences,
+        interaction-preferences: interaction-preferences,
+        notification-preferences: notification-preferences,
+        accessibility-preferences: accessibility-preferences,
+        privacy-preferences: privacy-preferences,
+    }
+
+    record display-preferences {
+        theme: ui-theme,
+        brightness: brightness-setting,
+        font-size: font-size-setting,
+        color-scheme: color-scheme,
+        animation-enabled: bool,
+        high-contrast: bool,
+    }
+
+    enum ui-theme {
+        light,
+        dark,
+        auto,
+        high-contrast,
+        colorblind-friendly,
+        custom,
+    }
+
+    enum brightness-setting {
+        auto,
+        dim,
+        medium,
+        bright,
+        maximum,
+    }
+
+    enum font-size-setting {
+        small,
+        medium,
+        large,
+        extra-large,
+        custom,
+    }
+
+    enum color-scheme {
+        default,
+        blue,
+        green,
+        orange,
+        red,
+        purple,
+        monochrome,
+        custom,
+    }
+
+    record interaction-preferences {
+        gesture-sensitivity: sensitivity-level,
+        voice-activation: bool,
+        haptic-feedback: bool,
+        auto-hide-controls: bool,
+        confirmation-required: bool,
+    }
+
+    enum sensitivity-level {
+        low,
+        medium,
+        high,
+        adaptive,
+    }
+
+    record notification-preferences {
+        notification-types: list<notification-type>,
+        quiet-hours: option<time-range>,
+        priority-filtering: bool,
+        grouped-notifications: bool,
+        notification-sounds: bool,
+    }
+
+    enum notification-type {
+        safety-alerts,
+        navigation-updates,
+        maintenance-reminders,
+        traffic-updates,
+        system-status,
+        promotional,
+        social,
+    }
+
+    record accessibility-preferences {
+        screen-reader: bool,
+        voice-navigation: bool,
+        large-text: bool,
+        high-contrast: bool,
+        reduced-motion: bool,
+        audio-descriptions: bool,
+        subtitle-enabled: bool,
+    }
+
+    record privacy-preferences {
+        location-sharing: location-sharing-level,
+        usage-analytics: bool,
+        crash-reporting: bool,
+        personalization: bool,
+        voice-recording: bool,
+        camera-access: bool,
+    }
+
+    enum location-sharing-level {
+        none,
+        navigation-only,
+        services-only,
+        full,
+        emergency-only,
+    }
+
+    enum hmi-status {
+        offline,
+        initializing,
+        active,
+        standby,
+        error,
+        updating,
+    }
+
+    /// Initialize HMI system
+    initialize: func(displays: list<display-config>, preferences: user-preferences) -> result<_, string>;
+
+    /// Start HMI system
+    start-hmi: func() -> result<_, string>;
+
+    /// Stop HMI system
+    stop-hmi: func() -> result<_, string>;
+
+    /// Update display content
+    update-display: func(display-id: u32, content: adas-display) -> result<_, string>;
+
+    /// Show warning
+    show-warning: func(warning: warning-display) -> result<u32, string>;
+
+    /// Hide warning
+    hide-warning: func(warning-id: u32) -> result<_, string>;
+
+    /// Update navigation
+    update-navigation: func(navigation: navigation-overlay) -> result<_, string>;
+
+    /// Update sensor visualization
+    update-sensors: func(sensors: sensor-visualization) -> result<_, string>;
+
+    /// Process user input
+    process-input: func(input: user-input) -> result<_, string>;
+
+    record user-input {
+        input-type: input-type,
+        element-id: option<u32>,
+        position: option<screen-position>,
+        gesture: option<gesture-type>,
+        voice-command: option<string>,
+        key-input: option<string>,
+        timestamp: u64,
+    }
+
+    enum input-type {
+        touch,
+        gesture,
+        voice,
+        keyboard,
+        physical-button,
+        scroll-wheel,
+    }
+
+    /// Update preferences
+    update-preferences: func(preferences: user-preferences) -> result<_, string>;
+
+    /// Get current status
+    get-status: func() -> hmi-status;
+
+    /// Take screenshot
+    take-screenshot: func(display-id: u32) -> result<image-data, string>;
+
+    /// Run diagnostic
+    run-diagnostic: func() -> result<hmi-diagnostic-result, string>;
+
+    record hmi-diagnostic-result {
+        display-health: list<display-health>,
+        touch-calibration: calibration-result,
+        audio-test: audio-test-result,
+        performance-metrics: hmi-performance,
+        user-experience: ux-metrics,
+    }
+
+    record display-health {
+        display-id: u32,
+        pixel-test: test-result,
+        color-accuracy: f32,
+        brightness-uniformity: f32,
+        response-time: f32,
+        dead-pixels: u32,
+    }
+
+    enum test-result {
+        passed,
+        failed,
+        warning,
+        not-tested,
+    }
+
+    record calibration-result {
+        accuracy: f32,
+        precision: f32,
+        calibration-date: u64,
+        drift-detected: bool,
+        needs-recalibration: bool,
+    }
+
+    record audio-test-result {
+        speaker-test: test-result,
+        microphone-test: test-result,
+        volume-levels: list<f32>,
+        frequency-response: test-result,
+        echo-cancellation: test-result,
+    }
+
+    record hmi-performance {
+        frame-rate: f32,
+        input-latency: f32,
+        rendering-time: f32,
+        memory-usage: f32,
+        cpu-usage: f32,
+    }
+
+    record ux-metrics {
+        user-satisfaction: f32,
+        task-completion-rate: f32,
+        error-rate: f32,
+        learning-curve: f32,
+        accessibility-score: f32,
+    }
+}
+
+world hmi-interface-component {
+    export hmi-interface;
+}
