@@ -98,3 +98,6 @@ jspm_packages/
 
 # TernJS port file
 .tern-port
+
+# External repositories (should be git submodules or separate clones)
+# mcp-loxone/ # Temporarily included with HTTP transport fixes
