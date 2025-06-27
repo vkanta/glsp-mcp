@@ -15,7 +15,18 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "Bash(open test-connection.html)",
+      "Bash(open http://localhost:5174/debug.html)",
+      "WebFetch(domain:spec.modelcontextprotocol.io)",
+      "Bash(open http://localhost:5174/test-app.html)",
+      "Bash(chmod:*)",
+      "Bash(/Users/r/git/glsp-rust/test-mcp.sh)",
+      "Bash(open http://localhost:5174/)",
+      "Bash(npm run:*)",
+      "WebFetch(domain:bytecodealliance.github.io)",
+      "WebFetch(domain:component-model.bytecodealliance.org)"
     ],
     "deny": []
   }

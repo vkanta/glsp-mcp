@@ -22,7 +22,11 @@
       "Bash(cargo build:*)",
       "Bash(grep:*)",
       "Bash(bash:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(wasm-tools component:*)",
+      "Bash(cargo:*)"
     ],
     "deny": []
   }
