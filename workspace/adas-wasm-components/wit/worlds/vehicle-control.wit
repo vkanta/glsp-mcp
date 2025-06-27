@@ -1,0 +1,275 @@
+/// Vehicle Control Component - IMPORTS fusion data, EXPORTS vehicle control commands
+package adas:vehicle-control@0.1.0;
+
+world vehicle-control-component {
+    /// Import fused sensor data
+    import fusion-data: interface {
+        record position3d {
+            x: f64,
+            y: f64,  
+            z: f64,
+        }
+        
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+        
+        record acceleration3d {
+            ax: f64,
+            ay: f64,
+            az: f64,
+            magnitude: f64,
+        }
+        
+        record environment-model {
+            objects: list<fused-object>,
+            timestamp: u64,
+            fusion-quality: f32,
+        }
+        
+        record fused-object {
+            object-id: u32,
+            object-type: object-type,
+            position: position3d,
+            velocity: velocity3d,
+            confidence: f32,
+        }
+        
+        enum object-type {
+            unknown,
+            vehicle,
+            pedestrian,
+            cyclist,
+            traffic-sign,
+        }
+        
+        resource fusion-stream {
+            get-environment: func() -> result<environment-model, string>;
+            is-available: func() -> bool;
+        }
+        
+        create-stream: func() -> fusion-stream;
+    }
+    
+    /// Export vehicle control commands
+    export vehicle-commands: interface {
+        /// Vehicle control commands
+        record steering-command {
+            target-angle: f32,      // Target steering wheel angle (degrees)
+            angular-velocity: f32,  // Target angular velocity (deg/s)
+            torque-limit: f32,      // Maximum steering torque (Nm)
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        record braking-command {
+            target-deceleration: f32,  // Target deceleration (m/s²)
+            brake-pressure: f32,       // Brake pressure (bar)
+            abs-enabled: bool,         // Anti-lock braking enabled
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        record acceleration-command {
+            target-acceleration: f32,  // Target acceleration (m/s²)
+            throttle-position: f32,    // Throttle position (0-1)
+            traction-control: bool,    // Traction control enabled
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        record emergency-command {
+            action: emergency-action,
+            reason: string,
+            timestamp: u64,
+            override-all: bool,
+        }
+
+        enum command-priority {
+            low,
+            normal,
+            high,
+            emergency,
+        }
+
+        enum emergency-action {
+            emergency-brake,
+            emergency-steer,
+            engine-cut,
+            hazard-lights,
+            full-stop,
+        }
+        
+        /// Get current steering command
+        get-steering-command: func() -> result<steering-command, string>;
+        
+        /// Get current braking command
+        get-braking-command: func() -> result<braking-command, string>;
+        
+        /// Get current acceleration command
+        get-acceleration-command: func() -> result<acceleration-command, string>;
+        
+        /// Get emergency stop command if active
+        get-emergency-command: func() -> result<option<emergency-command>, string>;
+        
+        /// Check if control system is active
+        is-active: func() -> bool;
+    }
+    
+    /// Control system interface
+    export control-system: interface {
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+        
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+        
+        record acceleration3d {
+            ax: f64,
+            ay: f64,
+            az: f64,
+            magnitude: f64,
+        }
+        
+        /// Control system configuration
+        record control-config {
+            control-mode: control-mode,
+            max-acceleration: f32,
+            max-deceleration: f32,
+            max-steering-rate: f32,
+            comfort-level: comfort-level,
+            safety-margin: f32,
+        }
+
+        enum control-mode {
+            manual,
+            assisted,
+            autonomous-level2,
+            autonomous-level3,
+            autonomous-level4,
+        }
+
+        enum comfort-level {
+            eco,
+            comfort,
+            normal,
+            sport,
+            custom,
+        }
+
+        /// Control limits
+        record control-limits {
+            steering-limits: steering-limits,
+            braking-limits: braking-limits,
+            acceleration-limits: acceleration-limits,
+        }
+
+        record steering-limits {
+            max-angle: f32,
+            max-angular-velocity: f32,
+            max-torque: f32,
+        }
+
+        record braking-limits {
+            max-deceleration: f32,
+            max-brake-pressure: f32,
+            min-stopping-distance: f32,
+        }
+
+        record acceleration-limits {
+            max-acceleration: f32,
+            max-throttle-rate: f32,
+            max-jerk: f32,
+        }
+
+        /// Vehicle state information
+        record vehicle-state {
+            position: position3d,
+            velocity: velocity3d,
+            acceleration: acceleration3d,
+            heading: f32,
+            steering-angle: f32,
+            brake-pressure: f32,
+            throttle-position: f32,
+            gear-position: gear-position,
+            timestamp: u64,
+        }
+
+        enum gear-position {
+            park,
+            reverse,
+            neutral,
+            drive,
+            sport,
+            manual-first,
+            manual-second,
+            manual-third,
+            manual-fourth,
+            manual-fifth,
+            manual-sixth,
+        }
+
+        enum control-status {
+            offline,
+            initializing,
+            standby,
+            active,
+            emergency,
+            error,
+            maintenance,
+        }
+
+        record diagnostic-result {
+            steering-system: test-result,
+            braking-system: test-result,
+            acceleration-system: test-result,
+            safety-systems: test-result,
+            response-time: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+        
+        /// Initialize control system
+        initialize: func(config: control-config) -> result<_, string>;
+        
+        /// Start vehicle control
+        start-control: func() -> result<_, string>;
+        
+        /// Stop vehicle control
+        stop-control: func() -> result<_, string>;
+        
+        /// Execute emergency stop
+        emergency-stop: func(reason: string) -> result<_, string>;
+        
+        /// Update control configuration
+        update-config: func(config: control-config) -> result<_, string>;
+        
+        /// Set control limits
+        set-limits: func(limits: control-limits) -> result<_, string>;
+        
+        /// Get control system status
+        get-status: func() -> control-status;
+        
+        /// Get vehicle state
+        get-vehicle-state: func() -> result<vehicle-state, string>;
+        
+        /// Run control system diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

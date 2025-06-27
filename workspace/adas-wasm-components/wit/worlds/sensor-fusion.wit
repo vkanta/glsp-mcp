@@ -1,0 +1,189 @@
+/// Sensor Fusion Component - IMPORTS sensor data, EXPORTS fused environment model
+package adas:sensor-fusion@0.1.0;
+
+world sensor-fusion-component {
+    import wasi:cli/environment@0.2.3;
+    import wasi:cli/exit@0.2.3;
+    import wasi:io/streams@0.2.3;
+    import wasi:cli/stdout@0.2.3;
+    import wasi:cli/stderr@0.2.3;
+    import wasi:clocks/monotonic-clock@0.2.3;
+    import wasi:clocks/wall-clock@0.2.3;
+
+    /// Import sensor data streams
+    import adas:sensor-data/camera-data@0.1.0;
+    import adas:sensor-data/radar-data@0.1.0;
+    import adas:sensor-data/lidar-data@0.1.0;
+    import adas:sensor-data/detection-data@0.1.0;
+    
+    /// Export fused environment model
+    export fusion-data: interface {
+        /// Get the current fused environment model
+        get-environment-model: func() -> result<environment-model, string>;
+        
+        /// Get object tracks with sensor fusion
+        get-object-tracks: func() -> result<list<fused-object>, string>;
+        
+        /// Check if fusion system is ready
+        is-ready: func() -> bool;
+    }
+    
+    /// Fusion control interface
+    export fusion-control: interface {
+        /// Initialize fusion system
+        initialize: func(config: fusion-config) -> result<_, string>;
+        
+        /// Start sensor fusion
+        start-fusion: func() -> result<_, string>;
+        
+        /// Stop sensor fusion
+        stop-fusion: func() -> result<_, string>;
+        
+        /// Update fusion configuration
+        update-config: func(config: fusion-config) -> result<_, string>;
+        
+        /// Get fusion system status
+        get-status: func() -> fusion-status;
+        
+        /// Get fusion performance metrics
+        get-performance: func() -> performance-metrics;
+        
+        /// Run fusion diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+
+    /// Fused environment model
+    record environment-model {
+        timestamp: u64,
+        ego-vehicle-state: vehicle-state,
+        objects: list<fused-object>,
+        free-space: free-space-map,
+        confidence: f32,
+    }
+
+    record vehicle-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        heading: f64,
+        yaw-rate: f64,
+    }
+
+    record fused-object {
+        object-id: u32,
+        object-type: object-type,
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        bounding-box: bounding-box3d,
+        confidence: f32,
+        source-sensors: list<sensor-type>,
+        track-age: u32,
+        prediction: object-prediction,
+    }
+
+    record object-prediction {
+        predicted-positions: list<predicted-position>,
+        time-horizon: f32,
+        confidence: f32,
+    }
+
+    record predicted-position {
+        position: position3d,
+        timestamp: u64,
+        uncertainty: position3d,
+    }
+
+    record free-space-map {
+        grid-cells: list<grid-cell>,
+        resolution: f32,
+        origin: position3d,
+        width: u32,
+        height: u32,
+    }
+
+    record grid-cell {
+        x: u32,
+        y: u32,
+        occupancy-probability: f32,
+        confidence: f32,
+    }
+
+    /// Fusion configuration
+    record fusion-config {
+        kalman-filter-params: kalman-config,
+        sensor-weights: sensor-weights,
+        association-thresholds: association-thresholds,
+        temporal-window: u32,
+        max-tracking-distance: f32,
+    }
+
+    record kalman-config {
+        process-noise: f32,
+        measurement-noise: f32,
+        initial-uncertainty: f32,
+    }
+
+    record sensor-weights {
+        camera-weight: f32,
+        radar-weight: f32,
+        lidar-weight: f32,
+    }
+
+    record association-thresholds {
+        position-threshold: f32,
+        velocity-threshold: f32,
+        size-threshold: f32,
+    }
+
+    /// Shared types from sensor-data interface
+    use adas:sensor-data/spatial-types.{position3d, velocity3d, acceleration3d};
+    use adas:sensor-data/detection-data.{object-type, bounding-box3d};
+
+    enum sensor-type {
+        camera-front,
+        camera-rear,
+        camera-left,
+        camera-right,
+        radar-front,
+        radar-corner,
+        lidar,
+        ultrasonic,
+    }
+
+    enum fusion-status {
+        offline,
+        initializing,
+        calibrating,
+        active,
+        degraded,
+        error,
+        maintenance,
+    }
+
+    record performance-metrics {
+        fusion-latency-ms: f32,
+        object-tracking-accuracy: f32,
+        false-positive-rate: f32,
+        false-negative-rate: f32,
+        sensor-coverage-percent: f32,
+        cpu-usage-percent: f32,
+        memory-usage-mb: u32,
+    }
+
+    record diagnostic-result {
+        sensor-calibration: test-result,
+        temporal-alignment: test-result,
+        tracking-performance: test-result,
+        prediction-accuracy: test-result,
+        data-association: test-result,
+        overall-score: f32,
+    }
+
+    enum test-result {
+        passed,
+        failed,
+        warning,
+        not-tested,
+    }
+}

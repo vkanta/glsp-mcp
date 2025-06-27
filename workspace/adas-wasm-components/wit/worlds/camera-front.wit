@@ -1,0 +1,92 @@
+/// Front Camera Component - EXPORTS camera data stream
+package adas:camera-front@0.1.0;
+
+world camera-front-component {
+    /// Export the camera data stream for other components to consume
+    export adas:sensor-data/camera-data@0.1.0;
+    
+    /// Camera control interface for configuration and control
+    export camera-control: interface {
+        /// Camera configuration
+        record camera-config {
+            resolution: resolution,
+            frame-rate: u32,
+            exposure-mode: exposure-mode,
+            white-balance: white-balance-mode,
+            image-format: image-format,
+            auto-focus: bool,
+            hdr-enabled: bool,
+        }
+
+        enum resolution {
+            hd-resolution,    // 1280x720
+            full-hd,          // 1920x1080  
+            uhd-four-k,       // 3840x2160
+        }
+
+        enum exposure-mode {
+            auto,
+            manual,
+            shutter-priority,
+            iso-priority,
+        }
+
+        enum white-balance-mode {
+            auto,
+            daylight,
+            cloudy,
+            tungsten,
+            fluorescent,
+            manual,
+        }
+
+        enum image-format {
+            jpeg,
+            png,
+            raw,
+            yuv,
+        }
+
+        enum camera-status {
+            offline,
+            initializing,
+            streaming,
+            error,
+            maintenance,
+        }
+
+        record diagnostic-result {
+            lens-health: test-result,
+            sensor-health: test-result,
+            auto-focus-test: test-result,
+            exposure-test: test-result,
+            color-calibration: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize camera with configuration
+        initialize: func(config: camera-config) -> result<_, string>;
+        
+        /// Start camera streaming
+        start-streaming: func() -> result<_, string>;
+        
+        /// Stop camera streaming  
+        stop-streaming: func() -> result<_, string>;
+        
+        /// Update camera configuration
+        update-config: func(config: camera-config) -> result<_, string>;
+        
+        /// Get camera status
+        get-status: func() -> camera-status;
+        
+        /// Run camera diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

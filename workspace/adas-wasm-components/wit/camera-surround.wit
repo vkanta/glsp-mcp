@@ -1,0 +1,136 @@
+/// Surround Camera Component - EXPORTS 360° camera data stream
+package adas:camera-surround@0.1.0;
+
+world camera-surround-component {
+    /// Export the camera data stream for other components to consume
+    export camera-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record quaternion {
+            x: f64,
+            y: f64,
+            z: f64,
+            w: f64,
+        }
+
+        /// Camera data types
+        record camera-frame {
+            width: u32,
+            height: u32,
+            data: list<u8>,
+            format: pixel-format,
+            timestamp: u64,
+            exposure-time: f32,
+            gain: f32,
+            sensor-pose: camera-pose,
+        }
+
+        record camera-pose {
+            position: position3d,
+            orientation: quaternion,
+        }
+
+        enum pixel-format {
+            rgb8,
+            rgba8,
+            bgr8,
+            bgra8,
+            yuv420,
+            gray8,
+            gray16,
+        }
+
+        record camera-intrinsics {
+            focal-length-x: f64,
+            focal-length-y: f64,
+            principal-point-x: f64,
+            principal-point-y: f64,
+            distortion: list<f64>,
+        }
+
+        resource camera-stream {
+            get-frame: func() -> result<camera-frame, string>;
+            get-intrinsics: func() -> camera-intrinsics;
+            is-available: func() -> bool;
+        }
+        
+        create-stream: func() -> camera-stream;
+    }
+    
+    /// Export surround camera control interface
+    export surround-control: interface {
+        /// Surround camera configuration
+        record surround-config {
+            view-mode: view-mode,
+            stitch-quality: stitch-quality,
+            recording-enabled: bool,
+            object-overlay: bool,
+            grid-lines: bool,
+            auto-brightness: bool,
+            parking-guides: bool,
+        }
+
+        enum view-mode {
+            bird-eye,
+            front-rear,
+            left-right,
+            split-view,
+            panoramic,
+        }
+
+        enum stitch-quality {
+            low,
+            medium,
+            high,
+            ultra,
+        }
+
+        enum surround-status {
+            offline,
+            initializing,
+            calibrating,
+            active,
+            error,
+            maintenance,
+        }
+
+        record calibration-result {
+            camera-alignment: test-result,
+            stitch-accuracy: test-result,
+            distortion-correction: test-result,
+            color-matching: test-result,
+            overlap-zones: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize surround camera system
+        initialize: func(config: surround-config) -> result<_, string>;
+        
+        /// Start surround view processing
+        start-processing: func() -> result<_, string>;
+        
+        /// Stop surround view processing
+        stop-processing: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: surround-config) -> result<_, string>;
+        
+        /// Get system status
+        get-status: func() -> surround-status;
+        
+        /// Run calibration
+        run-calibration: func() -> result<calibration-result, string>;
+    }
+}

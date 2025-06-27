@@ -1,0 +1,102 @@
+/// Prediction Data Interfaces - EXPORTED by tracking and behavior prediction
+package adas:prediction-data@0.1.0;
+
+interface tracking-data {
+    use adas:sensor-data/spatial-types.{position3d, velocity3d, acceleration3d};
+    use adas:sensor-data/detection-data.{object-type, bounding-box3d};
+
+    record tracked-objects {
+        objects: list<tracked-object>,
+        timestamp: u64,
+        tracking-confidence: f32,
+    }
+
+    record tracked-object {
+        track-id: u32,
+        object-type: object-type,
+        state: object-state,
+        history: list<object-state>,
+        age: u32, // Frames tracked
+        confidence: f32,
+        prediction: trajectory-prediction,
+    }
+
+    record object-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        heading: f32,
+        yaw-rate: f32,
+        bounding-box: bounding-box3d,
+        timestamp: u64,
+    }
+
+    record trajectory-prediction {
+        predicted-states: list<predicted-state>,
+        confidence: f32,
+        uncertainty-growth: f32,
+    }
+
+    record predicted-state {
+        state: object-state,
+        probability: f32,
+        uncertainty: state-uncertainty,
+    }
+
+    record state-uncertainty {
+        position-std: position3d,
+        velocity-std: velocity3d,
+        heading-std: f32,
+    }
+
+    /// Get current tracked objects
+    get-tracked-objects: func() -> result<tracked-objects, string>;
+    
+    /// Check if tracking is ready
+    is-ready: func() -> bool;
+}
+
+interface behavior-data {
+    use adas:sensor-data/spatial-types.{position3d};
+
+    record behavior-predictions {
+        predictions: list<object-behavior>,
+        timestamp: u64,
+    }
+
+    record object-behavior {
+        track-id: u32,
+        behaviors: list<predicted-behavior>,
+        intent-confidence: f32,
+    }
+
+    record predicted-behavior {
+        behavior-type: behavior-type,
+        probability: f32,
+        time-to-action: option<f32>,
+        target-position: option<position3d>,
+        target-lane: option<u32>,
+    }
+
+    enum behavior-type {
+        lane-keeping,
+        lane-change-left,
+        lane-change-right,
+        acceleration,
+        deceleration,
+        stopping,
+        turning-left,
+        turning-right,
+        u-turn,
+        parking,
+        merging,
+        yielding,
+        overtaking,
+    }
+
+    /// Get behavior predictions for tracked objects
+    get-behavior-predictions: func() -> result<behavior-predictions, string>;
+    
+    /// Check if behavior prediction is ready
+    is-ready: func() -> bool;
+}

@@ -1,160 +1,298 @@
-use wit_bindgen::generate;
+// Planning Decision - IMPORTS perception data, EXPORTS trajectory plans and driving decisions
 
-// Generate bindings for planning-decision
-generate!({
+wit_bindgen::generate!({
     world: "planning-decision-component",
-    path: "../../wit/planning-decision-standalone.wit"
+    path: "../../wit/planning-decision.wit",
 });
 
-use exports::adas::planning_decision::planning_decision::*;
+use crate::exports::planning_data;
+use crate::exports::planning_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(_config: PlanningConfig) -> Result<(), String> {
-        println!("Initializing planning and decision system");
+// Resource state for planning stream
+pub struct PlanningStreamState {
+    id: u32,
+}
+
+// Planning system configuration state
+static mut PLANNING_CONFIG: Option<planning_control::PlanningConfig> = None;
+static mut PLANNING_STATUS: planning_control::PlanningStatus = planning_control::PlanningStatus::Offline;
+static mut CURRENT_DESTINATION: Option<planning_control::Destination> = None;
+
+// Input stream from perception system
+// Note: Will be created on-demand when planning system is initialized
+
+// Implement the planning-data interface (EXPORTED)
+impl planning_data::Guest for Component {
+    type PlanningStream = PlanningStreamState;
+    
+    fn create_stream() -> planning_data::PlanningStream {
+        planning_data::PlanningStream::new(PlanningStreamState { id: 1 })
+    }
+}
+
+impl planning_data::GuestPlanningStream for PlanningStreamState {
+    fn get_planning(&self) -> Result<planning_data::PlanningResult, String> {
+        unsafe {
+            if matches!(PLANNING_STATUS, planning_control::PlanningStatus::Planning | planning_control::PlanningStatus::Executing) {
+                // Generate planning result based on current perception and destination
+                let ego_trajectory = planning_data::PlannedTrajectory {
+                    waypoints: vec![
+                        planning_data::TrajectoryWaypoint {
+                            position: planning_data::Position3d { x: 0.0, y: 0.0, z: 0.0 },
+                            velocity: planning_data::Velocity3d { vx: 15.0, vy: 0.0, vz: 0.0, speed: 15.0 },
+                            acceleration: planning_data::Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0, magnitude: 0.0 },
+                            curvature: 0.0,
+                            timestamp: 0.0,
+                            lane_id: 1,
+                        },
+                        planning_data::TrajectoryWaypoint {
+                            position: planning_data::Position3d { x: 15.0, y: 0.0, z: 0.0 },
+                            velocity: planning_data::Velocity3d { vx: 15.0, vy: 0.0, vz: 0.0, speed: 15.0 },
+                            acceleration: planning_data::Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0, magnitude: 0.0 },
+                            curvature: 0.0,
+                            timestamp: 1.0,
+                            lane_id: 1,
+                        },
+                        planning_data::TrajectoryWaypoint {
+                            position: planning_data::Position3d { x: 30.0, y: 0.0, z: 0.0 },
+                            velocity: planning_data::Velocity3d { vx: 15.0, vy: 0.0, vz: 0.0, speed: 15.0 },
+                            acceleration: planning_data::Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0, magnitude: 0.0 },
+                            curvature: 0.0,
+                            timestamp: 2.0,
+                            lane_id: 1,
+                        },
+                    ],
+                    duration: 3.0,
+                    cost: 12.5,
+                    feasibility: 0.95,
+                    safety_score: 0.92,
+                    comfort_score: 0.88,
+                };
+
+                Ok(planning_data::PlanningResult {
+                    trajectory_plan: planning_data::TrajectoryPlan {
+                        ego_trajectory,
+                        alternative_trajectories: vec![], // No alternatives for now
+                        planning_horizon: PLANNING_CONFIG.as_ref().map(|c| c.planning_horizon).unwrap_or(5.0),
+                        update_frequency: PLANNING_CONFIG.as_ref().map(|c| c.update_frequency).unwrap_or(10),
+                        trajectory_confidence: 0.89,
+                    },
+                    driving_decisions: planning_data::DrivingDecisions {
+                        primary_action: planning_data::DrivingAction::ContinueStraight,
+                        secondary_actions: vec![planning_data::DrivingAction::Yield],
+                        speed_recommendation: planning_data::SpeedCommand {
+                            target_speed: 15.0,
+                            acceleration_limit: 2.0,
+                            deceleration_limit: -3.0,
+                            speed_profile: planning_data::SpeedProfile::Constant,
+                        },
+                        steering_recommendation: planning_data::SteeringCommand {
+                            target_curvature: 0.0,
+                            steering_rate_limit: 0.5,
+                            lane_keeping_mode: planning_data::LaneKeepingMode::Center,
+                        },
+                        urgency_level: planning_data::UrgencyLevel::Routine,
+                        action_confidence: 0.91,
+                    },
+                    mission_status: planning_data::MissionStatus {
+                        current_goal: planning_data::GoalType::Navigation,
+                        progress_percentage: 25.0,
+                        remaining_distance: 150.0,
+                        estimated_time: 36.0,
+                        obstacles_detected: 2,
+                        replanning_required: false,
+                    },
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    planning_confidence: 0.87,
+                })
+            } else {
+                Err("Planning system not active".to_string())
+            }
+        }
+    }
+
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(PLANNING_STATUS, 
+                planning_control::PlanningStatus::Planning | 
+                planning_control::PlanningStatus::Executing |
+                planning_control::PlanningStatus::Replanning
+            )
+        }
+    }
+
+    fn get_trajectory_count(&self) -> u32 {
+        // Return count of alternative trajectories + ego trajectory
+        1 // Simulated count
+    }
+}
+
+// Implement the planning control interface (EXPORTED)
+impl planning_control::Guest for Component {
+    fn initialize(config: planning_control::PlanningConfig) -> Result<(), String> {
+        unsafe {
+            PLANNING_CONFIG = Some(config);
+            PLANNING_STATUS = planning_control::PlanningStatus::Initializing;
+            
+            // TODO: Create input stream from perception system
+            // let _perception_stream = crate::perception_data::create_stream();
+        }
         Ok(())
     }
 
     fn start_planning() -> Result<(), String> {
-        println!("Starting planning process");
-        Ok(())
-    }
-
-    fn stop_planning() -> Result<(), String> {
-        println!("Stopping planning process");
-        Ok(())
-    }
-
-    fn create_mission_plan(start: Position3d, destination: Position3d, _constraints: PlanningConstraints) -> Result<MissionPlan, String> {
-        println!("Creating mission plan from start to destination");
-        
-        Ok(MissionPlan {
-            plan_id: 1,
-            start_position: start,
-            destination,
-            waypoints: vec![],
-            route_segments: vec![],
-            estimated_duration: 300.0,
-            estimated_distance: 100.0,
-            planning_constraints: PlanningConstraints {
-                max_speed: 15.0,
-                comfort_level: ComfortLevel::Standard,
-                efficiency_priority: EfficiencyPriority::Balanced,
-                safety_margin: 2.0,
-                route_preferences: vec![],
-                time_constraints: vec![],
-            },
-        })
-    }
-
-    fn generate_tactical_plan(_context: DecisionContext) -> Result<TacticalPlan, String> {
-        println!("Generating tactical plan");
-        
-        Ok(TacticalPlan {
-            plan_id: 1,
-            time_horizon: 10.0,
-            planned_trajectory: Trajectory {
-                trajectory_id: 1,
-                path_points: vec![],
-                velocity_profile: vec![],
-                acceleration_profile: vec![],
-                total_duration: 10.0,
-                path_length: 50.0,
-            },
-            alternative_trajectories: vec![],
-            maneuver_sequence: vec![],
-            risk_assessment: RiskAssessment {
-                overall_risk_level: RiskLevel::Low,
-                collision_probability: 0.01,
-                comfort_violation_risk: 0.05,
-                mission_failure_risk: 0.02,
-                risk_factors: vec![],
-            },
-            confidence: 0.9,
-            computational_cost: 0.1,
-        })
-    }
-
-    fn make_decision(_context: DecisionContext, available_options: Vec<PlannedManeuver>) -> Result<PlannedManeuver, String> {
-        println!("Making decision from {} available options", available_options.len());
-        
-        // Return first option or create default
-        if let Some(maneuver) = available_options.into_iter().next() {
-            Ok(maneuver)
-        } else {
-            Ok(PlannedManeuver {
-                maneuver_id: 1,
-                maneuver_type: ManeuverType::LaneKeeping,
-                start_time: 0,
-                duration: 1.0,
-                target_state: VehicleState {
-                    lane_id: 1,
-                    lane_offset: 0.0,
-                },
-                preconditions: vec![],
-                postconditions: vec![],
-            })
+        unsafe {
+            if PLANNING_CONFIG.is_some() {
+                PLANNING_STATUS = planning_control::PlanningStatus::Planning;
+                Ok(())
+            } else {
+                Err("Planning system not initialized".to_string())
+            }
         }
     }
 
-    fn update_context(_context: DecisionContext) -> Result<(), String> {
-        println!("Updating decision context");
+    fn stop_planning() -> Result<(), String> {
+        unsafe {
+            PLANNING_STATUS = planning_control::PlanningStatus::Offline;
+        }
         Ok(())
     }
 
-    fn validate_plan(_plan: TacticalPlan) -> Result<bool, String> {
-        println!("Validating tactical plan");
-        Ok(true)
-    }
-
-    fn get_current_plan() -> Result<TacticalPlan, String> {
-        println!("Getting current plan");
-        
-        Ok(TacticalPlan {
-            plan_id: 1,
-            time_horizon: 10.0,
-            planned_trajectory: Trajectory {
-                trajectory_id: 1,
-                path_points: vec![],
-                velocity_profile: vec![],
-                acceleration_profile: vec![],
-                total_duration: 10.0,
-                path_length: 50.0,
-            },
-            alternative_trajectories: vec![],
-            maneuver_sequence: vec![],
-            risk_assessment: RiskAssessment {
-                overall_risk_level: RiskLevel::Low,
-                collision_probability: 0.01,
-                comfort_violation_risk: 0.05,
-                mission_failure_risk: 0.02,
-                risk_factors: vec![],
-            },
-            confidence: 0.9,
-            computational_cost: 0.1,
-        })
-    }
-
-    fn get_status() -> PlanningStatus {
-        PlanningStatus::Active
-    }
-
-    fn update_config(_config: PlanningConfig) -> Result<(), String> {
-        println!("Updating planning configuration");
+    fn set_destination(destination: planning_control::Destination) -> Result<(), String> {
+        unsafe {
+            CURRENT_DESTINATION = Some(destination);
+            // Trigger replanning if system is active
+            if matches!(PLANNING_STATUS, planning_control::PlanningStatus::Planning | planning_control::PlanningStatus::Executing) {
+                PLANNING_STATUS = planning_control::PlanningStatus::Replanning;
+            }
+        }
         Ok(())
     }
 
-    fn run_diagnostic() -> Result<DiagnosticResult, String> {
-        println!("Running planning diagnostic");
-        
-        Ok(DiagnosticResult {
-            planning_performance: 0.95,
-            decision_latency: 10,
-            plan_success_rate: 0.98,
-            resource_utilization: 0.3,
+    fn update_config(config: planning_control::PlanningConfig) -> Result<(), String> {
+        unsafe {
+            PLANNING_CONFIG = Some(config);
+        }
+        Ok(())
+    }
+
+    fn get_status() -> planning_control::PlanningStatus {
+        unsafe { PLANNING_STATUS.clone() }
+    }
+
+    fn get_performance() -> planning_control::PerformanceMetrics {
+        planning_control::PerformanceMetrics {
+            planning_time_ms: 8.7,
+            trajectory_smoothness: 0.94,
+            safety_violations: 0,
+            comfort_score: 0.88,
+            efficiency_score: 0.82,
+            success_rate: 0.96,
+            cpu_usage_percent: 22.0,
+            memory_usage_mb: 128,
+        }
+    }
+
+    fn run_diagnostic() -> Result<planning_control::DiagnosticResult, String> {
+        Ok(planning_control::DiagnosticResult {
+            perception_integration: planning_control::TestResult::Passed,
+            trajectory_generation: planning_control::TestResult::Passed,
+            decision_logic: planning_control::TestResult::Passed,
+            safety_checks: planning_control::TestResult::Passed,
+            performance_metrics: planning_control::TestResult::Passed,
+            overall_score: 92.1,
         })
+    }
+
+    fn emergency_stop() -> Result<(), String> {
+        unsafe {
+            PLANNING_STATUS = planning_control::PlanningStatus::Completed; // Emergency stop completed
+        }
+        println!("Emergency stop activated");
+        Ok(())
+    }
+
+    fn resume_planning() -> Result<(), String> {
+        unsafe {
+            if PLANNING_CONFIG.is_some() {
+                PLANNING_STATUS = planning_control::PlanningStatus::Planning;
+                Ok(())
+            } else {
+                Err("Planning system not initialized".to_string())
+            }
+        }
+    }
+}
+
+// Helper function to generate trajectory plan from perception data
+fn _generate_trajectory_plan(
+    // TODO: Use proper import types once wit-bindgen generates them correctly
+    // perception: &crate::perception_data::PerceptionModel,
+    // destination: Option<&planning_control::Destination>,
+) -> planning_data::TrajectoryPlan {
+    // TODO: Implement actual trajectory planning algorithms
+    // 1. Analyze perception data for obstacles and scene context
+    // 2. Generate multiple trajectory candidates
+    // 3. Evaluate trajectories for safety, comfort, and efficiency
+    // 4. Select optimal trajectory
+    // 5. Generate fallback alternatives
+    
+    println!("Generating trajectory plan from perception data");
+    
+    // Placeholder trajectory planning
+    planning_data::TrajectoryPlan {
+        ego_trajectory: planning_data::PlannedTrajectory {
+            waypoints: vec![],
+            duration: 5.0,
+            cost: 10.0,
+            feasibility: 0.95,
+            safety_score: 0.92,
+            comfort_score: 0.88,
+        },
+        alternative_trajectories: vec![],
+        planning_horizon: 5.0,
+        update_frequency: 10,
+        trajectory_confidence: 0.89,
+    }
+}
+
+// Helper function to make driving decisions based on perception and trajectory
+fn _make_driving_decisions(
+    // TODO: Use proper import types once wit-bindgen generates them correctly
+    // perception: &crate::perception_data::PerceptionModel,
+    // trajectory: &planning_data::TrajectoryPlan,
+) -> planning_data::DrivingDecisions {
+    // TODO: Implement actual decision-making logic
+    // 1. Analyze risk assessment from perception
+    // 2. Consider trajectory constraints and goals  
+    // 3. Apply driving rules and safety protocols
+    // 4. Generate speed and steering commands
+    // 5. Determine urgency level and action confidence
+    
+    println!("Making driving decisions from perception and trajectory");
+    
+    // Placeholder decision making
+    planning_data::DrivingDecisions {
+        primary_action: planning_data::DrivingAction::ContinueStraight,
+        secondary_actions: vec![],
+        speed_recommendation: planning_data::SpeedCommand {
+            target_speed: 15.0,
+            acceleration_limit: 2.0,
+            deceleration_limit: -3.0,
+            speed_profile: planning_data::SpeedProfile::Constant,
+        },
+        steering_recommendation: planning_data::SteeringCommand {
+            target_curvature: 0.0,
+            steering_rate_limit: 0.5,
+            lane_keeping_mode: planning_data::LaneKeepingMode::Center,
+        },
+        urgency_level: planning_data::UrgencyLevel::Routine,
+        action_confidence: 0.91,
     }
 }
 

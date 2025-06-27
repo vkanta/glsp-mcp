@@ -1,135 +1,223 @@
-use wit_bindgen::generate;
+// Sensor Fusion ECU - IMPORTS multiple sensor streams, EXPORTS fused environment model
 
-// Generate bindings for sensor-fusion-ecu
-generate!({
+wit_bindgen::generate!({
     world: "sensor-fusion-component",
-    path: "../../wit/sensor-fusion-ecu-standalone.wit"
+    path: "../../wit/sensor-fusion.wit",
 });
 
-use exports::adas::sensor_fusion::sensor_fusion::*;
+use crate::exports::fusion_data;
+use crate::exports::fusion_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: FusionConfig) -> Result<(), String> {
-        println!("Initializing sensor fusion with {:?} algorithm", config.algorithm_type);
-        println!("Temporal window: {} seconds", config.temporal_window);
-        Ok(())
-    }
+// Resource state for fusion stream
+pub struct FusionStreamState {
+    id: u32,
+}
 
-    fn add_sensor_input(input: SensorInput) -> Result<(), String> {
-        println!("Adding sensor input from {} (type: {:?})", input.sensor_id, input.sensor_type);
-        Ok(())
-    }
+// Fusion system configuration state
+static mut FUSION_CONFIG: Option<fusion_control::FusionConfig> = None;
+static mut FUSION_STATUS: fusion_control::FusionStatus = fusion_control::FusionStatus::Offline;
 
-    fn fuse_sensors() -> Result<SceneState, String> {
-        // Return mock fused scene state
-        Ok(SceneState {
-            ego_vehicle_state: VehicleState {
-                position: Position3d { x: 0.0, y: 0.0, z: 0.0 },
-                velocity: Velocity3d { vx: 0.0, vy: 0.0, vz: 0.0 },
-                acceleration: Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0 },
-                heading: 0.0,
-                steering_angle: 0.0,
-                yaw_rate: 0.0,
-            },
-            detected_objects: vec![],
-            free_space: FreeSpaceMap {
-                grid_resolution: 0.1,
-                grid_size: GridDimensions {
-                    width: 200,
-                    height: 200,
-                    origin_x: -100.0,
-                    origin_y: -100.0,
-                },
-                occupancy_grid: vec![0; 40000],
-                confidence_grid: vec![255; 40000],
-            },
-            road_geometry: RoadInfo {
-                lane_markings: vec![],
-                road_boundaries: vec![],
-                traffic_signs: vec![],
-                road_curvature: 0.0,
-                lane_width: 3.5,
-            },
-            weather_conditions: WeatherState {
-                visibility: 1000.0,
-                precipitation: PrecipitationType::None,
-                temperature: 20.0,
-                wind_speed: 5.0,
-            },
-            scene_confidence: 0.95,
-        })
-    }
+// Input streams from various sensors and AI components
+// Note: Will be created on-demand when fusion system is initialized
 
-    fn get_tracked_objects() -> Result<Vec<FusedObject>, String> {
-        // Return mock tracked objects
-        Ok(vec![
-            FusedObject {
-                object_id: 1,
-                position: Position3d { x: 20.0, y: 5.0, z: 0.0 },
-                velocity: Velocity3d { vx: -10.0, vy: 0.0, vz: 0.0 },
-                acceleration: Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0 },
-                dimensions: Dimensions3d {
-                    length: 4.5,
-                    width: 2.0,
-                    height: 1.5,
-                },
-                object_type: ObjectType::Vehicle,
-                confidence: 0.95,
-                covariance_matrix: vec![1.0; 81], // 9x9 matrix
-                sensor_sources: vec![SensorSource::FrontCamera, SensorSource::FrontRadar],
-                track_age: 10,
-                prediction_horizon: 3.0,
+// Implement the fusion-data interface (EXPORTED)
+impl fusion_data::Guest for Component {
+    type FusionStream = FusionStreamState;
+    
+    fn create_stream() -> fusion_data::FusionStream {
+        fusion_data::FusionStream::new(FusionStreamState { id: 1 })
+    }
+}
+
+impl fusion_data::GuestFusionStream for FusionStreamState {
+    fn get_environment(&self) -> Result<fusion_data::EnvironmentModel, String> {
+        unsafe {
+            if matches!(FUSION_STATUS, fusion_control::FusionStatus::Fusing) {
+                // Simulate fusion of multiple sensor inputs
+                let fused_objects = vec![
+                    fusion_data::FusedObject {
+                        object_id: 1,
+                        object_type: fusion_data::ObjectType::Vehicle,
+                        position: fusion_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
+                        velocity: fusion_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
+                        confidence: 0.95, // High confidence from multiple sensors
+                        source_sensors: vec![
+                            fusion_data::SensorType::Camera,
+                            fusion_data::SensorType::Radar,
+                        ],
+                        tracking_state: fusion_data::TrackingState::Tracked,
+                    },
+                    fusion_data::FusedObject {
+                        object_id: 2,
+                        object_type: fusion_data::ObjectType::Pedestrian,
+                        position: fusion_data::Position3d { x: 25.0, y: 3.0, z: 0.0 },
+                        velocity: fusion_data::Velocity3d { vx: 1.2, vy: 0.0, vz: 0.0, speed: 1.2 },
+                        confidence: 0.88, // Lower confidence (camera only)
+                        source_sensors: vec![
+                            fusion_data::SensorType::Camera,
+                        ],
+                        tracking_state: fusion_data::TrackingState::Tracked,
+                    },
+                    fusion_data::FusedObject {
+                        object_id: 3,
+                        object_type: fusion_data::ObjectType::Unknown,
+                        position: fusion_data::Position3d { x: 15.0, y: -2.5, z: 0.0 },
+                        velocity: fusion_data::Velocity3d { vx: 2.0, vy: 0.5, vz: 0.0, speed: 2.1 },
+                        confidence: 0.72, // Medium confidence (radar only)
+                        source_sensors: vec![
+                            fusion_data::SensorType::Radar,
+                        ],
+                        tracking_state: fusion_data::TrackingState::New,
+                    },
+                ];
+
+                Ok(fusion_data::EnvironmentModel {
+                    objects: fused_objects,
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    fusion_quality: 0.92,
+                    coverage_area: fusion_data::CoverageArea {
+                        forward_range: 200.0,
+                        lateral_range: 50.0,
+                        angular_coverage: 120.0,
+                    },
+                })
+            } else {
+                Err("Fusion system not active".to_string())
             }
-        ])
+        }
     }
 
-    fn predict_future_state(time_horizon: f32) -> Result<Vec<FusedObject>, String> {
-        println!("Predicting future state for {} seconds", time_horizon);
-        Ok(vec![])
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(FUSION_STATUS, fusion_control::FusionStatus::Fusing)
+        }
     }
 
-    fn update_config(config: FusionConfig) -> Result<(), String> {
-        println!("Updating fusion configuration");
+    fn get_object_count(&self) -> u32 {
+        // Return count from last fusion
+        3 // Simulated count
+    }
+}
+
+// Implement the fusion control interface (EXPORTED)
+impl fusion_control::Guest for Component {
+    fn initialize(config: fusion_control::FusionConfig) -> Result<(), String> {
+        unsafe {
+            FUSION_CONFIG = Some(config);
+            FUSION_STATUS = fusion_control::FusionStatus::Initializing;
+            
+            // TODO: Create input streams from various sensors and AI components
+            // let _camera_stream = crate::camera_data::create_stream();
+            // let _radar_stream = crate::radar_data::create_stream(); 
+            // let _detection_stream = crate::detection_data::create_stream();
+        }
         Ok(())
     }
 
-    fn get_performance() -> Result<FusionMetrics, String> {
-        Ok(FusionMetrics {
-            processing_latency: 15.0,
-            track_accuracy: 0.95,
-            false_positive_rate: 0.02,
-            missed_detection_rate: 0.05,
-            temporal_consistency: 0.92,
-            memory_usage: 128,
-        })
+    fn start_fusion() -> Result<(), String> {
+        unsafe {
+            if FUSION_CONFIG.is_some() {
+                FUSION_STATUS = fusion_control::FusionStatus::Calibrating;
+                
+                // Simulate calibration process
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                
+                FUSION_STATUS = fusion_control::FusionStatus::Fusing;
+                Ok(())
+            } else {
+                Err("Fusion system not initialized".to_string())
+            }
+        }
     }
 
-    fn reset_tracks() -> Result<(), String> {
-        println!("Resetting all tracks");
+    fn stop_fusion() -> Result<(), String> {
+        unsafe {
+            FUSION_STATUS = fusion_control::FusionStatus::Offline;
+        }
         Ok(())
     }
 
-    fn get_debug_info() -> Result<DebugInfo, String> {
-        Ok(DebugInfo {
-            active_tracks: 5,
-            sensor_input_rates: vec![
-                SensorRate {
-                    sensor_id: "front-camera".to_string(),
-                    update_rate: 30.0,
+    fn update_config(config: fusion_control::FusionConfig) -> Result<(), String> {
+        unsafe {
+            FUSION_CONFIG = Some(config);
+        }
+        Ok(())
+    }
+
+    fn get_status() -> fusion_control::FusionStatus {
+        unsafe { FUSION_STATUS.clone() }
+    }
+
+    fn get_performance() -> fusion_control::PerformanceMetrics {
+        fusion_control::PerformanceMetrics {
+            fusion_accuracy: 0.92,
+            processing_latency: 5.2,
+            data_association_rate: 0.89,
+            false_positive_rate: 0.03,
+            false_negative_rate: 0.07,
+            sensor_availability: vec![
+                fusion_control::SensorStatus {
+                    sensor_type: fusion_control::SensorType::Camera,
+                    availability: 0.98,
                     data_quality: 0.95,
-                }
+                },
+                fusion_control::SensorStatus {
+                    sensor_type: fusion_control::SensorType::Radar,
+                    availability: 0.99,
+                    data_quality: 0.92,
+                },
+                fusion_control::SensorStatus {
+                    sensor_type: fusion_control::SensorType::Lidar,
+                    availability: 0.85,
+                    data_quality: 0.97,
+                },
             ],
-            fusion_statistics: FusionStats {
-                successful_associations: 450,
-                failed_associations: 10,
-                new_track_initiations: 5,
-                track_terminations: 3,
-            },
+        }
+    }
+
+    fn run_diagnostic() -> Result<fusion_control::DiagnosticResult, String> {
+        Ok(fusion_control::DiagnosticResult {
+            calibration_status: fusion_control::TestResult::Passed,
+            data_association: fusion_control::TestResult::Passed,
+            temporal_consistency: fusion_control::TestResult::Passed,
+            spatial_accuracy: fusion_control::TestResult::Passed,
+            sensor_synchronization: fusion_control::TestResult::Passed,
+            overall_score: 93.7,
         })
     }
+}
+
+// Helper function to perform actual sensor fusion  
+fn _fuse_sensor_data(
+    // TODO: Use proper import types once wit-bindgen generates them correctly
+    // camera_frame: Option<&crate::camera_data::CameraFrame>,
+    // radar_scan: Option<&crate::radar_data::RadarScan>, 
+    // detections: Option<&crate::detection_data::DetectionResults>,
+) -> Vec<fusion_data::FusedObject> {
+    // TODO: Implement actual sensor fusion algorithms
+    // 1. Data association - match detections across sensors
+    // 2. Kalman filtering - track objects over time
+    // 3. Confidence weighting - based on sensor reliability
+    // 4. Spatial and temporal alignment
+    // 5. Conflict resolution - handle contradictory data
+    
+    let mut fused_objects = Vec::new();
+    
+    // TODO: Simple fusion example: combine camera detections with radar data
+    // Once wit-bindgen properly generates import types, implement:
+    // 1. Data association between sensors
+    // 2. Confidence weighting 
+    // 3. Spatial and temporal alignment
+    // 4. Object tracking over time
+    
+    println!("Fusion algorithm placeholder - will implement once imports work");
+    
+    fused_objects
 }
 
 export!(Component);

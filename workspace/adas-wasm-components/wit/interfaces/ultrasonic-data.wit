@@ -1,0 +1,42 @@
+/// Ultrasonic Sensor Data Interface - EXPORTED by ultrasonic components
+package adas:ultrasonic-data@0.1.0;
+
+interface ultrasonic-data {
+    use adas:sensor-data/spatial-types.{position3d};
+
+    record ultrasonic-scan {
+        sensors: list<ultrasonic-reading>,
+        timestamp: u64,
+    }
+
+    record ultrasonic-reading {
+        sensor-id: u32,
+        sensor-position: position3d,
+        sensor-orientation: f32, // Angle in radians
+        distance: f32, // Distance in meters
+        confidence: f32,
+        detection-status: detection-status,
+    }
+
+    enum detection-status {
+        no-echo,
+        valid,
+        too-close,
+        too-far,
+        invalid,
+    }
+
+    resource ultrasonic-stream {
+        /// Get current ultrasonic scan data
+        get-scan: func() -> result<ultrasonic-scan, string>;
+        
+        /// Check if ultrasonic system is available
+        is-available: func() -> bool;
+        
+        /// Get minimum detection range
+        get-min-range: func() -> f32;
+        
+        /// Get maximum detection range
+        get-max-range: func() -> f32;
+    }
+}

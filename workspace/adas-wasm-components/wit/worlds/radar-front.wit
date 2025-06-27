@@ -1,0 +1,99 @@
+/// Front Radar Component - EXPORTS radar data stream
+package adas:radar-front@0.1.0;
+
+world radar-front-component {
+    import wasi:cli/environment@0.2.3;
+    import wasi:cli/exit@0.2.3;
+    import wasi:io/streams@0.2.3;
+    import wasi:cli/stdout@0.2.3;
+    import wasi:cli/stderr@0.2.3;
+    import wasi:clocks/monotonic-clock@0.2.3;
+    import wasi:clocks/wall-clock@0.2.3;
+
+    /// Export the radar data stream for other components to consume
+    export adas:sensor-data/radar-data@0.1.0;
+    
+    /// Radar control interface for configuration and control
+    export radar-control: interface {
+        /// Initialize radar with configuration
+        initialize: func(config: radar-config) -> result<_, string>;
+        
+        /// Start radar scanning
+        start-scanning: func() -> result<_, string>;
+        
+        /// Stop radar scanning  
+        stop-scanning: func() -> result<_, string>;
+        
+        /// Update radar configuration
+        update-config: func(config: radar-config) -> result<_, string>;
+        
+        /// Get radar status
+        get-status: func() -> radar-status;
+        
+        /// Run radar diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+
+    /// Radar configuration
+    record radar-config {
+        range-mode: range-mode,
+        scan-pattern: scan-pattern,
+        power-mode: power-mode,
+        tracking-mode: tracking-mode,
+        frequency-band: frequency-band,
+    }
+
+    enum range-mode {
+        short-range,    // 0-50m
+        medium-range,   // 0-100m
+        long-range,     // 0-250m
+    }
+
+    enum scan-pattern {
+        narrow-beam,    // ±15°
+        standard,       // ±45°
+        wide-angle,     // ±75°
+    }
+
+    enum power-mode {
+        low-power,
+        standard,
+        high-resolution,
+    }
+
+    enum tracking-mode {
+        single-target,
+        multi-target,
+        adaptive,
+    }
+
+    enum frequency-band {
+        band-24ghz,
+        band-77ghz,
+        band-79ghz,
+    }
+
+    enum radar-status {
+        offline,
+        initializing,
+        scanning,
+        error,
+        maintenance,
+    }
+
+    record diagnostic-result {
+        transmitter-health: test-result,
+        receiver-health: test-result,
+        antenna-health: test-result,
+        signal-processing: test-result,
+        calibration-status: test-result,
+        overall-score: f32,
+    }
+
+    enum test-result {
+        passed,
+        failed,
+        warning,
+        not-tested,
+    }
+}

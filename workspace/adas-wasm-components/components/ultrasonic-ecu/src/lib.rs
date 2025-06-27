@@ -1,181 +1,138 @@
-use wit_bindgen::generate;
+// Ultrasonic ECU - Exports close-range ultrasonic data for parking assistance
 
-// Generate bindings for ultrasonic-ecu
-generate!({
+wit_bindgen::generate!({
     world: "ultrasonic-component",
-    path: "../../wit/ultrasonic-ecu-standalone.wit"
+    path: "../../wit/ultrasonic.wit",
 });
 
-use exports::adas::ultrasonic::ultrasonic::*;
+use crate::exports::ultrasonic_data;
+use crate::exports::ultrasonic_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: UltrasonicConfig) -> Result<(), String> {
-        println!("Initializing ultrasonic system with {} enabled sensors", config.enabled_sensors.len());
-        Ok(())
-    }
+// Resource state for ultrasonic stream
+pub struct UltrasonicStreamState {
+    id: u32,
+}
 
-    fn start_sensing() -> Result<(), String> {
-        println!("Starting ultrasonic sensing");
-        Ok(())
-    }
+// Ultrasonic configuration state
+static mut ULTRASONIC_CONFIG: Option<ultrasonic_control::UltrasonicConfig> = None;
+static mut ULTRASONIC_STATUS: ultrasonic_control::UltrasonicStatus = ultrasonic_control::UltrasonicStatus::Offline;
 
-    fn stop_sensing() -> Result<(), String> {
-        println!("Stopping ultrasonic sensing");
-        Ok(())
+// Implement the ultrasonic-data interface
+impl ultrasonic_data::Guest for Component {
+    type UltrasonicStream = UltrasonicStreamState;
+    
+    fn create_stream() -> ultrasonic_data::UltrasonicStream {
+        ultrasonic_data::UltrasonicStream::new(UltrasonicStreamState { id: 1 })
     }
+}
 
-    fn get_measurements() -> Result<Vec<UltrasonicMeasurement>, String> {
-        // Return mock ultrasonic measurements for all sensor positions
-        Ok(vec![
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::FrontLeft,
-                distance: 1.2,
+impl ultrasonic_data::GuestUltrasonicStream for UltrasonicStreamState {
+    fn get_scan(&self) -> Result<ultrasonic_data::UltrasonicScan, String> {
+        // Simulate ultrasonic sensor readings from 8 sensors
+        let sensors = vec![
+            ultrasonic_data::SensorReading {
+                sensor_id: 1,
+                distance: 1.2, // 1.2m to obstacle
                 confidence: 0.95,
-                temperature_compensated: true,
-                measurement_time: 1000000000, // Mock timestamp
+                sensor_position: ultrasonic_data::SensorPosition::FrontLeft,
+                sensor_pose: ultrasonic_data::UltrasonicPose {
+                    position: ultrasonic_data::Position3d { x: 2.0, y: 0.8, z: 0.5 },
+                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                },
             },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::FrontCenterLeft,
-                distance: 0.8,
-                confidence: 0.92,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
+            ultrasonic_data::SensorReading {
+                sensor_id: 2,
+                distance: 0.8, // Close obstacle
+                confidence: 0.98,
+                sensor_position: ultrasonic_data::SensorPosition::FrontCenterLeft,
+                sensor_pose: ultrasonic_data::UltrasonicPose {
+                    position: ultrasonic_data::Position3d { x: 2.1, y: 0.3, z: 0.5 },
+                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                },
             },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::FrontCenterRight,
-                distance: 0.6,
-                confidence: 0.88,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
+            ultrasonic_data::SensorReading {
+                sensor_id: 5,
+                distance: 0.4, // Very close rear obstacle
+                confidence: 0.99,
+                sensor_position: ultrasonic_data::SensorPosition::RearCenterLeft,
+                sensor_pose: ultrasonic_data::UltrasonicPose {
+                    position: ultrasonic_data::Position3d { x: -2.1, y: 0.3, z: 0.5 },
+                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 1.0, w: 0.0 }, // 180° rotated
+                },
             },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::FrontRight,
-                distance: 1.5,
-                confidence: 0.93,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
-            },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::RearLeft,
-                distance: 2.1,
-                confidence: 0.90,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
-            },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::RearCenterLeft,
-                distance: 0.9,
-                confidence: 0.96,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
-            },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::RearCenterRight,
-                distance: 0.7,
-                confidence: 0.94,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
-            },
-            UltrasonicMeasurement {
-                sensor_position: SensorPosition::RearRight,
-                distance: 2.3,
-                confidence: 0.89,
-                temperature_compensated: true,
-                measurement_time: 1000000000,
-            },
-        ])
-    }
+        ];
 
-    fn get_parking_assistance() -> Result<ParkingAssistance, String> {
-        let measurements = Self::get_measurements()?;
-        
-        // Find closest obstacle
-        let closest = measurements.iter()
-            .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
-            .cloned();
-
-        let closest_obstacle = closest.map(|m| ObstacleInfo {
-            position: m.sensor_position,
-            distance: m.distance,
-            obstacle_type: if m.distance < 1.0 { ObstacleType::Wall } else { ObstacleType::Vehicle },
-            confidence: m.confidence,
-        });
-
-        let warning_level = match closest_obstacle.as_ref().map(|o| o.distance) {
-            Some(d) if d < 0.5 => WarningLevel::Critical,
-            Some(d) if d < 1.0 => WarningLevel::Warning,
-            Some(d) if d < 1.5 => WarningLevel::Caution,
-            Some(d) if d < 2.0 => WarningLevel::Info,
-            _ => WarningLevel::None,
-        };
-
-        let guidance = ParkingGuidance {
-            direction: match warning_level {
-                WarningLevel::Critical => GuidanceDirection::Stop,
-                WarningLevel::Warning => GuidanceDirection::Reverse,
-                _ => GuidanceDirection::Forward,
-            },
-            recommended_action: match warning_level {
-                WarningLevel::Critical => ParkingAction::Stop,
-                WarningLevel::Warning => ParkingAction::SlowDown,
-                WarningLevel::Caution => ParkingAction::Continue,
-                _ => ParkingAction::Continue,
-            },
-            distance_to_target: Some(2.5),
-            steering_guidance: Some(0.0),
-        };
-
-        Ok(ParkingAssistance {
-            all_measurements: measurements,
-            closest_obstacle,
-            parking_guidance: guidance,
-            warning_level,
+        Ok(ultrasonic_data::UltrasonicScan {
+            sensors,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            scan_id: 11111,
         })
     }
 
-    fn get_status() -> SystemStatus {
-        SystemStatus::Active
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(ULTRASONIC_STATUS, ultrasonic_control::UltrasonicStatus::Monitoring | ultrasonic_control::UltrasonicStatus::Detecting)
+        }
     }
 
-    fn update_config(_config: UltrasonicConfig) -> Result<(), String> {
-        println!("Updating ultrasonic configuration");
+    fn get_min_distance(&self) -> f64 {
+        // Return minimum distance from all sensors
+        0.4 // From the scan above
+    }
+}
+
+// Implement the ultrasonic control interface
+impl ultrasonic_control::Guest for Component {
+    fn initialize(config: ultrasonic_control::UltrasonicConfig) -> Result<(), String> {
+        unsafe {
+            ULTRASONIC_CONFIG = Some(config);
+            ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Initializing;
+        }
         Ok(())
     }
 
-    fn calibrate_sensors() -> Result<(), String> {
-        println!("Calibrating ultrasonic sensors");
-        Ok(())
-    }
-
-    fn run_diagnostic() -> Result<DiagnosticResult, String> {
-        let sensor_positions = vec![
-            SensorPosition::FrontLeft,
-            SensorPosition::FrontCenterLeft,
-            SensorPosition::FrontCenterRight,
-            SensorPosition::FrontRight,
-            SensorPosition::RearLeft,
-            SensorPosition::RearCenterLeft,
-            SensorPosition::RearCenterRight,
-            SensorPosition::RearRight,
-        ];
-
-        let sensor_health: Vec<SensorHealth> = sensor_positions.into_iter().map(|pos| {
-            SensorHealth {
-                position: pos,
-                operational: true,
-                signal_quality: 0.95,
-                response_time: 0.05, // 50ms response time
+    fn start_monitoring() -> Result<(), String> {
+        unsafe {
+            if ULTRASONIC_CONFIG.is_some() {
+                ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Monitoring;
+                Ok(())
+            } else {
+                Err("Ultrasonic system not initialized".to_string())
             }
-        }).collect();
+        }
+    }
 
-        Ok(DiagnosticResult {
-            sensor_health,
-            overall_health: 0.96,
-            temperature: 22.5, // Celsius
-            voltage: 12.0, // Volts
+    fn stop_monitoring() -> Result<(), String> {
+        unsafe {
+            ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Offline;
+        }
+        Ok(())
+    }
+
+    fn update_config(config: ultrasonic_control::UltrasonicConfig) -> Result<(), String> {
+        unsafe {
+            ULTRASONIC_CONFIG = Some(config);
+        }
+        Ok(())
+    }
+
+    fn get_status() -> ultrasonic_control::UltrasonicStatus {
+        unsafe { ULTRASONIC_STATUS.clone() }
+    }
+
+    fn run_diagnostic() -> Result<ultrasonic_control::DiagnosticResult, String> {
+        Ok(ultrasonic_control::DiagnosticResult {
+            sensor_integrity: ultrasonic_control::TestResult::Passed,
+            range_accuracy: ultrasonic_control::TestResult::Passed,
+            response_time: ultrasonic_control::TestResult::Passed,
+            environmental_immunity: ultrasonic_control::TestResult::Passed,
+            cross_talk_suppression: ultrasonic_control::TestResult::Passed,
+            overall_score: 94.3,
         })
     }
 }

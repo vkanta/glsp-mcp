@@ -1,0 +1,270 @@
+/// Tracking & Prediction Component - IMPORTS fusion data, EXPORTS tracked objects and predictions
+package adas:tracking-prediction@0.1.0;
+
+world tracking-prediction-component {
+    /// Import fusion data for object tracking
+    import fusion-data: interface {
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        record environment-model {
+            objects: list<fused-object>,
+            timestamp: u64,
+            fusion-quality: f32,
+            coverage-area: coverage-area,
+        }
+
+        record fused-object {
+            object-id: u32,
+            object-type: object-type,
+            position: position3d,
+            velocity: velocity3d,
+            confidence: f32,
+            source-sensors: list<sensor-type>,
+            tracking-state: tracking-state,
+        }
+
+        record coverage-area {
+            forward-range: f64,
+            lateral-range: f64,
+            angular-coverage: f32,
+        }
+
+        enum object-type {
+            unknown,
+            vehicle,
+            pedestrian,
+            cyclist,
+            motorcycle,
+            truck,
+            bus,
+            traffic-sign,
+            traffic-light,
+            construction-zone,
+            road-debris,
+        }
+
+        enum sensor-type {
+            camera,
+            radar,
+            lidar,
+            ultrasonic,
+        }
+
+        enum tracking-state {
+            new,
+            tracked,
+            lost,
+            deleted,
+        }
+
+        resource fusion-stream {
+            get-environment: func() -> result<environment-model, string>;
+            is-available: func() -> bool;
+            get-object-count: func() -> u32;
+        }
+        
+        create-stream: func() -> fusion-stream;
+    }
+    
+    /// Export tracking data for behavior prediction and planning
+    export tracking-data: interface {
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        record acceleration3d {
+            ax: f64,
+            ay: f64,
+            az: f64,
+            magnitude: f64,
+        }
+
+        record tracking-results {
+            tracked-objects: list<tracked-object>,
+            timestamp: u64,
+            tracking-quality: f32,
+            active-tracks: u32,
+        }
+
+        record tracked-object {
+            object-id: u32,
+            object-type: object-type,
+            position: position3d,
+            velocity: velocity3d,
+            acceleration: acceleration3d,
+            track-history: track-history,
+            tracking-confidence: f32,
+            prediction: trajectory-prediction,
+        }
+
+        record track-history {
+            positions: list<historical-point>,
+            duration: f32,
+            consistency-score: f32,
+        }
+
+        record historical-point {
+            position: position3d,
+            velocity: velocity3d,
+            timestamp: f32,
+            measurement-quality: f32,
+        }
+
+        record trajectory-prediction {
+            predicted-points: list<predicted-point>,
+            prediction-horizon: f32,
+            uncertainty: prediction-uncertainty,
+        }
+
+        record predicted-point {
+            position: position3d,
+            velocity: velocity3d,
+            acceleration: acceleration3d,
+            timestamp: f32,
+            confidence: f32,
+        }
+
+        record prediction-uncertainty {
+            position-variance: position3d,
+            velocity-variance: velocity3d,
+            temporal-uncertainty: f32,
+        }
+
+        enum object-type {
+            unknown,
+            vehicle,
+            pedestrian,
+            cyclist,
+            motorcycle,
+            truck,
+            bus,
+            traffic-sign,
+            traffic-light,
+            construction-zone,
+            road-debris,
+        }
+
+        resource tracking-stream {
+            get-tracking: func() -> result<tracking-results, string>;
+            is-available: func() -> bool;
+            get-track-count: func() -> u32;
+        }
+        
+        create-stream: func() -> tracking-stream;
+    }
+    
+    /// Export tracking control interface
+    export tracking-control: interface {
+        record tracking-config {
+            kalman-params: kalman-parameters,
+            association-params: association-parameters,
+            prediction-horizon: f32,
+            max-tracks: u32,
+            track-management: track-management-config,
+        }
+
+        record kalman-parameters {
+            process-noise: f32,
+            measurement-noise: f32,
+            initial-covariance: f32,
+            adaptive-filtering: bool,
+        }
+
+        record association-parameters {
+            distance-threshold: f32,
+            velocity-threshold: f32,
+            size-threshold: f32,
+            gating-distance: f32,
+            association-method: association-method,
+        }
+
+        enum association-method {
+            nearest-neighbor,
+            global-nearest-neighbor,
+            joint-probabilistic,
+            multiple-hypothesis,
+        }
+
+        record track-management-config {
+            init-threshold: u32,
+            delete-threshold: u32,
+            max-coast-time: f32,
+            min-track-confidence: f32,
+        }
+
+        enum tracking-status {
+            offline,
+            initializing,
+            tracking,
+            degraded,
+            error,
+        }
+
+        record performance-metrics {
+            active-tracks: u32,
+            mota: f32,
+            motp: f32,
+            id-switches: u32,
+            fragmentations: u32,
+            processing-time-ms: f32,
+            cpu-usage-percent: f32,
+            memory-usage-mb: u32,
+        }
+
+        record diagnostic-result {
+            kalman-filter: test-result,
+            data-association: test-result,
+            track-management: test-result,
+            prediction-accuracy: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize tracking system
+        initialize: func(config: tracking-config) -> result<_, string>;
+        
+        /// Start tracking
+        start-tracking: func() -> result<_, string>;
+        
+        /// Stop tracking
+        stop-tracking: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: tracking-config) -> result<_, string>;
+        
+        /// Get status
+        get-status: func() -> tracking-status;
+        
+        /// Get performance metrics
+        get-performance: func() -> performance-metrics;
+        
+        /// Run diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

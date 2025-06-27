@@ -1,211 +1,243 @@
-use wit_bindgen::generate;
+// Perception Fusion - IMPORTS sensor fusion and AI predictions, EXPORTS unified perception model
 
-// Generate bindings for perception-fusion
-generate!({
+wit_bindgen::generate!({
     world: "perception-fusion-component",
-    path: "../../wit/perception-fusion-standalone.wit"
+    path: "../../wit/perception-fusion.wit",
 });
 
-use exports::adas::perception_fusion::perception_fusion::*;
+use crate::exports::perception_data;
+use crate::exports::perception_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: FusionConfig) -> Result<(), String> {
-        println!("Initializing perception fusion system with update frequency: {} Hz", config.update_frequency);
-        Ok(())
-    }
+// Resource state for perception stream
+pub struct PerceptionStreamState {
+    id: u32,
+}
 
-    fn start_fusion() -> Result<(), String> {
-        println!("Starting perception fusion processing");
-        Ok(())
-    }
+// Perception system configuration state
+static mut PERCEPTION_CONFIG: Option<perception_control::PerceptionConfig> = None;
+static mut PERCEPTION_STATUS: perception_control::PerceptionStatus = perception_control::PerceptionStatus::Offline;
 
-    fn stop_fusion() -> Result<(), String> {
-        println!("Stopping perception fusion processing");
-        Ok(())
-    }
+// Input streams from fusion and AI systems
+// Note: Will be created on-demand when perception system is initialized
 
-    fn get_perception_model() -> Result<PerceptionModel, String> {
-        // Return mock perception model
-        Ok(PerceptionModel {
-            timestamp: 1000000,
-            model_id: 1,
-            ego_vehicle: EgoVehicleState {
-                position: Position3d {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    coordinate_frame: CoordinateFrame::VehicleCentric,
-                },
-                velocity: Velocity3d {
-                    vx: 20.0,
-                    vy: 0.0,
-                    vz: 0.0,
-                },
-                acceleration: Acceleration3d {
-                    ax: 0.0,
-                    ay: 0.0,
-                    az: 0.0,
-                },
-                orientation: Orientation3d {
-                    yaw: 0.0,
-                    pitch: 0.0,
-                    roll: 0.0,
-                },
-                lane_position: LanePosition {
-                    lane_id: Some(2),
-                    lateral_offset: 0.1,
-                    heading_offset: 0.02,
-                    lane_confidence: 0.95,
-                },
-                vehicle_dynamics: VehicleDynamics {
-                    steering_angle: 0.0,
-                    wheel_speeds: vec![20.0, 20.0, 20.0, 20.0],
-                    yaw_rate: 0.0,
-                    lateral_acceleration: 0.0,
-                },
-            },
-            dynamic_objects: vec![],
-            static_environment: StaticEnvironment {
-                road_boundaries: vec![],
-                lane_markings: vec![],
-                traffic_signs: vec![],
-                traffic_lights: vec![],
-                road_surface: RoadSurfaceInfo {
-                    surface_type: SurfaceType::Asphalt,
-                    condition: SurfaceCondition::Dry,
-                    friction_coefficient: 0.8,
-                    grade: 0.0,
-                    banking: 0.0,
-                },
-                infrastructure: vec![],
-            },
-            road_model: RoadModel {
-                current_road: RoadSegment {
-                    road_id: 101,
-                    road_type: RoadType::Highway,
-                    speed_limit: 120.0,
-                    number_of_lanes: 3,
-                    road_geometry: RoadGeometry {
-                        centerline: vec![],
-                        curvature: 0.0,
-                        elevation_profile: vec![],
-                        lane_width: 3.5,
+// Implement the perception-data interface (EXPORTED)
+impl perception_data::Guest for Component {
+    type PerceptionStream = PerceptionStreamState;
+    
+    fn create_stream() -> perception_data::PerceptionStream {
+        perception_data::PerceptionStream::new(PerceptionStreamState { id: 1 })
+    }
+}
+
+impl perception_data::GuestPerceptionStream for PerceptionStreamState {
+    fn get_perception(&self) -> Result<perception_data::PerceptionModel, String> {
+        unsafe {
+            if matches!(PERCEPTION_STATUS, perception_control::PerceptionStatus::Processing) {
+                // Simulate perception fusion results
+                let perceived_objects = vec![
+                    perception_data::PerceivedObject {
+                        object_id: 1,
+                        object_type: perception_data::ObjectType::Vehicle,
+                        position: perception_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
+                        velocity: perception_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
+                        predicted_trajectory: perception_data::PredictedTrajectory {
+                            waypoints: vec![
+                                perception_data::TrajectoryPoint {
+                                    position: perception_data::Position3d { x: 45.0, y: 0.0, z: 0.0 },
+                                    velocity: perception_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
+                                    acceleration: perception_data::Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0, magnitude: 0.0 },
+                                    timestamp: 1.0,
+                                },
+                            ],
+                            duration: 3.0,
+                            probability: 0.92,
+                        },
+                        semantic_attributes: perception_data::SemanticAttributes {
+                            size_category: perception_data::SizeCategory::Large,
+                            movement_state: perception_data::MovementState::NormalSpeed,
+                            interaction_potential: 0.85,
+                            lane_association: perception_data::LaneAssociation::SameLane,
+                        },
+                        risk_level: perception_data::RiskLevel::Low,
+                        confidence: 0.94,
                     },
-                },
-                connected_roads: vec![],
-                intersections: vec![],
-                lane_topology: LaneTopology {
-                    current_lane: LaneInfo {
-                        lane_id: 2,
-                        lane_type: LaneType::Driving,
-                        direction: Direction::Forward,
-                        speed_limit: 120.0,
-                        lane_width: 3.5,
-                        centerline: vec![],
+                    perception_data::PerceivedObject {
+                        object_id: 2,
+                        object_type: perception_data::ObjectType::Pedestrian,
+                        position: perception_data::Position3d { x: 25.0, y: 3.0, z: 0.0 },
+                        velocity: perception_data::Velocity3d { vx: 1.2, vy: 0.0, vz: 0.0, speed: 1.2 },
+                        predicted_trajectory: perception_data::PredictedTrajectory {
+                            waypoints: vec![
+                                perception_data::TrajectoryPoint {
+                                    position: perception_data::Position3d { x: 26.2, y: 3.0, z: 0.0 },
+                                    velocity: perception_data::Velocity3d { vx: 1.2, vy: 0.0, vz: 0.0, speed: 1.2 },
+                                    acceleration: perception_data::Acceleration3d { ax: 0.0, ay: 0.0, az: 0.0, magnitude: 0.0 },
+                                    timestamp: 1.0,
+                                },
+                            ],
+                            duration: 2.0,
+                            probability: 0.78,
+                        },
+                        semantic_attributes: perception_data::SemanticAttributes {
+                            size_category: perception_data::SizeCategory::Small,
+                            movement_state: perception_data::MovementState::SlowMoving,
+                            interaction_potential: 0.65,
+                            lane_association: perception_data::LaneAssociation::AdjacentRight,
+                        },
+                        risk_level: perception_data::RiskLevel::Medium,
+                        confidence: 0.87,
                     },
-                    adjacent_lanes: vec![],
-                    lane_connections: vec![],
-                },
-            },
-            confidence: 0.9,
-            uncertainty: UncertaintyEstimate {
-                position_uncertainty: Position3d {
-                    x: 0.1,
-                    y: 0.1,
-                    z: 0.05,
-                    coordinate_frame: CoordinateFrame::VehicleCentric,
-                },
-                velocity_uncertainty: Velocity3d {
-                    vx: 0.5,
-                    vy: 0.5,
-                    vz: 0.1,
-                },
-                object_existence_probability: 0.95,
-                classification_confidence: 0.92,
-                temporal_consistency: 0.88,
-            },
-        })
+                ];
+
+                Ok(perception_data::PerceptionModel {
+                    perceived_objects,
+                    scene_understanding: perception_data::SceneContext {
+                        traffic_density: perception_data::TrafficDensity::Moderate,
+                        weather_conditions: perception_data::WeatherConditions::Clear,
+                        lighting_conditions: perception_data::LightingConditions::Daylight,
+                        road_type: perception_data::RoadType::CityStreet,
+                        intersection_nearby: false,
+                    },
+                    risk_assessment: perception_data::RiskAssessment {
+                        overall_risk: perception_data::RiskLevel::Medium,
+                        collision_probability: 0.15,
+                        time_to_collision: 8.5,
+                        critical_objects: vec![2], // Pedestrian is critical
+                        recommended_actions: vec![
+                            perception_data::ActionRecommendation::Monitor,
+                            perception_data::ActionRecommendation::PrepareBrake,
+                        ],
+                    },
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    confidence: 0.91,
+                })
+            } else {
+                Err("Perception system not active".to_string())
+            }
+        }
     }
 
-    fn update_sensor_data(sensor_type: SensorType, data: Vec<u8>) -> Result<(), String> {
-        println!("Updating sensor data from {:?} - {} bytes", sensor_type, data.len());
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(PERCEPTION_STATUS, perception_control::PerceptionStatus::Processing)
+        }
+    }
+
+    fn get_object_count(&self) -> u32 {
+        // Return count from last perception
+        2 // Simulated count
+    }
+}
+
+// Implement the perception control interface (EXPORTED)
+impl perception_control::Guest for Component {
+    fn initialize(config: perception_control::PerceptionConfig) -> Result<(), String> {
+        unsafe {
+            PERCEPTION_CONFIG = Some(config);
+            PERCEPTION_STATUS = perception_control::PerceptionStatus::Initializing;
+            
+            // TODO: Create input streams from fusion and AI systems
+            // let _fusion_stream = crate::fusion_data::create_stream();
+            // let _prediction_stream = crate::prediction_data::create_stream();
+        }
         Ok(())
     }
 
-    fn get_dynamic_objects() -> Result<Vec<DynamicObject>, String> {
-        // Return empty list for now
-        Ok(vec![])
+    fn start_perception() -> Result<(), String> {
+        unsafe {
+            if PERCEPTION_CONFIG.is_some() {
+                PERCEPTION_STATUS = perception_control::PerceptionStatus::Processing;
+                Ok(())
+            } else {
+                Err("Perception system not initialized".to_string())
+            }
+        }
     }
 
-    fn get_static_environment() -> Result<StaticEnvironment, String> {
-        Ok(StaticEnvironment {
-            road_boundaries: vec![],
-            lane_markings: vec![],
-            traffic_signs: vec![],
-            traffic_lights: vec![],
-            road_surface: RoadSurfaceInfo {
-                surface_type: SurfaceType::Asphalt,
-                condition: SurfaceCondition::Dry,
-                friction_coefficient: 0.8,
-                grade: 0.0,
-                banking: 0.0,
-            },
-            infrastructure: vec![],
-        })
-    }
-
-    fn get_road_model() -> Result<RoadModel, String> {
-        Ok(RoadModel {
-            current_road: RoadSegment {
-                road_id: 101,
-                road_type: RoadType::Highway,
-                speed_limit: 120.0,
-                number_of_lanes: 3,
-                road_geometry: RoadGeometry {
-                    centerline: vec![],
-                    curvature: 0.0,
-                    elevation_profile: vec![],
-                    lane_width: 3.5,
-                },
-            },
-            connected_roads: vec![],
-            intersections: vec![],
-            lane_topology: LaneTopology {
-                current_lane: LaneInfo {
-                    lane_id: 2,
-                    lane_type: LaneType::Driving,
-                    direction: Direction::Forward,
-                    speed_limit: 120.0,
-                    lane_width: 3.5,
-                    centerline: vec![],
-                },
-                adjacent_lanes: vec![],
-                lane_connections: vec![],
-            },
-        })
-    }
-
-    fn get_status() -> FusionStatus {
-        FusionStatus::Active
-    }
-
-    fn update_config(config: FusionConfig) -> Result<(), String> {
-        println!("Updating fusion configuration");
+    fn stop_perception() -> Result<(), String> {
+        unsafe {
+            PERCEPTION_STATUS = perception_control::PerceptionStatus::Offline;
+        }
         Ok(())
     }
 
-    fn run_diagnostic() -> Result<DiagnosticResult, String> {
-        Ok(DiagnosticResult {
-            fusion_accuracy: 0.95,
-            processing_latency: 15,
-            memory_usage: 256000,
-            active_objects: 0,
-            sensor_health: vec![],
-            model_consistency: 0.92,
+    fn update_config(config: perception_control::PerceptionConfig) -> Result<(), String> {
+        unsafe {
+            PERCEPTION_CONFIG = Some(config);
+        }
+        Ok(())
+    }
+
+    fn get_status() -> perception_control::PerceptionStatus {
+        unsafe { PERCEPTION_STATUS.clone() }
+    }
+
+    fn get_performance() -> perception_control::PerformanceMetrics {
+        perception_control::PerformanceMetrics {
+            processing_time_ms: 12.5,
+            fusion_accuracy: 0.89,
+            prediction_accuracy: 0.82,
+            risk_detection_rate: 0.91,
+            cpu_usage_percent: 28.0,
+            memory_usage_mb: 384,
+        }
+    }
+
+    fn run_diagnostic() -> Result<perception_control::DiagnosticResult, String> {
+        Ok(perception_control::DiagnosticResult {
+            fusion_health: perception_control::TestResult::Passed,
+            prediction_health: perception_control::TestResult::Passed,
+            scene_analysis: perception_control::TestResult::Passed,
+            risk_assessment: perception_control::TestResult::Passed,
+            overall_score: 88.7,
         })
+    }
+}
+
+// Helper function to fuse sensor data with AI predictions into unified perception
+fn _fuse_perception_data(
+    // TODO: Use proper import types once wit-bindgen generates them correctly
+    // fusion_data: &crate::fusion_data::EnvironmentModel,
+    // predictions: &crate::prediction_data::PredictionResults,
+) -> perception_data::PerceptionModel {
+    // TODO: Implement actual perception fusion
+    // 1. Correlate fusion objects with prediction objects by ID
+    // 2. Enhance object attributes with semantic understanding
+    // 3. Generate scene context from environmental data
+    // 4. Perform risk assessment based on trajectories and interactions
+    // 5. Generate action recommendations
+    
+    println!("Fusing sensor data with AI predictions for unified perception");
+    
+    // Placeholder - actual implementation will combine:
+    // - Spatial accuracy from sensor fusion
+    // - Behavioral understanding from AI predictions  
+    // - Semantic context and risk assessment
+    // - Scene-level understanding and recommendations
+    
+    perception_data::PerceptionModel {
+        perceived_objects: vec![],
+        scene_understanding: perception_data::SceneContext {
+            traffic_density: perception_data::TrafficDensity::Moderate,
+            weather_conditions: perception_data::WeatherConditions::Clear,
+            lighting_conditions: perception_data::LightingConditions::Daylight,
+            road_type: perception_data::RoadType::CityStreet,
+            intersection_nearby: false,
+        },
+        risk_assessment: perception_data::RiskAssessment {
+            overall_risk: perception_data::RiskLevel::Low,
+            collision_probability: 0.05,
+            time_to_collision: 999.0,
+            critical_objects: vec![],
+            recommended_actions: vec![perception_data::ActionRecommendation::Monitor],
+        },
+        timestamp: 0,
+        confidence: 0.85,
     }
 }
 

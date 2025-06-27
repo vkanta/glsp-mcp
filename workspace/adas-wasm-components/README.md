@@ -1,161 +1,133 @@
 # ADAS WebAssembly Components
 
-An industry-realistic Advanced Driver Assistance System (ADAS) implementation using WebAssembly Component Model with 18 specialized automotive ECUs.
+A modular Advanced Driver-Assistance System (ADAS) built using WebAssembly Component Model.
 
-## 🚗 System Overview
+## 🚗 Overview
 
-This project implements a comprehensive ADAS architecture with:
-- **18 Automotive ECUs** covering sensors, AI/ML processing, fusion, and control
-- **WebAssembly Component Model** for modular, safe automotive computing
-- **wasm32-wasip2** target for modern component generation
-- **Industry Standards** compliance (ISO 26262, AUTOSAR)
+This project implements a complete ADAS architecture as WebAssembly components that can be composed together. Each component has a single responsibility and communicates through well-defined WIT (WebAssembly Interface Types) interfaces.
 
-## 📊 Current Status: **12/18 Components Operational (66.7%)**
+## 🏗️ Architecture
 
-### ✅ Fully Operational Layers
+```
+Sensors → AI Processing → Fusion → Planning → Control → Vehicle
+   ↓           ↓            ↓         ↓          ↓         ↓
+Camera    Detection    Environment  Trajectory  Commands  CAN Bus
+Radar     Tracking     Model        Planning    Actuation
+LiDAR     Prediction
+```
 
-#### Sensor Layer (6/6 - 100%)
-- `camera-front-ecu` - Front-facing camera with YOLO object detection
-- `camera-surround-ecu` - 360° surround view cameras
-- `radar-front-ecu` - Long-range automotive radar
-- `radar-corner-ecu` - Short-range corner radar
-- `lidar-ecu` - 3D LiDAR point cloud processing
-- `ultrasonic-ecu` - Parking assistance sensors
+### Component Layers
 
-#### AI/ML Processing Layer (4/4 - 100%)
-- `object-detection-ai` - YOLO-based object detection
-- `tracking-prediction-ai` - Kalman filter object tracking
-- `computer-vision-ai` - Scene understanding and segmentation
-- `behavior-prediction-ai` - Human and vehicle behavior analysis
+1. **Sensor Layer** (6 components)
+   - Camera ECUs (front, surround)
+   - Radar ECUs (front, corner)
+   - LiDAR ECU
+   - Ultrasonic ECU
 
-#### Fusion & Decision Layer (2/4 - 50%)
-- `sensor-fusion-ecu` ✅ - Extended Kalman Filter multi-sensor fusion
-- `perception-fusion` ✅ - High-level perception combining
-- `planning-decision` ❌ - Mission and tactical planning
-- `safety-monitor` ❌ - ISO 26262 safety monitoring
+2. **AI/Perception Layer** (3 components)
+   - Object Detection AI
+   - Behavior Prediction AI  
+   - Perception Fusion
 
-#### Control & Communication Layer (0/4 - 0%)
-- `adas-domain-controller` ❌ - Central ADAS coordination
-- `vehicle-control-ecu` ❌ - Throttle/brake/steering control
-- `can-gateway` ❌ - CAN/Ethernet communication bridge
-- `hmi-interface` ❌ - Human-machine interface
+3. **Fusion & Tracking Layer** (2 components)
+   - Sensor Fusion ECU
+   - Tracking & Prediction
 
-## 🛠️ Build System
+4. **Planning & Control Layer** (2 components)
+   - Planning & Decision
+   - Vehicle Control ECU
+
+5. **Safety & Infrastructure** (4 components)
+   - Safety Monitor
+   - CAN Gateway
+   - HMI Interface
+   - ADAS Domain Controller
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Rust (latest stable)
-- `wasm-tools` for component generation
-- Node.js 18+ (for frontend testing)
 
-### Quick Start
+- Rust (latest stable)
+- `wasm-tools` CLI
+- `wasm32-wasip2` target
+
+### Building
+
 ```bash
+# Add WASI target if not installed
+rustup target add wasm32-wasip2
+
 # Build all components
 ./scripts/build-components.sh
-
-# Individual component build
-cd components/camera-front-ecu
-cargo build --target wasm32-wasip2 --release
 ```
 
-### Architecture
-- **Pure wasm-tools workflow** (no cargo-component dependency)
-- **Component-first design** with WIT interface definitions
-- **Automotive-grade** real-time constraints and safety requirements
+### Build Output
 
-## 🏗️ Component Architecture
+Successfully built components will be in the `build/` directory as `.wasm` files.
+
+## 🔧 Component Details
+
+Each component:
+- Has a single, well-defined responsibility
+- Exports specific interfaces for other components to use
+- Imports only what it needs from other components
+- Can be tested and deployed independently
+
+### Example: Object Detection Flow
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Sensor ECUs   │    │   AI/ML Layer   │    │ Fusion & Control│
-│                 │    │                 │    │                 │
-│ Cameras ✅      │    │ Detection ✅    │    │ Sensor Fusion ✅│
-│ Radar ✅        │───▶│ Tracking ✅     │───▶│ Planning ❌     │
-│ LiDAR ✅        │    │ Vision ✅       │    │ Safety ❌       │
-│ Ultrasonic ✅   │    │ Behavior ✅     │    │ Control ❌      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+Camera → Object Detection AI → Sensor Fusion → Planning
+  ↓             ↓                   ↓            ↓
+Frame      Detections        Environment    Trajectory
 ```
-
-## 🔍 Technical Details
-
-### Component Model
-Each component implements:
-- **WIT Interface** definition with automotive data types
-- **Rust Implementation** with real-time constraints
-- **Safety Mechanisms** for ISO 26262 compliance
-- **Performance Metrics** for automotive validation
-
-### AI/ML Integration
-- **YOLO Models** for real-time object detection
-- **Kalman Filters** for multi-object tracking
-- **Neural Networks** for behavior prediction
-- **Computer Vision** for scene understanding
-
-### Automotive Standards
-- **ISO 26262** functional safety compliance
-- **AUTOSAR** adaptive platform architecture
-- **CAN-FD** and Automotive Ethernet protocols
-- **Real-time** deterministic processing guarantees
-
-## 🚧 Known Issues & Future Work
-
-### Remaining Components (6)
-All require complete implementation rewrites due to:
-- WIT interface mismatches from older codebase
-- Function signature incompatibilities
-- Struct field name differences
-- Dependency conflicts (tokio/WASM incompatibility)
-
-### Recommended Next Steps
-1. **High Priority**: Fix `adas-domain-controller` (system coordination)
-2. **Medium Priority**: Complete `planning-decision` (autonomous planning)
-3. **Future**: Restore `wasi-nn` integration for enhanced AI performance
 
 ## 📁 Project Structure
 
 ```
 adas-wasm-components/
-├── components/          # 18 ADAS component implementations
-├── wit/                # WebAssembly Interface Type definitions
-├── scripts/            # Build and automation scripts
-├── BUILD_STATUS.md     # Detailed technical status
-├── FINAL_REPORT.md     # Comprehensive project analysis
-└── ADAS_ARCHITECTURE.md # System architecture documentation
+├── components/          # Individual ADAS components
+│   ├── camera-front-ecu/
+│   ├── object-detection-ai/
+│   ├── sensor-fusion-ecu/
+│   └── ...
+├── wit/                 # WebAssembly Interface Types
+│   ├── interfaces/      # Shared data interfaces
+│   └── worlds/          # Component world definitions
+├── scripts/            # Build and utility scripts
+├── build/              # Compiled WASM components
+└── docs/               # Documentation
 ```
 
-## 🎯 Success Metrics
+## 🧪 Testing
 
-| Layer | Components | Status | Capability |
-|-------|------------|--------|------------|
-| **Sensor** | 6/6 | ✅ 100% | Full environmental perception |
-| **AI/ML** | 4/4 | ✅ 100% | Complete intelligent processing |
-| **Fusion** | 2/4 | ⚠️ 50% | Basic multi-sensor integration |
-| **Control** | 0/4 | ❌ 0% | Vehicle actuation pending |
-| **Overall** | **12/18** | **✅ 66.7%** | **Production-ready core** |
+Each component can be tested independently:
 
-## 🚀 Getting Started
+```bash
+cd components/sensor-fusion-ecu
+cargo test
+```
 
-1. **Clone and Build**:
-   ```bash
-   git clone <repository>
-   cd adas-wasm-components
-   ./scripts/build-components.sh
-   ```
+## 📊 Current Status
 
-2. **Test Components**:
-   ```bash
-   wasm-tools validate build/camera-front-ecu.wasm
-   ```
-
-3. **Integration**:
-   See `ADAS_ARCHITECTURE.md` for component interconnection details.
-
-## 📄 License
-
-Apache 2.0 - See LICENSE file for details.
+- ✅ 17 components implemented
+- ✅ 12/17 components building successfully
+- ✅ Modular architecture with clear data flow
+- ✅ WebAssembly Component Model ready
+- 🚧 5 components need WIT updates
 
 ## 🤝 Contributing
 
-This project represents a modernized ADAS component architecture. Contributions focusing on completing the remaining 6 components welcome.
+1. Each component should have a single responsibility
+2. Use WIT interfaces for all inter-component communication
+3. Follow the established data flow pattern
+4. Add tests for new functionality
 
----
-**Status**: 12/18 components operational - Production-ready sensor and AI processing pipeline ✅
+## 📄 License
+
+Apache-2.0
+
+## 📚 Documentation
+
+- [Architecture Overview](docs/ADAS_ARCHITECTURE.md)
+- [Component Mapping](docs/COMPONENT_MAPPING.md)
+- [Build Guide](scripts/build-components.sh)

@@ -1,0 +1,203 @@
+/// Sensor Data Interfaces - Shared data types and interfaces for ADAS sensors
+package adas:sensor-data@0.1.0;
+
+/// Shared spatial types
+interface spatial-types {
+    record position3d {
+        x: f64,  // Forward (meters)
+        y: f64,  // Left (meters) 
+        z: f64,  // Up (meters)
+    }
+
+    record velocity3d {
+        vx: f64,  // Forward velocity (m/s)
+        vy: f64,  // Left velocity (m/s)
+        vz: f64,  // Up velocity (m/s)
+        speed: f64,  // Magnitude (m/s)
+    }
+
+    record acceleration3d {
+        ax: f64,  // Forward acceleration (m/s²)
+        ay: f64,  // Left acceleration (m/s²) 
+        az: f64,  // Up acceleration (m/s²)
+        magnitude: f64,  // Magnitude (m/s²)
+    }
+
+    record quaternion {
+        x: f64,
+        y: f64,
+        z: f64,
+        w: f64,
+    }
+
+    enum coordinate-frame {
+        local,
+        global,
+        vehicle,
+        sensor,
+    }
+}
+
+/// Camera data interface - EXPORTED by camera components
+interface camera-data {
+    use spatial-types.{position3d, quaternion};
+
+    record camera-frame {
+        width: u32,
+        height: u32,
+        data: list<u8>,
+        format: pixel-format,
+        timestamp: u64,
+        exposure-time: f32,
+        gain: f32,
+        sensor-pose: camera-pose,
+    }
+
+    record camera-pose {
+        position: position3d,
+        orientation: quaternion,
+    }
+
+    enum pixel-format {
+        rgb8,
+        rgba8,
+        bgr8,
+        bgra8,
+        yuv420,
+        gray8,
+        gray16,
+    }
+
+    resource camera-stream {
+        get-frame: func() -> result<camera-frame, string>;
+        get-intrinsics: func() -> camera-intrinsics;
+        is-available: func() -> bool;
+    }
+    
+    create-stream: func() -> camera-stream;
+
+    record camera-intrinsics {
+        focal-length-x: f64,
+        focal-length-y: f64,
+        principal-point-x: f64,
+        principal-point-y: f64,
+        distortion: list<f64>,
+    }
+}
+
+/// Radar data interface - EXPORTED by radar components  
+interface radar-data {
+    use spatial-types.{position3d, velocity3d};
+
+    record radar-scan {
+        targets: list<radar-target>,
+        timestamp: u64,
+        scan-id: u32,
+        sensor-pose: radar-pose,
+    }
+
+    record radar-target {
+        position: position3d,
+        velocity: velocity3d,
+        range: f64,
+        azimuth: f64,
+        elevation: f64,
+        rcs: f64,  // Radar Cross Section
+        signal-strength: f64,
+        confidence: f32,
+    }
+
+    record radar-pose {
+        position: position3d,
+        orientation: quaternion,
+    }
+
+    resource radar-stream {
+        get-scan: func() -> result<radar-scan, string>;
+        is-available: func() -> bool;
+    }
+}
+
+/// LiDAR data interface - EXPORTED by LiDAR components
+interface lidar-data {
+    use spatial-types.{position3d, velocity3d};
+
+    record point-cloud {
+        points: list<lidar-point>,
+        timestamp: u64,
+        frame-id: string,
+        sensor-pose: lidar-pose,
+    }
+
+    record lidar-point {
+        position: position3d,
+        intensity: f32,
+        ring: u16,
+        timestamp: u64,
+    }
+
+    record lidar-pose {
+        position: position3d,
+        orientation: quaternion,
+    }
+
+    resource lidar-stream {
+        get-cloud: func() -> result<point-cloud, string>;
+        is-available: func() -> bool;
+    }
+}
+
+/// Object detection data interface - EXPORTED by AI components
+interface detection-data {
+    use spatial-types.{position3d, velocity3d};
+
+    record detection-results {
+        objects: list<detected-object>,
+        timestamp: u64,
+        frame-id: string,
+        confidence-threshold: f32,
+    }
+
+    record detected-object {
+        object-id: u32,
+        object-type: object-type,
+        position: position3d,
+        velocity: velocity3d,
+        bounding-box: bounding-box3d,
+        confidence: f32,
+        tracking-state: tracking-state,
+    }
+
+    record bounding-box3d {
+        center: position3d,
+        size: size3d,
+        orientation: quaternion,
+    }
+
+    record size3d {
+        length: f64,
+        width: f64,
+        height: f64,
+    }
+
+    enum object-type {
+        unknown,
+        vehicle,
+        pedestrian,
+        cyclist,
+        motorcycle,
+        truck,
+        bus,
+        traffic-sign,
+        traffic-light,
+        construction-zone,
+        road-debris,
+    }
+
+    enum tracking-state {
+        new,
+        tracked,
+        lost,
+        deleted,
+    }
+}

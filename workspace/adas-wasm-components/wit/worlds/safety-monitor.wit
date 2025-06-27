@@ -1,0 +1,384 @@
+/// Safety Monitor Component - IMPORTS all critical data, EXPORTS safety status & overrides
+package adas:safety-monitor@0.1.0;
+
+world safety-monitor-component {
+    /// Export safety data
+    export safety-data: interface {
+        record safety-state {
+            overall-state: safety-level,
+            active-safety-functions: list<safety-function>,
+            system-integrity: system-integrity,
+            redundancy-status: redundancy-status,
+            safety-violations: list<safety-violation>,
+            timestamp: u64,
+        }
+        
+        enum safety-level {
+            nominal,
+            warning,
+            degraded,
+            critical,
+            emergency,
+        }
+        
+        record safety-function {
+            function-id: u32,
+            function-name: string,
+            function-type: function-type,
+            status: function-status,
+            diagnostic-info: string,
+        }
+        
+        enum function-type {
+            collision-avoidance,
+            emergency-braking,
+            lane-keeping,
+            speed-limiting,
+            driver-monitoring,
+            system-monitoring,
+        }
+        
+        enum function-status {
+            active,
+            standby,
+            degraded,
+            failed,
+            disabled,
+        }
+        
+        record system-integrity {
+            cpu-health: health-status,
+            memory-health: health-status,
+            communication-health: health-status,
+            sensor-health: health-status,
+            actuator-health: health-status,
+        }
+        
+        enum health-status {
+            ok,
+            warning,
+            error,
+            critical,
+        }
+        
+        record redundancy-status {
+            primary-systems: list<system-info>,
+            backup-systems: list<system-info>,
+            voting-mechanism: voting-mechanism,
+            switchover-capability: bool,
+            current-active: string,
+        }
+        
+        record system-info {
+            system-id: string,
+            system-type: string,
+            status: health-status,
+            last-heartbeat: u64,
+        }
+        
+        enum voting-mechanism {
+            two-out-of-three,
+            master-slave,
+            hot-standby,
+            active-active,
+        }
+        
+        record safety-violation {
+            violation-id: u32,
+            violation-type: violation-type,
+            severity: violation-severity,
+            timestamp: u64,
+            description: string,
+            affected-systems: list<string>,
+        }
+        
+        enum violation-type {
+            speed-exceeded,
+            distance-violated,
+            system-fault,
+            communication-loss,
+            sensor-failure,
+            actuator-failure,
+            integrity-check-failed,
+        }
+        
+        enum violation-severity {
+            info,
+            warning,
+            critical,
+            emergency,
+        }
+        
+        get-safety-state: func() -> result<safety-state, string>;
+        report-violation: func(violation: safety-violation) -> result<_, string>;
+        trigger-failsafe: func(hazard-id: u32) -> result<_, string>;
+        acknowledge-alert: func(alert-id: u32) -> result<_, string>;
+    }
+    
+    /// Safety monitor control
+    export safety-monitor: interface {
+        record safety-config {
+            watchdog-timeout: u32,
+            redundancy-mode: redundancy-mode,
+            safety-thresholds: safety-thresholds,
+            monitoring-level: monitoring-level,
+            failsafe-config: failsafe-config,
+        }
+        
+        enum redundancy-mode {
+            single,
+            dual,
+            triple,
+            quad,
+        }
+        
+        record safety-thresholds {
+            max-speed: f32,
+            min-distance: f32,
+            max-deceleration: f32,
+            max-steering-rate: f32,
+            reaction-time: f32,
+        }
+        
+        enum monitoring-level {
+            basic,
+            standard,
+            comprehensive,
+            paranoid,
+        }
+        
+        record failsafe-config {
+            enable-auto-brake: bool,
+            enable-auto-steer: bool,
+            enable-limp-mode: bool,
+            enable-shutdown: bool,
+            escalation-delay: u32,
+        }
+        
+        enum safety-monitor-status {
+            offline,
+            initializing,
+            operational,
+            degraded,
+            emergency,
+            maintenance,
+        }
+        
+        record driver-state {
+            attention-level: attention-level,
+            fatigue-level: f32,
+            distraction-detected: bool,
+            hands-on-wheel: bool,
+            eyes-on-road: bool,
+            last-update: u64,
+        }
+        
+        enum attention-level {
+            attentive,
+            momentary-distraction,
+            distracted,
+            unresponsive,
+        }
+        
+        record self-test-result {
+            test-id: u32,
+            test-name: string,
+            test-type: test-type,
+            test-outcome: test-result,
+            execution-time: u64,
+            details: string,
+            coverage-percentage: f32,
+        }
+        
+        enum test-type {
+            functional,
+            performance,
+            integration,
+            stress,
+            failover,
+        }
+        
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            skipped,
+        }
+        
+        record functional-safety {
+            implementation-level: implementation-level,
+            asil-compliance: asil-compliance,
+            safety-mechanisms: list<safety-mechanism>,
+            redundancy-strategy: redundancy-strategy,
+            fault-handling: fault-handling,
+            safety-lifecycle: safety-lifecycle,
+        }
+        
+        enum implementation-level {
+            prototype,
+            development,
+            pre-production,
+            production-ready,
+        }
+        
+        record asil-compliance {
+            target-asil: asil-level,
+            achieved-asil: asil-level,
+            safety-goals: list<safety-goal>,
+            hazard-analysis: list<hazard>,
+            verification-results: list<verification-result>,
+            validation-results: list<validation-result>,
+        }
+        
+        enum asil-level {
+            asil-a,
+            asil-b,
+            asil-c,
+            asil-d,
+            qm,
+        }
+        
+        record safety-goal {
+            goal-id: string,
+            description: string,
+            asil-level: asil-level,
+            fault-tolerant-time: u32,
+        }
+        
+        record hazard {
+            hazard-id: string,
+            description: string,
+            severity: u32,
+            exposure: u32,
+            controllability: u32,
+        }
+        
+        record verification-result {
+            test-id: string,
+            test-description: string,
+            test-outcome: test-result,
+            coverage: f32,
+        }
+        
+        record validation-result {
+            scenario-id: string,
+            scenario-description: string,
+            validation-outcome: test-result,
+            confidence: f32,
+        }
+        
+        record safety-mechanism {
+            mechanism-id: string,
+            mechanism-type: mechanism-type,
+            diagnostic-coverage: f32,
+            reaction-time: u32,
+        }
+        
+        enum mechanism-type {
+            error-detection,
+            error-correction,
+            failsafe,
+            redundancy,
+            monitoring,
+        }
+        
+        enum redundancy-strategy {
+            none,
+            cold-standby,
+            warm-standby,
+            hot-standby,
+            triple-modular,
+            byzantine-fault-tolerant,
+        }
+        
+        record fault-handling {
+            detection-mechanisms: list<string>,
+            reaction-strategies: list<string>,
+            recovery-procedures: list<string>,
+        }
+        
+        record safety-lifecycle {
+            development-phase: development-phase,
+            certification-status: certification-status,
+            last-assessment: u64,
+            next-assessment: u64,
+        }
+        
+        enum development-phase {
+            concept,
+            development,
+            production,
+            operation,
+            decommission,
+        }
+        
+        enum certification-status {
+            not-started,
+            in-progress,
+            certified,
+            expired,
+        }
+        
+        record compliance-report {
+            overall-compliance: compliance-level,
+            standard-compliance: list<standard-compliance>,
+            regulatory-requirements: list<regulatory-requirement>,
+            audit-results: list<audit-result>,
+            deviations: list<deviation>,
+        }
+        
+        enum compliance-level {
+            non-compliant,
+            partially-compliant,
+            fully-compliant,
+            exceeds-requirements,
+        }
+        
+        record standard-compliance {
+            standard-name: string,
+            version: string,
+            compliance-level: compliance-level,
+            last-audit: u64,
+        }
+        
+        record regulatory-requirement {
+            requirement-id: string,
+            description: string,
+            status: requirement-status,
+            evidence: list<string>,
+        }
+        
+        enum requirement-status {
+            met,
+            not-met,
+            in-progress,
+            not-applicable,
+        }
+        
+        record audit-result {
+            audit-id: string,
+            audit-date: u64,
+            auditor: string,
+            findings: list<string>,
+            recommendations: list<string>,
+        }
+        
+        record deviation {
+            deviation-id: string,
+            description: string,
+            justification: string,
+            approval-status: string,
+            expiry-date: u64,
+        }
+        
+        initialize: func(config: safety-config) -> result<_, string>;
+        start-monitoring: func() -> result<_, string>;
+        stop-monitoring: func() -> result<_, string>;
+        get-status: func() -> safety-monitor-status;
+        update-config: func(config: safety-config) -> result<_, string>;
+        update-driver-state: func(driver-state: driver-state) -> result<_, string>;
+        run-diagnostic: func(test-type: test-type) -> result<self-test-result, string>;
+        get-functional-safety: func() -> result<functional-safety, string>;
+        get-compliance-report: func() -> result<compliance-report, string>;
+    }
+}

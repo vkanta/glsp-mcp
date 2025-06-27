@@ -1,0 +1,228 @@
+/// HMI Interface Component - IMPORTS ADAS data, EXPORTS display & user interaction
+package adas:hmi-interface@0.1.0;
+
+world hmi-interface-component {
+    /// Export HMI display interface
+    export hmi-display: interface {
+        record display-config {
+            display-id: u32,
+            display-type: display-type,
+            resolution: resolution,
+            refresh-rate: u32,
+            brightness: u32,
+        }
+        
+        enum display-type {
+            instrument-cluster,
+            center-console,
+            heads-up-display,
+            rear-view-mirror,
+        }
+        
+        record resolution {
+            width: u32,
+            height: u32,
+        }
+        
+        record adas-display {
+            active-features: list<adas-feature>,
+            speed-info: speed-display,
+            navigation-info: navigation-display,
+            warnings: list<warning-display>,
+            system-status: system-status-display,
+        }
+        
+        record adas-feature {
+            feature-id: u32,
+            feature-name: string,
+            feature-type: feature-type,
+            enabled: bool,
+            status: feature-status,
+        }
+        
+        enum feature-type {
+            safety,
+            comfort,
+            navigation,
+            entertainment,
+        }
+        
+        enum feature-status {
+            active,
+            standby,
+            disabled,
+            error,
+        }
+        
+        record speed-display {
+            current-speed: f32,
+            speed-limit: f32,
+            recommended-speed: f32,
+            speed-unit: speed-unit,
+        }
+        
+        enum speed-unit {
+            kmh,
+            mph,
+        }
+        
+        record navigation-display {
+            next-turn: turn-info,
+            destination: destination-info,
+            route-guidance: bool,
+        }
+        
+        record turn-info {
+            direction: turn-direction,
+            distance: f32,
+            street-name: string,
+        }
+        
+        enum turn-direction {
+            straight,
+            left,
+            right,
+            u-turn,
+            exit,
+        }
+        
+        record destination-info {
+            name: string,
+            distance: f32,
+            estimated-time: u32,
+        }
+        
+        record warning-display {
+            warning-id: u32,
+            warning-type: warning-type,
+            severity: warning-severity,
+            message: string,
+            timestamp: u64,
+        }
+        
+        enum warning-type {
+            collision,
+            lane-departure,
+            speed-limit,
+            blind-spot,
+            system-malfunction,
+        }
+        
+        enum warning-severity {
+            info,
+            caution,
+            warning,
+            critical,
+        }
+        
+        record system-status-display {
+            autonomy-level: autonomy-level,
+            active-systems: list<string>,
+            sensor-status: sensor-status,
+            connectivity: connectivity-status,
+        }
+        
+        enum autonomy-level {
+            manual,
+            level-one,
+            level-two,
+            level-three,
+            level-four,
+            level-five,
+        }
+        
+        enum sensor-status {
+            all-operational,
+            degraded,
+            critical,
+        }
+        
+        enum connectivity-status {
+            connected,
+            limited,
+            offline,
+        }
+        
+        initialize: func(displays: list<display-config>) -> result<_, string>;
+        update-display: func(display-id: u32, content: adas-display) -> result<_, string>;
+        show-warning: func(warning: warning-display) -> result<u32, string>;
+        hide-warning: func(warning-id: u32) -> result<_, string>;
+        get-status: func() -> interface-status;
+        
+        enum interface-status {
+            offline,
+            initializing,
+            active,
+            error,
+        }
+    }
+    
+    /// Export user input interface
+    export user-input: interface {
+        record user-action {
+            action-type: action-type,
+            action-data: action-data,
+            timestamp: u64,
+        }
+        
+        enum action-type {
+            button-press,
+            touch,
+            gesture,
+            voice-command,
+        }
+        
+        variant action-data {
+            button(button-data),
+            touch(touch-data),
+            gesture(gesture-data),
+            voice(voice-data),
+        }
+        
+        record button-data {
+            button-id: string,
+            button-state: button-state,
+        }
+        
+        enum button-state {
+            pressed,
+            released,
+            held,
+        }
+        
+        record touch-data {
+            x: u32,
+            y: u32,
+            pressure: f32,
+        }
+        
+        record gesture-data {
+            gesture-type: gesture-type,
+            direction: option<swipe-direction>,
+        }
+        
+        enum gesture-type {
+            tap,
+            double-tap,
+            swipe,
+            pinch,
+            long-press,
+        }
+        
+        enum swipe-direction {
+            up,
+            down,
+            left,
+            right,
+        }
+        
+        record voice-data {
+            command: string,
+            confidence: f32,
+        }
+        
+        process-input: func(input: user-action) -> result<_, string>;
+        enable-input: func(input-type: action-type) -> result<_, string>;
+        disable-input: func(input-type: action-type) -> result<_, string>;
+    }
+}

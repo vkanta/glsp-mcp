@@ -1,379 +1,303 @@
-use wit_bindgen::generate;
+// Object Detection AI - IMPORTS camera data, EXPORTS detection results
 
-// Generate bindings for the object-detection-ai component
-generate!({
-    world: "object-detection-ai-component",
-    path: "../../wit/object-detection-ai-standalone.wit"
+wit_bindgen::generate!({
+    world: "object-detection-component",
+    path: "../../wit/object-detection-ai.wit",
 });
 
-use exports::adas::object_detection_ai::object_detection::{
-    Guest, ModelInfo, NnArchitecture, Resolution, QuantizationType, DetectionResult,
-    BoundingBox, FeatureVector, FeatureType, SensorSource, TrackingInfo,
-    Velocity2d, Acceleration2d, PerformanceMetrics, AdaptationConfig, PixelFormat, 
-    DetectionSequence, FrameData, TrainingSample, DrivingScenario, ScenarioConfig, 
-    AttentionMap, BenchmarkResults, FailureCase
-};
+use crate::exports::detection_data;
+use crate::exports::ai_control;
 
-struct ObjectDetectionAi {
-    initialized: bool,
-    model: Option<ModelInfo>,
-    config: Option<AdaptationConfig>,
-    object_counter: u32,
-    track_counter: u32,
-    frame_counter: u32,
+struct Component;
+
+// Resource state for detection stream
+pub struct DetectionStreamState {
+    id: u32,
 }
 
-static mut DETECTOR: ObjectDetectionAi = ObjectDetectionAi {
-    initialized: false,
-    model: None,
-    config: None,
-    object_counter: 0,
-    track_counter: 0,
-    frame_counter: 0,
-};
+// AI system configuration state
+static mut AI_CONFIG: Option<ai_control::AiConfig> = None;
+static mut AI_STATUS: ai_control::AiStatus = ai_control::AiStatus::Offline;
+static mut CAMERA_STREAM: Option<crate::camera_data::CameraStream> = None;
+static mut NN_GRAPH: Option<crate::wasi_nn::Graph> = None;
+static mut NN_CONTEXT: Option<crate::wasi_nn::GraphExecutionContext> = None;
 
-impl Guest for ObjectDetectionAi {
-    fn initialize(_model_path: String, config: AdaptationConfig) -> Result<ModelInfo, String> {
+// Implement the detection-data interface (EXPORTED)
+impl detection_data::Guest for Component {
+    type DetectionStream = DetectionStreamState;
+    
+    fn create_stream() -> detection_data::DetectionStream {
+        detection_data::DetectionStream::new(DetectionStreamState { id: 1 })
+    }
+}
+
+impl detection_data::GuestDetectionStream for DetectionStreamState {
+    fn get_detections(&self) -> Result<detection_data::DetectionResults, String> {
         unsafe {
-            let model_info = ModelInfo {
-                model_name: "YOLOv8-ADAS".to_string(),
-                model_version: "1.0.0".to_string(),
-                architecture: NnArchitecture::YoloV8,
-                input_resolution: Resolution { width: 640, height: 640 },
-                quantization: QuantizationType::Fp16,
-                inference_time: 15.2, // milliseconds
-                memory_usage: 256, // MB
-            };
-            
-            DETECTOR.model = Some(model_info.clone());
-            DETECTOR.config = Some(config);
-            DETECTOR.initialized = true;
-            DETECTOR.object_counter = 0;
-            DETECTOR.track_counter = 0;
-            DETECTOR.frame_counter = 0;
-            
-            Ok(model_info)
+            if matches!(AI_STATUS, ai_control::AiStatus::Processing) {
+                // Simulate object detection results
+                let objects = vec![
+                    detection_data::DetectedObject {
+                        object_id: 1,
+                        object_type: detection_data::ObjectType::Vehicle,
+                        position: detection_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
+                        velocity: detection_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
+                        bounding_box: detection_data::BoundingBox3d {
+                            center: detection_data::Position3d { x: 50.0, y: 0.0, z: 1.0 },
+                            size: detection_data::Size3d { length: 4.5, width: 1.8, height: 1.5 },
+                            orientation: detection_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                        },
+                        confidence: 0.92,
+                        tracking_state: detection_data::TrackingState::New,
+                    },
+                    detection_data::DetectedObject {
+                        object_id: 2,
+                        object_type: detection_data::ObjectType::Pedestrian,
+                        position: detection_data::Position3d { x: 25.0, y: 3.0, z: 0.0 },
+                        velocity: detection_data::Velocity3d { vx: 1.2, vy: 0.0, vz: 0.0, speed: 1.2 },
+                        bounding_box: detection_data::BoundingBox3d {
+                            center: detection_data::Position3d { x: 25.0, y: 3.0, z: 0.9 },
+                            size: detection_data::Size3d { length: 0.6, width: 0.4, height: 1.8 },
+                            orientation: detection_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                        },
+                        confidence: 0.87,
+                        tracking_state: detection_data::TrackingState::New,
+                    },
+                ];
+
+                Ok(detection_data::DetectionResults {
+                    objects,
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    frame_id: "camera_front".to_string(),
+                    confidence_threshold: AI_CONFIG.as_ref().map(|c| c.confidence_threshold).unwrap_or(0.5),
+                })
+            } else {
+                Err("AI system not processing".to_string())
+            }
         }
     }
 
-    fn load_model(model_data: Vec<u8>) -> Result<ModelInfo, String> {
-        if model_data.is_empty() {
-            return Err("Empty model data".to_string());
-        }
-
+    fn is_available(&self) -> bool {
         unsafe {
-            let model_info = ModelInfo {
-                model_name: "EfficientDet-D2".to_string(),
-                model_version: "2.1.0".to_string(),
-                architecture: NnArchitecture::Efficientdet,
-                input_resolution: Resolution { width: 768, height: 768 },
-                quantization: QuantizationType::Int8,
-                inference_time: 22.5, // milliseconds
-                memory_usage: 384, // MB
-            };
-            
-            DETECTOR.model = Some(model_info.clone());
-            DETECTOR.initialized = true;
-            
-            Ok(model_info)
+            matches!(AI_STATUS, ai_control::AiStatus::Processing)
         }
     }
 
-    fn detect_objects(
-        image_data: Vec<u8>,
-        width: u32,
-        height: u32,
-        _format: PixelFormat
-    ) -> Result<Vec<DetectionResult>, String> {
+    fn get_object_count(&self) -> u32 {
+        // Return count from last detection
+        2 // Simulated count
+    }
+}
+
+// Implement the AI control interface (EXPORTED)
+impl ai_control::Guest for Component {
+    fn initialize(config: ai_control::AiConfig) -> Result<(), String> {
         unsafe {
-            if !DETECTOR.initialized {
-                return Err("Model not initialized".to_string());
-            }
-
-            if image_data.is_empty() {
-                return Err("Empty image data".to_string());
-            }
-
-            DETECTOR.object_counter += 1;
-            DETECTOR.frame_counter += 1;
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64;
-
-            // Mock realistic object detection results
-            let detections = vec![
-                DetectionResult {
-                    object_id: DETECTOR.object_counter,
-                    class_id: 0,
-                    class_name: "car".to_string(),
-                    confidence: 0.94,
-                    bounding_box: BoundingBox {
-                        x: width as f32 * 0.2,
-                        y: height as f32 * 0.3,
-                        width: width as f32 * 0.15,
-                        height: height as f32 * 0.2,
-                        rotation: 0.0,
-                    },
-                    segmentation_mask: Some(vec![255u8; 100]), // Mock segmentation
-                    features: FeatureVector {
-                        features: (0..512).map(|i| (i as f32) * 0.001).collect(),
-                        feature_type: FeatureType::CnnFeatures,
-                    },
-                    detection_source: SensorSource::FrontCamera,
-                    timestamp,
-                },
-                DetectionResult {
-                    object_id: DETECTOR.object_counter + 1,
-                    class_id: 1,
-                    class_name: "pedestrian".to_string(),
-                    confidence: 0.87,
-                    bounding_box: BoundingBox {
-                        x: width as f32 * 0.7,
-                        y: height as f32 * 0.4,
-                        width: width as f32 * 0.08,
-                        height: height as f32 * 0.25,
-                        rotation: 0.0,
-                    },
-                    segmentation_mask: None,
-                    features: FeatureVector {
-                        features: (0..512).map(|i| ((i * 2) as f32) * 0.0005).collect(),
-                        feature_type: FeatureType::CnnFeatures,
-                    },
-                    detection_source: SensorSource::FrontCamera,
-                    timestamp,
-                },
-                DetectionResult {
-                    object_id: DETECTOR.object_counter + 2,
-                    class_id: 2,
-                    class_name: "traffic_light".to_string(),
-                    confidence: 0.96,
-                    bounding_box: BoundingBox {
-                        x: width as f32 * 0.5,
-                        y: height as f32 * 0.1,
-                        width: width as f32 * 0.03,
-                        height: width as f32 * 0.08,
-                        rotation: 0.0,
-                    },
-                    segmentation_mask: None,
-                    features: FeatureVector {
-                        features: (0..512).map(|i| ((i * 3) as f32) * 0.0003).collect(),
-                        feature_type: FeatureType::CnnFeatures,
-                    },
-                    detection_source: SensorSource::FrontCamera,
-                    timestamp,
-                },
-            ];
-
-            DETECTOR.object_counter += 3;
-            Ok(detections)
-        }
-    }
-
-    fn detect_objects_temporal(
-        image_sequence: Vec<FrameData>,
-        previous_tracks: Vec<TrackingInfo>
-    ) -> Result<DetectionSequence, String> {
-        unsafe {
-            if !DETECTOR.initialized {
-                return Err("Model not initialized".to_string());
-            }
-
-            if image_sequence.is_empty() {
-                return Err("Empty image sequence".to_string());
-            }
-
-            DETECTOR.track_counter += 1;
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64;
-
-            // Process the latest frame for detections
-            let latest_frame = &image_sequence[image_sequence.len() - 1];
-            let detections = vec![
-                DetectionResult {
-                    object_id: DETECTOR.object_counter,
-                    class_id: 0,
-                    class_name: "car".to_string(),
-                    confidence: 0.92,
-                    bounding_box: BoundingBox {
-                        x: latest_frame.width as f32 * 0.25,
-                        y: latest_frame.height as f32 * 0.35,
-                        width: latest_frame.width as f32 * 0.18,
-                        height: latest_frame.height as f32 * 0.22,
-                        rotation: 2.5,
-                    },
-                    segmentation_mask: Some(vec![200u8; 150]),
-                    features: FeatureVector {
-                        features: (0..1024).map(|i| (i as f32) * 0.0008).collect(),
-                        feature_type: FeatureType::TransformerFeatures,
-                    },
-                    detection_source: SensorSource::FusedSensors,
-                    timestamp,
-                },
-            ];
-
-            // Mock tracking updates
-            let updated_tracks = previous_tracks.into_iter().map(|mut track| {
-                track.track_age += 1;
-                track.track_confidence = (track.track_confidence * 0.98).max(0.5);
-                track.predicted_position.x += track.velocity.vx;
-                track.predicted_position.y += track.velocity.vy;
-                track
-            }).collect();
-
-            // New tracks from new detections
-            let new_tracks = vec![
-                TrackingInfo {
-                    track_id: DETECTOR.track_counter,
-                    track_age: 1,
-                    track_confidence: 0.95,
-                    predicted_position: BoundingBox {
-                        x: latest_frame.width as f32 * 0.25,
-                        y: latest_frame.height as f32 * 0.35,
-                        width: latest_frame.width as f32 * 0.18,
-                        height: latest_frame.height as f32 * 0.22,
-                        rotation: 2.5,
-                    },
-                    velocity: Velocity2d { vx: -2.5, vy: 0.1 },
-                    acceleration: Acceleration2d { ax: 0.2, ay: 0.0 },
-                    state_covariance: vec![0.1, 0.0, 0.0, 0.1], // 2x2 simplified
-                },
-            ];
-
-            let detection_sequence = DetectionSequence {
-                detections,
-                updated_tracks,
-                new_tracks,
-                lost_tracks: vec![], // No lost tracks in this mock
-            };
-
-            DETECTOR.object_counter += 1;
-            Ok(detection_sequence)
-        }
-    }
-
-    fn update_model(training_samples: Vec<TrainingSample>) -> Result<(), String> {
-        if training_samples.is_empty() {
-            return Err("No training samples provided".to_string());
-        }
-
-        // Mock online learning update
-        Ok(())
-    }
-
-    fn get_performance() -> PerformanceMetrics {
-        PerformanceMetrics {
-            fps: 35.8,
-            average_precision: 0.89,
-            recall: 0.92,
-            f1_score: 0.905,
-            inference_latency: 18.3, // milliseconds
-            memory_peak: 412, // MB
-            gpu_utilization: 78.5, // percentage
-        }
-    }
-
-    fn set_scenario_config(
-        scenario: DrivingScenario,
-        _config: ScenarioConfig
-    ) -> Result<(), String> {
-        // Adjust detection parameters based on scenario
-        match scenario {
-            DrivingScenario::Highway => {
-                // High-speed, long-range detection
-            },
-            DrivingScenario::CityTraffic => {
-                // Dense traffic, pedestrian focus
-            },
-            DrivingScenario::NightDriving => {
-                // Low-light optimizations
-            },
-            DrivingScenario::Rain | DrivingScenario::Snow => {
-                // Weather-specific adjustments
-            },
-            _ => {}
+            AI_CONFIG = Some(config);
+            AI_STATUS = ai_control::AiStatus::Initializing;
+            
+            // Create camera stream to get input data
+            CAMERA_STREAM = Some(crate::camera_data::create_stream());
         }
         Ok(())
     }
 
-    fn export_model() -> Result<Vec<u8>, String> {
+    fn load_model(model_path: String, model_type: ai_control::ModelType) -> Result<(), String> {
         unsafe {
-            if !DETECTOR.initialized {
-                return Err("No model loaded".to_string());
+            if AI_CONFIG.is_some() {
+                AI_STATUS = ai_control::AiStatus::LoadingModel;
+                
+                // Use WASI-NN to load the actual model
+                println!("Loading model: {} (type: {:?})", model_path, model_type);
+                
+                // Determine encoding based on model type
+                // Most modern models (YOLO, SSD, etc.) use ONNX format for deployment
+                let encoding = match model_type {
+                    ai_control::ModelType::YoloV5 => crate::wasi_nn::GraphEncoding::Onnx,
+                    ai_control::ModelType::YoloV8 => crate::wasi_nn::GraphEncoding::Onnx,
+                    ai_control::ModelType::SsdMobilenet => crate::wasi_nn::GraphEncoding::Tensorflowlite,
+                    ai_control::ModelType::FasterRcnn => crate::wasi_nn::GraphEncoding::Tensorflow,
+                    ai_control::ModelType::Efficientdet => crate::wasi_nn::GraphEncoding::Onnx,
+                    ai_control::ModelType::Custom => crate::wasi_nn::GraphEncoding::Onnx, // Default to ONNX
+                };
+                
+                // TODO: Load actual model file bytes
+                // For now, use placeholder model data
+                let model_data: Vec<u8> = vec![]; // In real implementation, read from model_path
+                
+                // Load the graph using WASI-NN
+                match crate::wasi_nn::load(
+                    &[("model".to_string(), model_data)],
+                    encoding,
+                    crate::wasi_nn::ExecutionTarget::Cpu,
+                ) {
+                    Ok(graph) => {
+                        NN_GRAPH = Some(graph);
+                        
+                        // Initialize execution context
+                        if let Some(ref graph) = NN_GRAPH {
+                            match crate::wasi_nn::init_execution_context(graph) {
+                                Ok(context) => {
+                                    NN_CONTEXT = Some(context);
+                                    AI_STATUS = ai_control::AiStatus::Ready;
+                                    Ok(())
+                                }
+                                Err(e) => {
+                                    AI_STATUS = ai_control::AiStatus::Error;
+                                    Err(format!("Failed to initialize execution context: {:?}", e))
+                                }
+                            }
+                        } else {
+                            AI_STATUS = ai_control::AiStatus::Error;
+                            Err("Graph not available after loading".to_string())
+                        }
+                    }
+                    Err(e) => {
+                        AI_STATUS = ai_control::AiStatus::Error;
+                        Err(format!("Failed to load model: {:?}", e))
+                    }
+                }
+            } else {
+                Err("AI system not initialized".to_string())
             }
-            
-            // Mock exported model data
-            let mut mock_data = vec![0xCAu8, 0xFE, 0xBA, 0xBE];
-            mock_data.resize(1024, 0u8);
-            Ok(mock_data) // Mock model binary
         }
     }
 
-    fn get_attention_maps(image_data: Vec<u8>) -> Result<Vec<AttentionMap>, String> {
-        if image_data.is_empty() {
-            return Err("Empty image data".to_string());
+    fn start_detection() -> Result<(), String> {
+        unsafe {
+            if matches!(AI_STATUS, ai_control::AiStatus::Ready) {
+                AI_STATUS = ai_control::AiStatus::Processing;
+                Ok(())
+            } else {
+                Err("AI system not ready".to_string())
+            }
         }
-
-        // Mock attention maps for model interpretability
-        let attention_maps = vec![
-            AttentionMap {
-                class_name: "car".to_string(),
-                heatmap: (0..64*64).map(|i| (i as f32) / (64.0 * 64.0)).collect(),
-                width: 64,
-                height: 64,
-            },
-            AttentionMap {
-                class_name: "pedestrian".to_string(),
-                heatmap: (0..64*64).map(|i| ((i * 2) as f32) / (64.0 * 64.0 * 2.0)).collect(),
-                width: 64,
-                height: 64,
-            },
-        ];
-
-        Ok(attention_maps)
     }
 
-    fn benchmark(test_dataset: Vec<FrameData>) -> Result<BenchmarkResults, String> {
-        if test_dataset.is_empty() {
-            return Err("Empty test dataset".to_string());
+    fn stop_detection() -> Result<(), String> {
+        unsafe {
+            AI_STATUS = ai_control::AiStatus::Ready;
         }
+        Ok(())
+    }
 
-        let benchmark_results = BenchmarkResults {
-            total_frames: test_dataset.len() as u32,
-            average_fps: 28.5,
-            min_fps: 15.2,
-            max_fps: 42.8,
-            accuracy_metrics: PerformanceMetrics {
-                fps: 28.5,
-                average_precision: 0.87,
-                recall: 0.91,
-                f1_score: 0.89,
-                inference_latency: 21.3,
-                memory_peak: 398,
-                gpu_utilization: 82.1,
-            },
-            failure_cases: vec![
-                FailureCase {
-                    frame_id: 42,
-                    expected_objects: 3,
-                    detected_objects: 2,
-                    false_positives: 0,
-                    false_negatives: 1,
-                },
-                FailureCase {
-                    frame_id: 158,
-                    expected_objects: 1,
-                    detected_objects: 2,
-                    false_positives: 1,
-                    false_negatives: 0,
-                },
-            ],
-        };
+    fn update_config(config: ai_control::AiConfig) -> Result<(), String> {
+        unsafe {
+            AI_CONFIG = Some(config);
+        }
+        Ok(())
+    }
 
-        Ok(benchmark_results)
+    fn get_status() -> ai_control::AiStatus {
+        unsafe { AI_STATUS.clone() }
+    }
+
+    fn get_performance() -> ai_control::PerformanceMetrics {
+        ai_control::PerformanceMetrics {
+            inference_time_ms: 15.0,
+            fps: 30.0,
+            cpu_usage_percent: 45.0,
+            memory_usage_mb: 512,
+            gpu_usage_percent: 80.0,
+            model_accuracy: 0.91,
+            throughput_hz: 30.0,
+        }
+    }
+
+    fn run_diagnostic() -> Result<ai_control::DiagnosticResult, String> {
+        Ok(ai_control::DiagnosticResult {
+            model_integrity: ai_control::TestResult::Passed,
+            inference_engine: ai_control::TestResult::Passed,
+            memory_test: ai_control::TestResult::Passed,
+            performance_test: ai_control::TestResult::Passed,
+            accuracy_test: ai_control::TestResult::Passed,
+            overall_score: 94.5,
+        })
     }
 }
 
-export!(ObjectDetectionAi);
+// Helper function to process camera frame with AI
+fn process_frame_with_ai(frame: &crate::camera_data::CameraFrame) -> Result<Vec<detection_data::DetectedObject>, String> {
+    unsafe {
+        if let (Some(ref _graph), Some(ref _context)) = (&NN_GRAPH, &NN_CONTEXT) {
+            println!("Processing frame with WASI-NN: {}x{} at timestamp {}", 
+                     frame.width, frame.height, frame.timestamp);
+            
+            // 1. Preprocess camera frame (resize, normalize)
+            let _preprocessed_data = preprocess_frame(frame)?;
+            
+            // 2. Create input tensor
+            // TODO: Create actual tensor from preprocessed data
+            // For now, we'll simulate the tensor operations
+            
+            // 3. Set input tensor
+            // match crate::wasi_nn::set_input(context, 0, input_tensor) {
+            //     Ok(_) => {},
+            //     Err(e) => return Err(format!("Failed to set input: {:?}", e)),
+            // }
+            
+            // 4. Run inference
+            // match crate::wasi_nn::compute(context) {
+            //     Ok(_) => {},
+            //     Err(e) => return Err(format!("Inference failed: {:?}", e)),
+            // }
+            
+            // 5. Get output tensor
+            // match crate::wasi_nn::get_output(context, 0) {
+            //     Ok(output_tensor) => {
+            //         // 6. Post-process results (NMS, confidence filtering)
+            //         return postprocess_detections(output_tensor, frame);
+            //     },
+            //     Err(e) => return Err(format!("Failed to get output: {:?}", e)),
+            // }
+            
+            // For now, return placeholder until tensor operations are fully implemented
+            println!("WASI-NN inference placeholder - model loaded and ready");
+            Ok(vec![])
+        } else {
+            Err("WASI-NN model not loaded".to_string())
+        }
+    }
+}
+
+// Helper function to preprocess camera frame for neural network input
+fn preprocess_frame(frame: &crate::camera_data::CameraFrame) -> Result<Vec<f32>, String> {
+    // TODO: Implement actual preprocessing
+    // 1. Decode pixel format
+    // 2. Resize to model input size (e.g., 640x640 for YOLO)
+    // 3. Normalize pixel values (0-255 -> 0.0-1.0)
+    // 4. Convert to CHW format (channels-height-width)
+    // 5. Apply mean/std normalization if required
+    
+    println!("Preprocessing frame: {}x{} format {:?}", 
+             frame.width, frame.height, frame.format);
+    
+    // Placeholder preprocessing
+    let input_size = 640 * 640 * 3; // RGB image
+    let normalized_data: Vec<f32> = vec![0.0; input_size];
+    Ok(normalized_data)
+}
+
+// Helper function to post-process neural network output into detections
+fn _postprocess_detections(
+    _output_data: Vec<f32>, 
+    _frame: &crate::camera_data::CameraFrame
+) -> Result<Vec<detection_data::DetectedObject>, String> {
+    // TODO: Implement actual post-processing
+    // 1. Parse output tensor (bounding boxes, confidences, classes)
+    // 2. Apply confidence threshold filtering
+    // 3. Apply Non-Maximum Suppression (NMS)
+    // 4. Convert normalized coordinates to pixel coordinates
+    // 5. Map class IDs to ObjectType enum
+    // 6. Create DetectedObject structs
+    
+    println!("Post-processing neural network output");
+    
+    // Placeholder post-processing
+    Ok(vec![])
+}
+
+export!(Component);

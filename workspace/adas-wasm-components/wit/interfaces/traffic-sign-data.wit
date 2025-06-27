@@ -1,0 +1,70 @@
+/// Traffic Sign Recognition Data Interface - EXPORTED by TSR AI
+package adas:traffic-sign-data@0.1.0;
+
+interface traffic-sign-data {
+    use adas:sensor-data/spatial-types.{position3d};
+
+    record traffic-sign-results {
+        signs: list<detected-sign>,
+        traffic-lights: list<traffic-light>,
+        timestamp: u64,
+        frame-id: string,
+    }
+
+    record detected-sign {
+        sign-id: u32,
+        sign-type: sign-type,
+        position: position3d,
+        value: option<string>, // For speed limits, text signs
+        confidence: f32,
+        relevance: f32, // How relevant to ego vehicle path
+        distance: f32,
+    }
+
+    record traffic-light {
+        light-id: u32,
+        state: light-state,
+        position: position3d,
+        time-to-change: option<f32>,
+        relevance: f32,
+        confidence: f32,
+    }
+
+    enum sign-type {
+        speed-limit,
+        stop,
+        yield,
+        no-entry,
+        no-turn-left,
+        no-turn-right,
+        no-u-turn,
+        one-way,
+        pedestrian-crossing,
+        school-zone,
+        construction,
+        merge,
+        lane-ends,
+        traffic-light,
+        railroad-crossing,
+        custom-text,
+    }
+
+    enum light-state {
+        red,
+        yellow,
+        green,
+        red-arrow,
+        yellow-arrow,
+        green-arrow,
+        flashing-red,
+        flashing-yellow,
+        off,
+        unknown,
+    }
+
+    /// Get current traffic sign recognition results
+    get-traffic-signs: func() -> result<traffic-sign-results, string>;
+    
+    /// Check if TSR is ready
+    is-ready: func() -> bool;
+}

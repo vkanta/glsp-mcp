@@ -1,0 +1,224 @@
+/// CAN Gateway Component - IMPORTS control commands & safety, EXPORTS CAN messages
+package adas:can-gateway@0.1.0;
+
+world can-gateway-component {
+    /// Import control commands
+    import vehicle-commands: interface {
+        record steering-command {
+            target-angle: f32,
+            angular-velocity: f32,
+            torque-limit: f32,
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        record braking-command {
+            target-deceleration: f32,
+            brake-pressure: f32,
+            abs-enabled: bool,
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        record acceleration-command {
+            target-acceleration: f32,
+            throttle-position: f32,
+            traction-control: bool,
+            timestamp: u64,
+            priority: command-priority,
+        }
+
+        enum command-priority {
+            low,
+            normal,
+            high,
+            emergency,
+        }
+
+        get-steering-command: func() -> result<steering-command, string>;
+        get-braking-command: func() -> result<braking-command, string>;
+        get-acceleration-command: func() -> result<acceleration-command, string>;
+        is-active: func() -> bool;
+    }
+    
+    /// Import safety overrides
+    import safety-data: interface {
+        record safety-override {
+            override-type: override-type,
+            reason: string,
+            timestamp: u64,
+            active: bool,
+        }
+
+        enum override-type {
+            emergency-brake,
+            speed-limit,
+            steering-limit,
+            system-disable,
+        }
+
+        get-active-overrides: func() -> list<safety-override>;
+        is-override-active: func() -> bool;
+    }
+    
+    /// Export CAN message interface
+    export can-interface: interface {
+        /// CAN message structure
+        record can-message {
+            bus-id: u32,
+            message-id: u32,
+            data: list<u8>,
+            is-extended: bool,
+            is-remote-frame: bool,
+            timestamp: u64,
+            priority: message-priority,
+        }
+
+        enum message-priority {
+            low,
+            normal,
+            high,
+            critical,
+        }
+
+        record bus-status {
+            bus-id: u32,
+            state: bus-state,
+            error-count: u32,
+            bus-load: f32,
+            bit-rate: u32,
+        }
+
+        enum bus-state {
+            active,
+            passive,
+            bus-off,
+            disconnected,
+        }
+        
+        /// Send CAN message
+        send-message: func(message: can-message) -> result<_, string>;
+        
+        /// Send multiple messages
+        send-batch: func(messages: list<can-message>) -> result<_, string>;
+        
+        /// Get received messages
+        get-messages: func(timeout-ms: option<u32>) -> result<list<can-message>, string>;
+        
+        /// Get bus status
+        get-bus-status: func(bus-id: u32) -> result<bus-status, string>;
+    }
+    
+    /// Gateway control interface
+    export gateway-control: interface {
+        /// Gateway configuration
+        record gateway-config {
+            can-networks: list<can-network>,
+            routing-rules: list<routing-rule>,
+            filter-config: filter-config,
+            security-config: security-config,
+        }
+
+        record can-network {
+            bus-id: u32,
+            bit-rate: u32,
+            can-type: can-type,
+            termination: bool,
+        }
+
+        enum can-type {
+            can-two-zero-a,
+            can-two-zero-b,
+            can-fd,
+            can-xl,
+        }
+
+        record routing-rule {
+            source-bus: u32,
+            destination-bus: u32,
+            message-filter: message-filter,
+            transformation: option<message-transformation>,
+        }
+
+        record message-filter {
+            id-range: id-range,
+            data-mask: option<list<u8>>,
+        }
+
+        record id-range {
+            min-id: u32,
+            max-id: u32,
+        }
+
+        enum message-transformation {
+            none,
+            id-offset,
+            data-swap,
+            custom,
+        }
+
+        record filter-config {
+            accept-filters: list<message-filter>,
+            reject-filters: list<message-filter>,
+            default-action: filter-action,
+        }
+
+        enum filter-action {
+            accept,
+            reject,
+            log-only,
+        }
+
+        record security-config {
+            authentication-enabled: bool,
+            encryption-enabled: bool,
+            intrusion-detection: bool,
+            rate-limiting: bool,
+        }
+
+        enum gateway-status {
+            offline,
+            initializing,
+            active,
+            degraded,
+            error,
+        }
+
+        record gateway-statistics {
+            messages-sent: u64,
+            messages-received: u64,
+            messages-filtered: u64,
+            messages-routed: u64,
+            errors: u64,
+            uptime-seconds: u64,
+            bus-statistics: list<bus-statistics>,
+        }
+
+        record bus-statistics {
+            bus-id: u32,
+            tx-count: u64,
+            rx-count: u64,
+            error-count: u64,
+            bus-load-avg: f32,
+            bus-load-peak: f32,
+        }
+        
+        /// Initialize gateway
+        initialize: func(config: gateway-config) -> result<_, string>;
+        
+        /// Start gateway
+        start-gateway: func() -> result<_, string>;
+        
+        /// Stop gateway
+        stop-gateway: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: gateway-config) -> result<_, string>;
+        
+        /// Get gateway status
+        get-status: func() -> gateway-status;
+        
+        /// Get statistics
+        get-statistics: func() -> gateway-statistics;
+    }
+}

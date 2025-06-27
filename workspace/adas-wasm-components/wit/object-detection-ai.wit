@@ -1,0 +1,300 @@
+/// Object Detection AI Component - IMPORTS camera data, EXPORTS detection results
+package adas:object-detection-ai@0.1.0;
+
+world object-detection-component {
+    /// Import camera data from camera components
+    import camera-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record quaternion {
+            x: f64,
+            y: f64,
+            z: f64,
+            w: f64,
+        }
+
+        /// Camera data types
+        record camera-frame {
+            width: u32,
+            height: u32,
+            data: list<u8>,
+            format: pixel-format,
+            timestamp: u64,
+            exposure-time: f32,
+            gain: f32,
+            sensor-pose: camera-pose,
+        }
+
+        record camera-pose {
+            position: position3d,
+            orientation: quaternion,
+        }
+
+        enum pixel-format {
+            rgb8,
+            rgba8,
+            bgr8,
+            bgra8,
+            yuv420,
+            gray8,
+            gray16,
+        }
+
+        record camera-intrinsics {
+            focal-length-x: f64,
+            focal-length-y: f64,
+            principal-point-x: f64,
+            principal-point-y: f64,
+            distortion: list<f64>,
+        }
+
+        resource camera-stream {
+            get-frame: func() -> result<camera-frame, string>;
+            get-intrinsics: func() -> camera-intrinsics;
+            is-available: func() -> bool;
+        }
+        
+        create-stream: func() -> camera-stream;
+    }
+
+    /// Import WASI-NN for neural network inference
+    import wasi-nn: interface {
+        variant graph-error {
+            not-found,
+            invalid-argument,
+            invalid-encoding,
+            timeout,
+            runtime-error,
+            unsupported-operation,
+            too-large,
+            not-supported,
+        }
+
+        resource graph;
+        resource tensor;
+        resource graph-execution-context;
+
+        enum graph-encoding {
+            openvino,
+            onnx,
+            tensorflow,
+            pytorch,
+            tensorflowlite,
+        }
+
+        enum execution-target {
+            cpu,
+            gpu,
+            tpu,
+        }
+
+        enum tensor-type {
+            float16,
+            float32,
+            float64,
+            uint8,
+            int32,
+            int64,
+        }
+
+        load: func(graphs: list<tuple<string, list<u8>>>, encoding: graph-encoding, target: execution-target) -> result<graph, graph-error>;
+        
+        init-execution-context: func(graph: borrow<graph>) -> result<graph-execution-context, graph-error>;
+        
+        set-input: func(ctx: borrow<graph-execution-context>, index: u32, tensor: tensor) -> result<_, graph-error>;
+        
+        compute: func(ctx: borrow<graph-execution-context>) -> result<_, graph-error>;
+        
+        get-output: func(ctx: borrow<graph-execution-context>, index: u32) -> result<tensor, graph-error>;
+    }
+    
+    /// Export detection results for other components to consume
+    export detection-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        record quaternion {
+            x: f64,
+            y: f64,
+            z: f64,
+            w: f64,
+        }
+
+        /// Detection data types
+        record detection-results {
+            objects: list<detected-object>,
+            timestamp: u64,
+            frame-id: string,
+            confidence-threshold: f32,
+        }
+
+        record detected-object {
+            object-id: u32,
+            object-type: object-type,
+            position: position3d,
+            velocity: velocity3d,
+            bounding-box: bounding-box3d,
+            confidence: f32,
+            tracking-state: tracking-state,
+        }
+
+        record bounding-box3d {
+            center: position3d,
+            size: size3d,
+            orientation: quaternion,
+        }
+
+        record size3d {
+            length: f64,
+            width: f64,
+            height: f64,
+        }
+
+        enum object-type {
+            unknown,
+            vehicle,
+            pedestrian,
+            cyclist,
+            motorcycle,
+            truck,
+            bus,
+            traffic-sign,
+            traffic-light,
+            construction-zone,
+            road-debris,
+        }
+
+        enum tracking-state {
+            new,
+            tracked,
+            lost,
+            deleted,
+        }
+
+        resource detection-stream {
+            get-detections: func() -> result<detection-results, string>;
+            is-available: func() -> bool;
+            get-object-count: func() -> u32;
+        }
+        
+        create-stream: func() -> detection-stream;
+    }
+    
+    /// Export AI control interface
+    export ai-control: interface {
+        /// AI system configuration
+        record ai-config {
+            model-path: string,
+            confidence-threshold: f32,
+            nms-threshold: f32,
+            input-resolution: resolution,
+            batch-size: u32,
+            inference-device: inference-device,
+            performance-mode: performance-mode,
+        }
+
+        enum model-type {
+            yolo-v5,
+            yolo-v8,
+            ssd-mobilenet,
+            faster-rcnn,
+            efficientdet,
+            custom,
+        }
+
+        record resolution {
+            width: u32,
+            height: u32,
+        }
+
+        enum inference-device {
+            cpu,
+            gpu,
+            npu,
+            auto,
+        }
+
+        enum performance-mode {
+            accuracy,
+            speed,
+            balanced,
+            power-efficient,
+        }
+
+        enum ai-status {
+            offline,
+            initializing,
+            loading-model,
+            ready,
+            processing,
+            error,
+            maintenance,
+        }
+
+        record performance-metrics {
+            inference-time-ms: f32,
+            fps: f32,
+            cpu-usage-percent: f32,
+            memory-usage-mb: u32,
+            gpu-usage-percent: f32,
+            model-accuracy: f32,
+            throughput-hz: f32,
+        }
+
+        record diagnostic-result {
+            model-integrity: test-result,
+            inference-engine: test-result,
+            memory-test: test-result,
+            performance-test: test-result,
+            accuracy-test: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize AI system with model and configuration
+        initialize: func(config: ai-config) -> result<_, string>;
+        
+        /// Load neural network model
+        load-model: func(model-path: string, model-type: model-type) -> result<_, string>;
+        
+        /// Start object detection processing
+        start-detection: func() -> result<_, string>;
+        
+        /// Stop object detection processing
+        stop-detection: func() -> result<_, string>;
+        
+        /// Update AI configuration
+        update-config: func(config: ai-config) -> result<_, string>;
+        
+        /// Get AI system status
+        get-status: func() -> ai-status;
+        
+        /// Get performance metrics
+        get-performance: func() -> performance-metrics;
+        
+        /// Run AI system diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

@@ -1,0 +1,135 @@
+/// Ultrasonic Component - EXPORTS close-range ultrasonic data for parking assistance
+package adas:ultrasonic@0.1.0;
+
+world ultrasonic-component {
+    /// Export ultrasonic data stream
+    export ultrasonic-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record quaternion {
+            x: f64,
+            y: f64,
+            z: f64,
+            w: f64,
+        }
+
+        /// Ultrasonic data types
+        record ultrasonic-scan {
+            sensors: list<sensor-reading>,
+            timestamp: u64,
+            scan-id: u32,
+        }
+
+        record sensor-reading {
+            sensor-id: u32,
+            distance: f64,
+            confidence: f32,
+            sensor-position: sensor-position,
+            sensor-pose: ultrasonic-pose,
+        }
+
+        record ultrasonic-pose {
+            position: position3d,
+            orientation: quaternion,
+        }
+
+        enum sensor-position {
+            front-left,
+            front-center-left,
+            front-center-right,
+            front-right,
+            rear-left,
+            rear-center-left,
+            rear-center-right,
+            rear-right,
+        }
+
+        resource ultrasonic-stream {
+            get-scan: func() -> result<ultrasonic-scan, string>;
+            is-available: func() -> bool;
+            get-min-distance: func() -> f64;
+        }
+        
+        create-stream: func() -> ultrasonic-stream;
+    }
+    
+    /// Export ultrasonic control interface
+    export ultrasonic-control: interface {
+        /// Shared sensor position enum
+        enum sensor-position {
+            front-left,
+            front-center-left,
+            front-center-right,
+            front-right,
+            rear-left,
+            rear-center-left,
+            rear-center-right,
+            rear-right,
+        }
+
+        /// Ultrasonic configuration
+        record ultrasonic-config {
+            sensitivity-level: sensitivity-level,
+            detection-range: f64,
+            scan-frequency: u32,
+            enabled-sensors: list<sensor-position>,
+            obstacle-warning: bool,
+            audio-feedback: bool,
+        }
+
+        enum sensitivity-level {
+            low,
+            medium,
+            high,
+            adaptive,
+        }
+
+        enum ultrasonic-status {
+            offline,
+            initializing,
+            monitoring,
+            detecting,
+            error,
+            maintenance,
+        }
+
+        record diagnostic-result {
+            sensor-integrity: test-result,
+            range-accuracy: test-result,
+            response-time: test-result,
+            environmental-immunity: test-result,
+            cross-talk-suppression: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize ultrasonic system
+        initialize: func(config: ultrasonic-config) -> result<_, string>;
+        
+        /// Start monitoring
+        start-monitoring: func() -> result<_, string>;
+        
+        /// Stop monitoring
+        stop-monitoring: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: ultrasonic-config) -> result<_, string>;
+        
+        /// Get system status
+        get-status: func() -> ultrasonic-status;
+        
+        /// Run diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

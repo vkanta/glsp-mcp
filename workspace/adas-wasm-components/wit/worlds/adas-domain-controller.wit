@@ -1,0 +1,206 @@
+/// ADAS Domain Controller - IMPORTS status from all components, EXPORTS system management
+package adas:domain-controller@0.1.0;
+
+world adas-domain-controller-component {
+    /// Export system management interface
+    export system-management: interface {
+        record system-health {
+            overall-status: health-status,
+            component-health: list<component-health>,
+            system-integrity: f32,
+            uptime: u64,
+            last-diagnostic: u64,
+        }
+        
+        record component-health {
+            component: adas-component,
+            status: health-status,
+            last-heartbeat: u64,
+            error-count: u32,
+            warning-count: u32,
+        }
+        
+        enum health-status {
+            healthy,
+            degraded,
+            warning,
+            critical,
+            offline,
+        }
+        
+        enum adas-component {
+            sensor-fusion,
+            object-detection,
+            tracking-prediction,
+            behavior-prediction,
+            planning-decision,
+            vehicle-control,
+            safety-monitor,
+            hmi-interface,
+            cameras,
+            radars,
+            lidars,
+            ultrasonics,
+        }
+        
+        record component-status {
+            component: adas-component,
+            status: health-status,
+            cpu-usage: f32,
+            memory-usage: f32,
+            last-update: u64,
+            error-count: u32,
+        }
+        
+        record system-metrics {
+            total-cpu-usage: f32,
+            total-memory-usage: f32,
+            active-components: u32,
+            data-throughput: f32,
+            processing-latency: f32,
+            timestamp: u64,
+        }
+        
+        record adas-feature {
+            feature-id: u32,
+            name: string,
+            feature-type: feature-type,
+            enabled: bool,
+            availability: feature-availability,
+            dependencies: list<adas-component>,
+        }
+        
+        enum feature-type {
+            safety,
+            comfort,
+            efficiency,
+            automation,
+            diagnostic,
+        }
+        
+        enum feature-availability {
+            available,
+            degraded,
+            unavailable,
+            maintenance,
+        }
+        
+        /// Get overall system health
+        get-system-health: func() -> system-health;
+        
+        /// Get component statuses
+        get-component-statuses: func() -> list<component-status>;
+        
+        /// Get system metrics
+        get-system-metrics: func() -> system-metrics;
+        
+        /// Get active features
+        get-active-features: func() -> list<adas-feature>;
+        
+        /// Enable/disable features
+        set-feature-state: func(feature: adas-feature, enabled: bool) -> result<_, string>;
+    }
+    
+    /// Domain controller interface
+    export controller-interface: interface {
+        record controller-config {
+            system-mode: system-mode,
+            diagnostic-interval: u32,
+            monitoring-level: monitoring-level,
+            feature-config: feature-config,
+        }
+        
+        enum system-mode {
+            normal,
+            performance,
+            eco,
+            safe,
+            diagnostic,
+        }
+        
+        enum monitoring-level {
+            basic,
+            standard,
+            comprehensive,
+            debug,
+        }
+        
+        record feature-config {
+            default-features: list<string>,
+            safety-features: list<string>,
+            comfort-features: list<string>,
+        }
+        
+        enum controller-status {
+            offline,
+            initializing,
+            running,
+            degraded,
+            maintenance,
+            error,
+        }
+        
+        record update-result {
+            success: bool,
+            updated-components: list<string>,
+            failed-components: list<string>,
+            rollback-available: bool,
+        }
+        
+        enum health-status {
+            healthy,
+            degraded,
+            warning,
+            critical,
+            offline,
+        }
+        
+        record diagnostic-report {
+            system-health: health-status,
+            component-diagnostics: list<component-diagnostic>,
+            performance-metrics: performance-metrics,
+            recommendations: list<string>,
+        }
+        
+        record component-diagnostic {
+            component: string,
+            status: health-status,
+            tests-passed: u32,
+            tests-failed: u32,
+            warnings: list<string>,
+            errors: list<string>,
+        }
+        
+        record performance-metrics {
+            avg-response-time: f32,
+            peak-cpu-usage: f32,
+            peak-memory-usage: f32,
+            throughput: f32,
+            error-rate: f32,
+        }
+        
+        /// Initialize domain controller
+        initialize: func(config: controller-config) -> result<_, string>;
+        
+        /// Start system
+        start-system: func() -> result<_, string>;
+        
+        /// Stop system
+        stop-system: func() -> result<_, string>;
+        
+        /// Perform system update
+        update-system: func(update-package: list<u8>) -> result<update-result, string>;
+        
+        /// Run system diagnostics
+        run-diagnostics: func() -> result<diagnostic-report, string>;
+        
+        /// Get controller status
+        get-status: func() -> controller-status;
+        
+        /// Get configuration
+        get-config: func() -> controller-config;
+        
+        /// Update configuration
+        update-config: func(config: controller-config) -> result<_, string>;
+    }
+}

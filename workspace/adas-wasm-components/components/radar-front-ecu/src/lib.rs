@@ -1,171 +1,134 @@
-use wit_bindgen::generate;
+// Radar Front ECU - Exports long-range radar data for ACC/AEB
 
-// Generate bindings for radar-front-ecu
-generate!({
+wit_bindgen::generate!({
     world: "radar-front-component",
-    path: "../../wit/radar-front-ecu-standalone.wit"
+    path: "../../wit/radar-front.wit",
 });
 
-use exports::adas::radar_front::radar_front::*;
+use crate::exports::radar_data;
+use crate::exports::radar_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: RadarConfig, calibration: RadarCalibration) -> Result<(), String> {
-        println!("Initializing front radar with max range: {} meters", config.max_range);
-        println!("Calibration: azimuth offset = {} degrees", calibration.azimuth_offset);
+// Resource state for radar stream
+pub struct RadarStreamState {
+    id: u32,
+}
+
+// Radar configuration state
+static mut RADAR_CONFIG: Option<radar_control::RadarConfig> = None;
+static mut RADAR_STATUS: radar_control::RadarStatus = radar_control::RadarStatus::Offline;
+
+// Implement the radar-data interface
+impl radar_data::Guest for Component {
+    type RadarStream = RadarStreamState;
+    
+    fn create_stream() -> radar_data::RadarStream {
+        radar_data::RadarStream::new(RadarStreamState { id: 1 })
+    }
+}
+
+impl radar_data::GuestRadarStream for RadarStreamState {
+    fn get_scan(&self) -> Result<radar_data::RadarScan, String> {
+        // Simulate radar scan with detected targets
+        let targets = vec![
+            radar_data::RadarTarget {
+                position: radar_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
+                velocity: radar_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
+                range: 50.0,
+                azimuth: 0.0,
+                elevation: 0.0,
+                rcs: 10.0, // Car-sized target
+                signal_strength: -30.0,
+                confidence: 0.95,
+            },
+            radar_data::RadarTarget {
+                position: radar_data::Position3d { x: 120.0, y: 3.5, z: 0.0 },
+                velocity: radar_data::Velocity3d { vx: -10.0, vy: 0.0, vz: 0.0, speed: 10.0 },
+                range: 120.2,
+                azimuth: 1.7, // degrees
+                elevation: 0.0,
+                rcs: 12.0,
+                signal_strength: -35.0,
+                confidence: 0.88,
+            },
+        ];
+
+        Ok(radar_data::RadarScan {
+            targets,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            scan_id: 12345,
+            sensor_pose: radar_data::RadarPose {
+                position: radar_data::Position3d { x: 0.0, y: 0.0, z: 0.8 },
+                orientation: radar_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+            },
+        })
+    }
+
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(RADAR_STATUS, radar_control::RadarStatus::Scanning)
+        }
+    }
+
+    fn get_range(&self) -> f64 {
+        unsafe {
+            RADAR_CONFIG.as_ref().map(|c| c.detection_range).unwrap_or(200.0)
+        }
+    }
+}
+
+// Implement the radar control interface
+impl radar_control::Guest for Component {
+    fn initialize(config: radar_control::RadarConfig) -> Result<(), String> {
+        unsafe {
+            RADAR_CONFIG = Some(config);
+            RADAR_STATUS = radar_control::RadarStatus::Initializing;
+        }
         Ok(())
     }
 
     fn start_scanning() -> Result<(), String> {
-        println!("Starting radar scanning");
-        Ok(())
+        unsafe {
+            if RADAR_CONFIG.is_some() {
+                RADAR_STATUS = radar_control::RadarStatus::Scanning;
+                Ok(())
+            } else {
+                Err("Radar not initialized".to_string())
+            }
+        }
     }
 
     fn stop_scanning() -> Result<(), String> {
-        println!("Stopping radar scanning");
-        Ok(())
-    }
-
-    fn get_targets() -> Result<Vec<RadarTarget>, String> {
-        // Return mock radar targets
-        Ok(vec![
-            RadarTarget {
-                target_id: 1,
-                range: 50.0,
-                range_rate: -10.0,
-                azimuth_angle: 0.0,
-                elevation_angle: 0.0,
-                radar_cross_section: 15.0,
-                confidence: 0.95,
-                target_type: TargetType::Vehicle,
-                velocity: Velocity3d {
-                    vx: -10.0,
-                    vy: 0.0,
-                    vz: 0.0,
-                },
-                acceleration: Acceleration3d {
-                    ax: 0.0,
-                    ay: 0.0,
-                    az: 0.0,
-                },
-            },
-            RadarTarget {
-                target_id: 2,
-                range: 25.0,
-                range_rate: 0.0,
-                azimuth_angle: 5.0,
-                elevation_angle: 0.0,
-                radar_cross_section: 2.0,
-                confidence: 0.88,
-                target_type: TargetType::MovingObject,
-                velocity: Velocity3d {
-                    vx: 0.0,
-                    vy: 0.0,
-                    vz: 0.0,
-                },
-                acceleration: Acceleration3d {
-                    ax: 0.0,
-                    ay: 0.0,
-                    az: 0.0,
-                },
-            }
-        ])
-    }
-
-    fn get_tracks() -> Result<Vec<TrackInfo>, String> {
-        // Return mock tracking data with correct fields
-        Ok(vec![
-            TrackInfo {
-                track_id: 1,
-                target: RadarTarget {
-                    target_id: 1,
-                    range: 50.0,
-                    range_rate: -10.0,
-                    azimuth_angle: 0.0,
-                    elevation_angle: 0.0,
-                    radar_cross_section: 15.0,
-                    confidence: 0.95,
-                    target_type: TargetType::Vehicle,
-                    velocity: Velocity3d {
-                        vx: -10.0,
-                        vy: 0.0,
-                        vz: 0.0,
-                    },
-                    acceleration: Acceleration3d {
-                        ax: 0.0,
-                        ay: 0.0,
-                        az: 0.0,
-                    },
-                },
-                track_age: 100,
-                prediction_covariance: vec![0.1; 36], // 6x6 matrix
-                kalman_gain: vec![0.5; 36],
-                track_quality: 0.95,
-            }
-        ])
-    }
-
-    fn update_config(config: RadarConfig) -> Result<(), String> {
-        println!("Updating radar configuration");
-        Ok(())
-    }
-
-    fn get_status() -> RadarStatus {
-        RadarStatus::Active
-    }
-
-    fn get_performance() -> PerformanceMetrics {
-        PerformanceMetrics {
-            detection_range: 200.0,
-            false_alarm_rate: 0.01,
-            missed_detection_rate: 0.02,
-            range_accuracy: 0.5,
-            velocity_accuracy: 0.2,
-            angular_accuracy: 1.0,
+        unsafe {
+            RADAR_STATUS = radar_control::RadarStatus::Offline;
         }
-    }
-
-    fn set_environment(env: EnvironmentStatus) -> Result<(), String> {
-        println!("Setting environment conditions: {:?}", env.weather_condition);
         Ok(())
     }
 
-    fn get_interference_status() -> InterferenceStatus {
-        InterferenceStatus {
-            interference_detected: false,
-            interference_source: InterferenceType::None,
-            signal_to_noise_ratio: 20.0,
-            mitigation_active: false,
+    fn update_config(config: radar_control::RadarConfig) -> Result<(), String> {
+        unsafe {
+            RADAR_CONFIG = Some(config);
         }
-    }
-
-    fn calibrate() -> Result<RadarCalibration, String> {
-        Ok(RadarCalibration {
-            azimuth_offset: 0.0,
-            elevation_offset: 0.0,
-            range_offset: 0.0,
-            mounting_height: 0.6,
-            mounting_angle: 0.0,
-            antenna_gain: 25.0,
-        })
-    }
-
-    fn run_self_test() -> Result<TestResults, String> {
-        Ok(TestResults {
-            transmitter_ok: true,
-            receiver_ok: true,
-            antenna_ok: true,
-            processing_ok: true,
-            temperature_in_range: true,
-            power_supply_ok: true,
-        })
-    }
-
-    fn set_scenario(scenario: DrivingScenario) -> Result<(), String> {
-        println!("Setting driving scenario: {:?}", scenario);
         Ok(())
+    }
+
+    fn get_status() -> radar_control::RadarStatus {
+        unsafe { RADAR_STATUS.clone() }
+    }
+
+    fn run_diagnostic() -> Result<radar_control::DiagnosticResult, String> {
+        Ok(radar_control::DiagnosticResult {
+            rf_performance: radar_control::TestResult::Passed,
+            antenna_integrity: radar_control::TestResult::Passed,
+            signal_processing: radar_control::TestResult::Passed,
+            target_tracking: radar_control::TestResult::Passed,
+            interference_handling: radar_control::TestResult::Passed,
+            overall_score: 92.5,
+        })
     }
 }
 

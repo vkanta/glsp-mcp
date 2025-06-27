@@ -1,0 +1,66 @@
+package wasi:nn@0.2.0;
+
+interface graph {
+  variant graph-error {
+    not-found,
+    invalid-argument,
+    invalid-encoding,
+    timeout,
+    runtime-error,
+    unsupported-operation,
+    too-large,
+    not-supported,
+  }
+
+  resource graph;
+
+  load: func(graphs: list<tuple<string, list<u8>>>, encoding: graph-encoding, target: execution-target) -> result<graph, graph-error>;
+
+  enum graph-encoding {
+    openvino,
+    onnx,
+    tensorflow,
+    pytorch,
+    tensorflowlite,
+  }
+
+  enum execution-target {
+    cpu,
+    gpu,
+    tpu,
+  }
+}
+
+interface tensor {
+  use graph.{graph-error};
+
+  resource tensor;
+
+  enum tensor-type {
+    f16,
+    f32,
+    f64,
+    u8,
+    i32,
+    i64,
+  }
+
+  record tensor-dimensions {
+    dimensions: list<u32>,
+  }
+}
+
+interface inference {
+  use graph.{graph, graph-error};
+  use tensor.{tensor, tensor-type};
+
+  resource graph-execution-context;
+
+  init-execution-context: func(graph: borrow<graph>) -> result<graph-execution-context, graph-error>;
+  
+  set-input: func(ctx: borrow<graph-execution-context>, index: u32, tensor: tensor) -> result<_, graph-error>;
+  
+  compute: func(ctx: borrow<graph-execution-context>) -> result<_, graph-error>;
+  
+  get-output: func(ctx: borrow<graph-execution-context>, index: u32) -> result<tensor, graph-error>;
+}

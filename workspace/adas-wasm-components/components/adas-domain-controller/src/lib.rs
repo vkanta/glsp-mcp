@@ -1,126 +1,217 @@
 wit_bindgen::generate!({
     world: "adas-domain-controller-component",
-    path: "../../wit/adas-domain-controller-standalone.wit"
+    path: "../../wit/worlds/adas-domain-controller.wit"
 });
 
-use exports::adas::domain_controller::adas_domain_controller::*;
+use crate::exports::system_management;
+use crate::exports::controller_interface;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: SystemConfiguration) -> Result<(), String> {
-        println!("Initializing ADAS Domain Controller");
-        println!("Max concurrent features: {}", config.max_concurrent_features);
+// Global state
+static mut CONTROLLER_STATUS: controller_interface::ControllerStatus = controller_interface::ControllerStatus::Offline;
+static mut CONTROLLER_CONFIG: Option<controller_interface::ControllerConfig> = None;
+
+// Implement system-management interface (EXPORTED)
+impl system_management::Guest for Component {
+    fn get_system_health() -> system_management::SystemHealth {
+        system_management::SystemHealth {
+            overall_status: system_management::HealthStatus::Healthy,
+            component_health: vec![
+                system_management::ComponentHealth {
+                    component: system_management::AdasComponent::SensorFusion,
+                    status: system_management::HealthStatus::Healthy,
+                    last_heartbeat: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    error_count: 0,
+                    warning_count: 0,
+                },
+                system_management::ComponentHealth {
+                    component: system_management::AdasComponent::VehicleControl,
+                    status: system_management::HealthStatus::Healthy,
+                    last_heartbeat: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    error_count: 0,
+                    warning_count: 0,
+                },
+            ],
+            system_integrity: 95.5,
+            uptime: 86400000, // 24 hours in milliseconds
+            last_diagnostic: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        }
+    }
+
+    fn get_component_statuses() -> Vec<system_management::ComponentStatus> {
+        vec![
+            system_management::ComponentStatus {
+                component: system_management::AdasComponent::SensorFusion,
+                status: system_management::HealthStatus::Healthy,
+                cpu_usage: 12.5,
+                memory_usage: 45.2,
+                last_update: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+                error_count: 0,
+            },
+            system_management::ComponentStatus {
+                component: system_management::AdasComponent::ObjectDetection,
+                status: system_management::HealthStatus::Healthy,
+                cpu_usage: 28.3,
+                memory_usage: 67.8,
+                last_update: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+                error_count: 0,
+            },
+        ]
+    }
+
+    fn get_system_metrics() -> system_management::SystemMetrics {
+        system_management::SystemMetrics {
+            total_cpu_usage: 35.7,
+            total_memory_usage: 52.1,
+            active_components: 8,
+            data_throughput: 125.5,
+            processing_latency: 12.3,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        }
+    }
+
+    fn get_active_features() -> Vec<system_management::AdasFeature> {
+        vec![
+            system_management::AdasFeature {
+                feature_id: 1,
+                name: "Automatic Emergency Braking".to_string(),
+                feature_type: system_management::FeatureType::Safety,
+                enabled: true,
+                availability: system_management::FeatureAvailability::Available,
+                dependencies: vec![
+                    system_management::AdasComponent::ObjectDetection,
+                    system_management::AdasComponent::VehicleControl,
+                ],
+            },
+            system_management::AdasFeature {
+                feature_id: 2,
+                name: "Adaptive Cruise Control".to_string(),
+                feature_type: system_management::FeatureType::Comfort,
+                enabled: true,
+                availability: system_management::FeatureAvailability::Available,
+                dependencies: vec![
+                    system_management::AdasComponent::TrackingPrediction,
+                    system_management::AdasComponent::PlanningDecision,
+                ],
+            },
+        ]
+    }
+
+    fn set_feature_state(feature: system_management::AdasFeature, enabled: bool) -> Result<(), String> {
+        println!("Setting feature '{}' (ID: {}) to enabled: {}", feature.name, feature.feature_id, enabled);
+        Ok(())
+    }
+}
+
+// Implement controller-interface (EXPORTED)
+impl controller_interface::Guest for Component {
+    fn initialize(config: controller_interface::ControllerConfig) -> Result<(), String> {
+        unsafe {
+            CONTROLLER_CONFIG = Some(config);
+            CONTROLLER_STATUS = controller_interface::ControllerStatus::Initializing;
+        }
         Ok(())
     }
 
-    fn start_system(mode: AdasMode, features: Vec<AdasFeature>) -> Result<(), String> {
-        println!("Starting ADAS system in {:?} mode with {} features", mode, features.len());
-        Ok(())
+    fn start_system() -> Result<(), String> {
+        unsafe {
+            if CONTROLLER_CONFIG.is_some() {
+                CONTROLLER_STATUS = controller_interface::ControllerStatus::Running;
+                Ok(())
+            } else {
+                Err("Controller not initialized".to_string())
+            }
+        }
     }
 
     fn stop_system() -> Result<(), String> {
-        println!("Stopping ADAS system");
+        unsafe {
+            CONTROLLER_STATUS = controller_interface::ControllerStatus::Offline;
+        }
         Ok(())
     }
 
-    fn get_system_state() -> Result<AdasSystemState, String> {
-        Ok(AdasSystemState {
-            system_mode: AdasMode::ConditionalActive,
-            active_features: vec![
-                AdasFeature::AdaptiveCruiseControl,
-                AdasFeature::LaneKeepingAssist,
-            ],
-            system_health: SystemHealth {
-                overall_health: 0.95,
-                sensor_health: vec![],
-                ecu_health: vec![],
-                communication_health: CommunicationHealth {
-                    can_bus_health: 0.98,
-                    ethernet_health: 0.99,
-                    wireless_health: 0.85,
-                    latency_ms: 5.2,
-                    packet_loss: 0.001,
+    fn update_system(update_package: Vec<u8>) -> Result<controller_interface::UpdateResult, String> {
+        println!("Processing system update with {} bytes", update_package.len());
+        Ok(controller_interface::UpdateResult {
+            success: true,
+            updated_components: vec!["sensor-fusion".to_string(), "object-detection".to_string()],
+            failed_components: vec![],
+            rollback_available: true,
+        })
+    }
+
+    fn run_diagnostics() -> Result<controller_interface::DiagnosticReport, String> {
+        Ok(controller_interface::DiagnosticReport {
+            system_health: controller_interface::HealthStatus::Healthy,
+            component_diagnostics: vec![
+                controller_interface::ComponentDiagnostic {
+                    component: "sensor-fusion".to_string(),
+                    status: controller_interface::HealthStatus::Healthy,
+                    tests_passed: 25,
+                    tests_failed: 0,
+                    warnings: vec![],
+                    errors: vec![],
                 },
-                ai_model_health: vec![],
+            ],
+            performance_metrics: controller_interface::PerformanceMetrics {
+                avg_response_time: 8.5,
+                peak_cpu_usage: 45.2,
+                peak_memory_usage: 67.8,
+                throughput: 125.5,
+                error_rate: 0.001,
             },
-            performance_metrics: PerformanceMetrics {
-                system_latency: 15.5,
-                processing_load: 0.65,
-                decision_frequency: 20.0,
-                safety_margin: 0.8,
-                reliability_score: 0.96,
-            },
-            safety_status: SafetyStatus {
-                safety_level: SafetyLevel::AsilC,
-                redundancy_status: vec![],
-                fail_safe_active: false,
-                safety_violations: vec![],
-                iso26262_compliance: true,
-            },
-            timestamp: 1000000,
+            recommendations: vec!["Consider reducing sensor polling rate to improve efficiency".to_string()],
         })
     }
 
-    fn activate_feature(feature: AdasFeature) -> Result<(), String> {
-        println!("Activating ADAS feature: {:?}", feature);
-        Ok(())
+    fn get_status() -> controller_interface::ControllerStatus {
+        unsafe { CONTROLLER_STATUS.clone() }
     }
 
-    fn deactivate_feature(feature: AdasFeature) -> Result<(), String> {
-        println!("Deactivating ADAS feature: {:?}", feature);
-        Ok(())
+    fn get_config() -> controller_interface::ControllerConfig {
+        unsafe {
+            if let Some(config) = &CONTROLLER_CONFIG {
+                config.clone()
+            } else {
+                // Return default config
+                controller_interface::ControllerConfig {
+                    system_mode: controller_interface::SystemMode::Normal,
+                    diagnostic_interval: 60000, // 1 minute
+                    monitoring_level: controller_interface::MonitoringLevel::Standard,
+                    feature_config: controller_interface::FeatureConfig {
+                        default_features: vec!["emergency-braking".to_string()],
+                        safety_features: vec!["collision-avoidance".to_string()],
+                        comfort_features: vec!["adaptive-cruise".to_string()],
+                    },
+                }
+            }
+        }
     }
 
-    fn set_mode(mode: AdasMode) -> Result<(), String> {
-        println!("Setting ADAS mode to: {:?}", mode);
-        Ok(())
-    }
-
-    fn allocate_resources(allocation: ResourceAllocation) -> Result<(), String> {
-        println!("Allocating resources: compute={}, memory={}, bandwidth={}", 
-                 allocation.compute_resources, allocation.memory_allocation, allocation.bandwidth_allocation);
-        Ok(())
-    }
-
-    fn get_health_status() -> Result<SystemHealth, String> {
-        Ok(SystemHealth {
-            overall_health: 0.92,
-            sensor_health: vec![],
-            ecu_health: vec![],
-            communication_health: CommunicationHealth {
-                can_bus_health: 0.95,
-                ethernet_health: 0.98,
-                wireless_health: 0.82,
-                latency_ms: 6.1,
-                packet_loss: 0.002,
-            },
-            ai_model_health: vec![],
-        })
-    }
-
-    fn run_diagnostic() -> Result<DiagnosticReport, String> {
-        Ok(DiagnosticReport {
-            system_uptime: 3600000,
-            total_errors: 5,
-            critical_errors: 0,
-            performance_score: 0.94,
-            recommendation: "System operating normally".to_string(),
-        })
-    }
-
-    fn get_status() -> AdasControllerStatus {
-        AdasControllerStatus::Active
-    }
-
-    fn update_configuration(config: SystemConfiguration) -> Result<(), String> {
-        println!("Updating system configuration");
-        Ok(())
-    }
-
-    fn emergency_shutdown() -> Result<(), String> {
-        println!("Executing emergency shutdown");
+    fn update_config(config: controller_interface::ControllerConfig) -> Result<(), String> {
+        unsafe {
+            CONTROLLER_CONFIG = Some(config);
+        }
         Ok(())
     }
 }

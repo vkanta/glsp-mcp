@@ -1,0 +1,323 @@
+/// Behavior Prediction AI Component - IMPORTS detection data, EXPORTS prediction results
+package adas:behavior-prediction-ai@0.1.0;
+
+world behavior-prediction-component {
+    /// Import detection data from object detection AI
+    import detection-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        record quaternion {
+            x: f64,
+            y: f64,
+            z: f64,
+            w: f64,
+        }
+
+        /// Detection data types
+        record detection-results {
+            objects: list<detected-object>,
+            timestamp: u64,
+            frame-id: string,
+            confidence-threshold: f32,
+        }
+
+        record detected-object {
+            object-id: u32,
+            object-type: object-type,
+            position: position3d,
+            velocity: velocity3d,
+            bounding-box: bounding-box3d,
+            confidence: f32,
+            tracking-state: tracking-state,
+        }
+
+        record bounding-box3d {
+            center: position3d,
+            size: size3d,
+            orientation: quaternion,
+        }
+
+        record size3d {
+            length: f64,
+            width: f64,
+            height: f64,
+        }
+
+        enum object-type {
+            unknown,
+            vehicle,
+            pedestrian,
+            cyclist,
+            motorcycle,
+            truck,
+            bus,
+            traffic-sign,
+            traffic-light,
+            construction-zone,
+            road-debris,
+        }
+
+        enum tracking-state {
+            new,
+            tracked,
+            lost,
+            deleted,
+        }
+
+        resource detection-stream {
+            get-detections: func() -> result<detection-results, string>;
+            is-available: func() -> bool;
+            get-object-count: func() -> u32;
+        }
+        
+        create-stream: func() -> detection-stream;
+    }
+
+    /// Import WASI-NN for neural network inference
+    import wasi-nn: interface {
+        variant graph-error {
+            not-found,
+            invalid-argument,
+            invalid-encoding,
+            timeout,
+            runtime-error,
+            unsupported-operation,
+            too-large,
+            not-supported,
+        }
+
+        resource graph;
+        resource tensor;
+        resource graph-execution-context;
+
+        enum graph-encoding {
+            openvino,
+            onnx,
+            tensorflow,
+            pytorch,
+            tensorflowlite,
+        }
+
+        enum execution-target {
+            cpu,
+            gpu,
+            tpu,
+        }
+
+        enum tensor-type {
+            float16,
+            float32,
+            float64,
+            uint8,
+            int32,
+            int64,
+        }
+
+        load: func(graphs: list<tuple<string, list<u8>>>, encoding: graph-encoding, target: execution-target) -> result<graph, graph-error>;
+        
+        init-execution-context: func(graph: borrow<graph>) -> result<graph-execution-context, graph-error>;
+        
+        set-input: func(ctx: borrow<graph-execution-context>, index: u32, tensor: tensor) -> result<_, graph-error>;
+        
+        compute: func(ctx: borrow<graph-execution-context>) -> result<_, graph-error>;
+        
+        get-output: func(ctx: borrow<graph-execution-context>, index: u32) -> result<tensor, graph-error>;
+    }
+    
+    /// Export behavior predictions for other components to consume
+    export prediction-data: interface {
+        /// Shared spatial types
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        record acceleration3d {
+            ax: f64,
+            ay: f64,
+            az: f64,
+            magnitude: f64,
+        }
+
+        /// Prediction data types
+        record prediction-results {
+            predictions: list<behavior-prediction>,
+            timestamp: u64,
+            prediction-horizon: f32,
+            confidence-level: f32,
+        }
+
+        record behavior-prediction {
+            object-id: u32,
+            predicted-behavior: behavior-type,
+            trajectory: predicted-trajectory,
+            intention: intention-type,
+            risk-level: risk-level,
+            confidence: f32,
+        }
+
+        record predicted-trajectory {
+            waypoints: list<trajectory-point>,
+            duration: f32,
+            probability: f32,
+        }
+
+        record trajectory-point {
+            position: position3d,
+            velocity: velocity3d,
+            acceleration: acceleration3d,
+            timestamp: f32,
+        }
+
+        enum behavior-type {
+            straight-motion,
+            lane-change-left,
+            lane-change-right,
+            turning-left,
+            turning-right,
+            stopping,
+            accelerating,
+            decelerating,
+            merging,
+            yielding,
+            unknown,
+        }
+
+        enum intention-type {
+            continue-straight,
+            change-lane,
+            turn,
+            stop,
+            merge,
+            overtake,
+            park,
+            u-turn,
+            unknown,
+        }
+
+        enum risk-level {
+            none,
+            low,
+            medium,
+            high,
+            critical,
+        }
+
+        resource prediction-stream {
+            get-predictions: func() -> result<prediction-results, string>;
+            is-available: func() -> bool;
+            get-prediction-count: func() -> u32;
+        }
+        
+        create-stream: func() -> prediction-stream;
+    }
+    
+    /// Export prediction control interface
+    export prediction-control: interface {
+        /// Prediction AI configuration
+        record prediction-config {
+            model-path: string,
+            prediction-horizon: f32,
+            confidence-threshold: f32,
+            update-frequency: u32,
+            context-window: u32,
+            inference-device: inference-device,
+            prediction-modes: list<prediction-mode>,
+        }
+
+        enum inference-device {
+            cpu,
+            gpu,
+            npu,
+            auto,
+        }
+
+        enum prediction-mode {
+            vehicle-behavior,
+            pedestrian-behavior,
+            cyclist-behavior,
+            intersection-analysis,
+            highway-analysis,
+        }
+
+        enum prediction-status {
+            offline,
+            initializing,
+            loading-model,
+            ready,
+            predicting,
+            error,
+            maintenance,
+        }
+
+        record performance-metrics {
+            prediction-accuracy: f32,
+            processing-time-ms: f32,
+            throughput-hz: f32,
+            cpu-usage-percent: f32,
+            memory-usage-mb: u32,
+            false-positive-rate: f32,
+            false-negative-rate: f32,
+        }
+
+        record diagnostic-result {
+            model-integrity: test-result,
+            prediction-accuracy: test-result,
+            temporal-consistency: test-result,
+            computational-performance: test-result,
+            memory-efficiency: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize prediction system
+        initialize: func(config: prediction-config) -> result<_, string>;
+        
+        /// Load prediction model
+        load-model: func(model-path: string) -> result<_, string>;
+        
+        /// Start behavior prediction
+        start-prediction: func() -> result<_, string>;
+        
+        /// Stop behavior prediction
+        stop-prediction: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: prediction-config) -> result<_, string>;
+        
+        /// Get system status
+        get-status: func() -> prediction-status;
+        
+        /// Get performance metrics
+        get-performance: func() -> performance-metrics;
+        
+        /// Run diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

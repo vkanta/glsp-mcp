@@ -1,92 +1,119 @@
-use wit_bindgen::generate;
+// Camera Surround ECU - Exports 360° camera data stream
 
-// Generate bindings for camera surround component
-generate!({
+wit_bindgen::generate!({
     world: "camera-surround-component",
-    path: "../../wit/camera-surround-ecu-standalone.wit"
+    path: "../../wit/camera-surround.wit",
 });
 
-use exports::adas::camera_surround::camera_surround::*;
+use crate::exports::camera_data;
+use crate::exports::surround_control;
 
-// Component implementation
 struct Component;
 
-impl Guest for Component {
-    fn initialize(config: SurroundConfig) -> Result<(), String> {
-        // Initialize surround view system with multiple cameras
-        println!("Initializing surround view system with {:?} enabled cameras", config.enabled_cameras.len());
-        
-        // Validate camera positions
-        for position in &config.enabled_cameras {
-            println!("Enabling camera at position: {:?}", position);
-        }
-        
-        Ok(())
-    }
+// Resource state for camera stream
+pub struct CameraStreamState {
+    id: u32,
+}
 
-    fn start_capture() -> Result<(), String> {
-        println!("Starting surround view capture from all cameras");
-        Ok(())
-    }
+// Surround camera configuration state
+static mut SURROUND_CONFIG: Option<surround_control::SurroundConfig> = None;
+static mut SURROUND_STATUS: surround_control::SurroundStatus = surround_control::SurroundStatus::Offline;
 
-    fn stop_capture() -> Result<(), String> {
-        println!("Stopping surround view capture");
-        Ok(())
+// Implement the camera-data interface
+impl camera_data::Guest for Component {
+    type CameraStream = CameraStreamState;
+    
+    fn create_stream() -> camera_data::CameraStream {
+        camera_data::CameraStream::new(CameraStreamState { id: 1 })
     }
+}
 
-    fn get_surround_frame() -> Result<SurroundFrame, String> {
-        // Return mock surround frame data
-        Ok(SurroundFrame {
-            timestamp: 1234567890,
-            frame_id: 42,
-            camera_frames: vec![],
-            stitched_frame: None,
-            top_down_view: None,
-        })
-    }
-
-    fn generate_top_down_view(_surround_frame: SurroundFrame) -> Result<CameraFrame, String> {
-        // Generate bird's eye view from surround cameras
-        Ok(CameraFrame {
-            width: 640,
-            height: 640,
-            pixel_format: PixelFormat::Rgb888,
-            data: vec![0; 640 * 640 * 3],
-            exposure_time: 1.0 / 30.0,
+impl camera_data::GuestCameraStream for CameraStreamState {
+    fn get_frame(&self) -> Result<camera_data::CameraFrame, String> {
+        // Simulate 360° surround view frame generation
+        Ok(camera_data::CameraFrame {
+            width: 1920,
+            height: 1080,
+            data: vec![0; 1920 * 1080 * 3], // RGB8 stitched surround view
+            format: camera_data::PixelFormat::Rgb8,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            exposure_time: 16.67,
             gain: 1.0,
+            sensor_pose: camera_data::CameraPose {
+                position: camera_data::Position3d { x: 0.0, y: 0.0, z: 2.0 }, // Higher mounted
+                orientation: camera_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+            },
         })
     }
 
-    fn detect_parking_spaces(_surround_frame: SurroundFrame) -> Result<ParkingDetection, String> {
-        // Detect available parking spaces using surround view
-        Ok(ParkingDetection {
-            available_spaces: vec![],
-            obstacles: vec![],
-            guidance_lines: vec![],
-            safety_clearance: 0.5,
-        })
+    fn get_intrinsics(&self) -> camera_data::CameraIntrinsics {
+        // Surround view intrinsics (composite from multiple cameras)
+        camera_data::CameraIntrinsics {
+            focal_length_x: 800.0,
+            focal_length_y: 800.0,
+            principal_point_x: 960.0,
+            principal_point_y: 540.0,
+            distortion: vec![-0.2, 0.1, 0.0, 0.0, 0.0], // Higher distortion for wide-angle
+        }
     }
 
-    fn get_status() -> SystemStatus {
-        SystemStatus::Active
+    fn is_available(&self) -> bool {
+        unsafe {
+            matches!(SURROUND_STATUS, surround_control::SurroundStatus::Active)
+        }
     }
+}
 
-    fn calibrate_cameras() -> Result<Vec<CameraCalibration>, String> {
-        // Calibrate all surround cameras
-        Ok(vec![])
-    }
-
-    fn update_config(_config: SurroundConfig) -> Result<(), String> {
-        println!("Updating surround view configuration");
+// Implement the surround control interface
+impl surround_control::Guest for Component {
+    fn initialize(config: surround_control::SurroundConfig) -> Result<(), String> {
+        unsafe {
+            SURROUND_CONFIG = Some(config);
+            SURROUND_STATUS = surround_control::SurroundStatus::Initializing;
+        }
         Ok(())
     }
 
-    fn run_diagnostic() -> Result<DiagnosticResult, String> {
-        Ok(DiagnosticResult {
-            camera_status: vec![],
-            stitching_quality: 0.95,
-            calibration_accuracy: 0.98,
-            processing_latency: 16,
+    fn start_processing() -> Result<(), String> {
+        unsafe {
+            if SURROUND_CONFIG.is_some() {
+                SURROUND_STATUS = surround_control::SurroundStatus::Active;
+                Ok(())
+            } else {
+                Err("Surround camera not initialized".to_string())
+            }
+        }
+    }
+
+    fn stop_processing() -> Result<(), String> {
+        unsafe {
+            SURROUND_STATUS = surround_control::SurroundStatus::Offline;
+        }
+        Ok(())
+    }
+
+    fn update_config(config: surround_control::SurroundConfig) -> Result<(), String> {
+        unsafe {
+            SURROUND_CONFIG = Some(config);
+        }
+        Ok(())
+    }
+
+    fn get_status() -> surround_control::SurroundStatus {
+        unsafe { SURROUND_STATUS.clone() }
+    }
+
+    fn run_calibration() -> Result<surround_control::CalibrationResult, String> {
+        Ok(surround_control::CalibrationResult {
+            camera_alignment: surround_control::TestResult::Passed,
+            stitch_accuracy: surround_control::TestResult::Passed,
+            distortion_correction: surround_control::TestResult::Passed,
+            color_matching: surround_control::TestResult::Passed,
+            overlap_zones: surround_control::TestResult::Passed,
+            overall_score: 95.2,
         })
     }
 }

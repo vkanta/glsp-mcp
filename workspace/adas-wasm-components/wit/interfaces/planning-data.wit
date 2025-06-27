@@ -1,0 +1,70 @@
+/// Planning Data Interface - EXPORTED by planning component
+package adas:planning-data@0.1.0;
+
+interface planning-data {
+    use adas:sensor-data/spatial-types.{position3d, velocity3d};
+
+    record trajectory-plan {
+        trajectory: planned-trajectory,
+        maneuvers: list<planned-maneuver>,
+        planning-horizon: f32,
+        timestamp: u64,
+        confidence: f32,
+    }
+
+    record planned-trajectory {
+        waypoints: list<trajectory-waypoint>,
+        total-length: f32,
+        total-time: f32,
+        cost: f32,
+    }
+
+    record trajectory-waypoint {
+        position: position3d,
+        velocity: f32,
+        acceleration: f32,
+        heading: f32,
+        curvature: f32,
+        time: f32,
+    }
+
+    record planned-maneuver {
+        maneuver-type: maneuver-type,
+        start-time: f32,
+        duration: f32,
+        target-lane: option<u32>,
+        target-speed: option<f32>,
+        priority: maneuver-priority,
+    }
+
+    enum maneuver-type {
+        follow-lane,
+        lane-change-left,
+        lane-change-right,
+        overtake,
+        merge,
+        turn-left,
+        turn-right,
+        u-turn,
+        stop,
+        park,
+        emergency-stop,
+    }
+
+    enum maneuver-priority {
+        optional,
+        preferred,
+        required,
+        mandatory,
+        emergency,
+    }
+
+    /// Get current trajectory plan
+    get-trajectory-plan: func() -> result<trajectory-plan, string>;
+    
+    /// Get alternative trajectories
+    get-alternatives: func() -> result<list<trajectory-plan>, string>;
+    
+    /// Check if planning is ready
+    is-ready: func() -> bool;
+}
