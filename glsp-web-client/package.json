@@ -9,7 +9,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "@bytecodealliance/jco": "^1.0.0"
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",
