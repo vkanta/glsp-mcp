@@ -7,7 +7,7 @@ import { CanvasRenderer } from '../renderer/canvas-renderer.js';
 
 export class WasmComponentManager {
     private wasmComponentPalette: WasmComponentPalette;
-    private mcpService: McpService;
+    protected mcpService: McpService;
     private diagramService: DiagramService;
     private renderer?: CanvasRenderer;
     private loadedComponents: Map<string, any> = new Map(); // Track loaded WASM components
@@ -107,13 +107,10 @@ export class WasmComponentManager {
     }
 
     // Check if a click position is on a component's load switch
+    // NOTE: V2 design uses status indicator only (no clickable switch)
     public isLoadSwitchClick(position: { x: number; y: number }, element: ModelElement): boolean {
-        if (!element.bounds) return false;
-        
-        const nodeType = element.type || element.element_type || '';
-        if (nodeType !== 'wasm-component') return false;
-        
-        return WasmComponentRenderer.isPositionInLoadSwitch(position, element.bounds);
+        // V2 renderer doesn't have a clickable load switch - status is informational only
+        return false;
     }
 
     // Handle load/unload switch toggle

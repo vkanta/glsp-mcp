@@ -6,7 +6,7 @@
 import { DiagramModel, ModelElement, Node, Edge, Bounds, Position } from '../model/diagram.js';
 import { SelectionManager } from '../selection/selection-manager.js';
 import { InteractionMode, InteractionModeManager } from '../interaction/interaction-mode.js';
-import { WasmComponentRenderer } from '../diagrams/wasm-component-renderer.js';
+import { WasmComponentRendererV2 } from '../diagrams/wasm-component-renderer-v2.js';
 import { McpClient } from '../mcp/client.js';
 
 export interface RenderOptions {
@@ -696,7 +696,7 @@ export class CanvasRenderer {
 
         // Check if this is a WASM component type
         if (this.isWasmComponentType(nodeType)) {
-            const colors = WasmComponentRenderer.getDefaultColors();
+            const colors = WasmComponentRendererV2.getDefaultColors();
             
             // Check if component file is missing
             const isMissing = this.isComponentMissingFile(node);
@@ -710,11 +710,9 @@ export class CanvasRenderer {
                 colors
             };
 
-            if (nodeType === 'import-interface' || nodeType === 'export-interface') {
-                WasmComponentRenderer.renderInterfaceNode(node, node.bounds, context);
-            } else {
-                WasmComponentRenderer.renderWasmComponent(node, node.bounds, context);
-            }
+            // Use the new V2 renderer for all WASM components
+            // The V2 renderer handles both main components and interface nodes in one unified design
+            WasmComponentRendererV2.renderWasmComponent(node, node.bounds, context);
             return;
         }
 
@@ -1060,7 +1058,7 @@ export class CanvasRenderer {
     } | undefined {
         if (!this.currentDiagram) return undefined;
 
-        // Check each WASM component for interface connectors
+        // Check each WASM component for interface connectors using V2 renderer logic
         for (const element of Object.values(this.currentDiagram.elements)) {
             if (!element.bounds) continue;
             
@@ -1069,47 +1067,35 @@ export class CanvasRenderer {
                 continue;
             }
 
-            const interfaces = element.properties?.interfaces as any[] || [];
-            if (interfaces.length === 0) continue;
+            // Use the V2 renderer's port detection method
+            const portInfo = WasmComponentRendererV2.getPortAtPosition(element, element.bounds, position);
+            if (portInfo) {
+                // Calculate the actual connector position for the found port
+                const interfaces = element.properties?.interfaces as any[] || [];
+                const inputs = interfaces.filter(i => 
+                    i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
+                );
+                const outputs = interfaces.filter(i => 
+                    i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
+                );
 
-            // Calculate interface connector positions (same logic as renderer)
-            const bounds = element.bounds;
-            const headerHeight = 35;
-            const interfaceStartY = bounds.y + headerHeight + 20;
-            const availableHeight = bounds.y + bounds.height - interfaceStartY - 10;
-            const spacing = Math.min(20, availableHeight / Math.max(interfaces.length / 2, 1)); // Approximate spacing
-            const connectorRadius = 6;
-            const connectorOffset = 3;
-
-            // Check import interfaces (left side)
-            const importInterfaces = interfaces.filter(i => i.interface_type === 'import' || i.type === 'import');
-            for (let i = 0; i < importInterfaces.length; i++) {
-                const x = bounds.x - connectorOffset - connectorRadius;
-                const y = interfaceStartY + (i * spacing) + connectorRadius;
+                const isInput = portInfo.type === 'input';
+                const portArray = isInput ? inputs : outputs;
+                const portIndex = portArray.findIndex(p => p === portInfo.port);
                 
-                const distance = Math.sqrt(Math.pow(position.x - x, 2) + Math.pow(position.y - y, 2));
-                if (distance <= connectorRadius + 2) { // 2px tolerance
+                if (portIndex >= 0) {
+                    // Calculate position using V2 renderer constants
+                    const headerHeight = 40; // V2 HEADER_HEIGHT
+                    const portSpacing = 24;  // V2 PORT_SPACING
+                    const startY = element.bounds.y + headerHeight + 20;
+                    
+                    const x = isInput ? element.bounds.x : element.bounds.x + element.bounds.width;
+                    const y = startY + (portIndex * portSpacing);
+
                     return {
                         element,
-                        interface: importInterfaces[i],
-                        side: 'left',
-                        connectorPosition: { x, y }
-                    };
-                }
-            }
-
-            // Check export interfaces (right side)  
-            const exportInterfaces = interfaces.filter(i => i.interface_type === 'export' || i.type === 'export');
-            for (let i = 0; i < exportInterfaces.length; i++) {
-                const x = bounds.x + bounds.width + connectorOffset + connectorRadius;
-                const y = interfaceStartY + (i * spacing) + connectorRadius;
-                
-                const distance = Math.sqrt(Math.pow(position.x - x, 2) + Math.pow(position.y - y, 2));
-                if (distance <= connectorRadius + 2) { // 2px tolerance
-                    return {
-                        element,
-                        interface: exportInterfaces[i],
-                        side: 'right',
+                        interface: portInfo.port,
+                        side: isInput ? 'left' : 'right',
                         connectorPosition: { x, y }
                     };
                 }
