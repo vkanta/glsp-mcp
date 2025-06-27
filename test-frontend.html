@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Connection Test</title>
+</head>
+<body>
+    <h1>MCP Frontend Test</h1>
+    <div id="status">Testing connection...</div>
+    <div id="diagrams">Loading diagrams...</div>
+    
+    <script>
+        async function testMCP() {
+            const statusDiv = document.getElementById('status');
+            const diagramsDiv = document.getElementById('diagrams');
+            
+            try {
+                // Test basic connection
+                const response = await fetch('http://127.0.0.1:3000/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'initialize',
+                        id: 1,
+                        params: {
+                            protocolVersion: '2024-11-05',
+                            capabilities: { experimental: {}, sampling: {} },
+                            clientInfo: { name: 'Test Client', version: '0.1.0' }
+                        }
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Initialize result:', result);
+                statusDiv.innerHTML = 'Connected: ' + result.result.serverInfo.name;
+                
+                // Test diagram list
+                const diagResponse = await fetch('http://127.0.0.1:3000/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'resources/read',
+                        id: 2,
+                        params: { uri: 'diagram://list' }
+                    })
+                });
+                
+                const diagResult = await diagResponse.json();
+                console.log('Diagrams result:', diagResult);
+                const diagrams = JSON.parse(diagResult.result.contents[0].text).diagrams;
+                diagramsDiv.innerHTML = `Found ${diagrams.length} diagrams:<br>` + 
+                    diagrams.slice(0, 5).map(d => `• ${d.name} (${d.diagramType})`).join('<br>');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = 'Error: ' + error.message;
+                diagramsDiv.innerHTML = 'Failed to load diagrams';
+            }
+        }
+        
+        testMCP();
+    </script>
+</body>
+</html>
