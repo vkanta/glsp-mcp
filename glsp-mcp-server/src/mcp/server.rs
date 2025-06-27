@@ -3,23 +3,34 @@ use crate::mcp::tools::DiagramTools;
 use crate::mcp::resources::DiagramResources;
 use crate::mcp::prompts::DiagramPrompts;
 use axum::{
-    response::Json,
-    routing::post,
+    response::{Json, IntoResponse},
+    routing::{post, get},
     Router,
+    extract::Query,
+    http::{header, HeaderMap},
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn, error};
+use uuid::Uuid;
 
 pub type SharedMcpServer = Arc<Mutex<McpServer>>;
+
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub id: String,
+    pub client_info: Option<ClientInfo>,
+}
 
 pub struct McpServer {
     pub tools: DiagramTools,
     pub resources: DiagramResources,
     pub prompts: DiagramPrompts,
     pub capabilities: ServerCapabilities,
+    pub sessions: HashMap<String, Session>,
 }
 
 impl McpServer {
@@ -44,6 +55,7 @@ impl McpServer {
             resources: DiagramResources::new(),
             prompts: DiagramPrompts::new(),
             capabilities,
+            sessions: HashMap::new(),
         }
     }
 
@@ -51,40 +63,53 @@ impl McpServer {
         let server = Arc::new(Mutex::new(McpServer::new()));
         
         Router::new()
+            // Main MCP endpoint supporting both POST and GET
+            .route("/mcp", post({
+                let server = server.clone();
+                move |headers: HeaderMap, Json(request): Json<JsonRpcRequest>| async move {
+                    handle_post_request(server, headers, request).await
+                }
+            }))
+            .route("/mcp", get({
+                let server = server.clone();
+                move |headers: HeaderMap, Query(params): Query<HashMap<String, String>>| async move {
+                    handle_get_request(server, headers, params).await
+                }
+            }))
+            // Legacy endpoint for compatibility
             .route("/mcp/rpc", post({
                 let server = server.clone();
-move |Json(request): Json<JsonRpcRequest>| async move {
-                    let response = {
-                        let mut server = server.lock().await;
-                        server.handle_request(request).await
-                    };
-                    Json(response)
+                move |headers: HeaderMap, Json(request): Json<JsonRpcRequest>| async move {
+                    handle_post_request(server, headers, request).await
                 }
             }))
             .route("/health", axum::routing::get(health_check))
             .layer(CorsLayer::permissive())
     }
 
-    pub async fn handle_request(&mut self, request: JsonRpcRequest) -> JsonRpcResponse {
+    pub async fn handle_request(&mut self, request: JsonRpcRequest) -> (JsonRpcResponse, Option<String>) {
         info!("Handling MCP request: {}", request.method);
 
         match request.method.as_str() {
-            "initialize" => self.handle_initialize(request).await,
-            "initialized" => self.handle_initialized(request).await,
-            "tools/list" => self.handle_tools_list(request).await,
-            "tools/call" => self.handle_tools_call(request).await,
-            "resources/list" => self.handle_resources_list(request).await,
-            "resources/read" => self.handle_resources_read(request).await,
-            "prompts/list" => self.handle_prompts_list(request).await,
-            "prompts/get" => self.handle_prompts_get(request).await,
+            "initialize" => {
+                let (response, session_id) = self.handle_initialize(request).await;
+                (response, Some(session_id))
+            },
+            "initialized" => (self.handle_initialized(request).await, None),
+            "tools/list" => (self.handle_tools_list(request).await, None),
+            "tools/call" => (self.handle_tools_call(request).await, None),
+            "resources/list" => (self.handle_resources_list(request).await, None),
+            "resources/read" => (self.handle_resources_read(request).await, None),
+            "prompts/list" => (self.handle_prompts_list(request).await, None),
+            "prompts/get" => (self.handle_prompts_get(request).await, None),
             _ => {
                 warn!("Unknown method: {}", request.method);
-                JsonRpcResponse::error(request.id, JsonRpcError::method_not_found())
+                (JsonRpcResponse::error(request.id, JsonRpcError::method_not_found()), None)
             }
         }
     }
 
-    async fn handle_initialize(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+    async fn handle_initialize(&mut self, request: JsonRpcRequest) -> (JsonRpcResponse, String) {
         match request.params {
             Some(params) => {
                 match serde_json::from_value::<InitializeParams>(params) {
@@ -94,24 +119,32 @@ move |Json(request): Json<JsonRpcRequest>| async move {
                             init_params.client_info.version
                         );
 
+                        // Create a new session
+                        let session_id = Uuid::new_v4().to_string();
+                        self.sessions.insert(session_id.clone(), Session {
+                            id: session_id.clone(),
+                            client_info: Some(init_params.client_info.clone()),
+                        });
+
                         let result = InitializeResult {
-                            protocol_version: "2024-11-05".to_string(),
+                            protocol_version: "2025-03-26".to_string(),
                             capabilities: self.capabilities.clone(),
                             server_info: ServerInfo {
                                 name: "MCP-GLSP Server".to_string(),
                                 version: "0.1.0".to_string(),
                             },
+                            session_id: Some(session_id.clone()),
                         };
 
-                        JsonRpcResponse::success(request.id, serde_json::to_value(result).unwrap())
+                        (JsonRpcResponse::success(request.id, serde_json::to_value(result).unwrap()), session_id)
                     }
                     Err(e) => {
                         error!("Failed to parse initialize params: {}", e);
-                        JsonRpcResponse::error(request.id, JsonRpcError::invalid_params())
+                        (JsonRpcResponse::error(request.id, JsonRpcError::invalid_params()), String::new())
                     }
                 }
             }
-            None => JsonRpcResponse::error(request.id, JsonRpcError::invalid_params()),
+            None => (JsonRpcResponse::error(request.id, JsonRpcError::invalid_params()), String::new()),
         }
     }
 
@@ -208,4 +241,77 @@ async fn health_check() -> Json<Value> {
         "service": "MCP-GLSP Server",
         "version": "0.1.0"
     }))
+}
+
+async fn handle_post_request(
+    server: SharedMcpServer,
+    headers: HeaderMap,
+    request: JsonRpcRequest,
+) -> impl IntoResponse {
+    info!("Received {} request", request.method);
+    
+    let session_id = headers
+        .get("Mcp-Session-Id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    
+    info!("Session ID from headers: {:?}", session_id);
+
+    let (response, new_session_id) = {
+        let mut server = server.lock().await;
+        
+        // Validate session if provided - allow operation without session IDs for now
+        // The MCP spec says session IDs are optional (MAY use, not MUST)
+        if let Some(ref sid) = session_id {
+            if !server.sessions.contains_key(sid) {
+                info!("Session ID {} not found, but continuing anyway", sid);
+            }
+        }
+        
+        server.handle_request(request).await
+    };
+
+    // Return with session ID header - either existing or newly created
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+    
+    if let Some(sid) = new_session_id {
+        // New session from initialize
+        info!("Returning new session ID in headers: {}", sid);
+        headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+    } else if let Some(sid) = session_id {
+        // Existing session
+        headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+    }
+    
+    (headers, Json(response)).into_response()
+}
+
+async fn handle_get_request(
+    _server: SharedMcpServer,
+    headers: HeaderMap,
+    _params: HashMap<String, String>,
+) -> impl IntoResponse {
+    let session_id = headers
+        .get("Mcp-Session-Id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // For GET requests, we'll implement streaming later
+    // For now, return a simple JSON response indicating the endpoint is ready
+    let mut response_headers = HeaderMap::new();
+    response_headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+    
+    if let Some(sid) = session_id {
+        response_headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+    }
+
+    (
+        response_headers,
+        Json(json!({
+            "status": "ready",
+            "transport": "streamable-http",
+            "streaming": false
+        }))
+    ).into_response()
 }

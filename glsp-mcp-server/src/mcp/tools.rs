@@ -51,6 +51,20 @@ impl DiagramTools {
                 }),
             },
             Tool {
+                name: "delete_diagram".to_string(),
+                description: Some("Delete a diagram and its associated files".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram to delete"
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
                 name: "create_node".to_string(),
                 description: Some("Create a new node in the diagram".to_string()),
                 input_schema: json!({

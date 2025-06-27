@@ -13,6 +13,19 @@ pub struct DiagramModel {
     pub elements: HashMap<String, ModelElement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selection: Option<SelectionState>,
+    // Extended fields for persistence
+    #[serde(default = "default_name")]
+    pub name: String,
+    #[serde(default = "chrono::Utc::now")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default = "chrono::Utc::now")]
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+fn default_name() -> String {
+    "Untitled Diagram".to_string()
 }
 
 /// Base model element
@@ -29,6 +42,25 @@ pub struct ModelElement {
     pub layout_options: Option<HashMap<String, serde_json::Value>>,
     #[serde(flatten)]
     pub properties: HashMap<String, serde_json::Value>,
+    // Extended fields for backend operations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route: Option<Vec<Position>>,
+    #[serde(default = "default_true")]
+    pub visible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub z_index: Option<i32>,
+    #[serde(default)]
+    pub style: HashMap<String, serde_json::Value>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Element bounds/position
@@ -114,6 +146,13 @@ impl DiagramModel {
             bounds: None,
             layout_options: None,
             properties: HashMap::new(),
+            label: None,
+            source_id: None,
+            target_id: None,
+            route: None,
+            visible: true,
+            z_index: None,
+            style: HashMap::new(),
         };
 
         let mut elements = HashMap::new();
@@ -126,6 +165,10 @@ impl DiagramModel {
             root,
             elements,
             selection: Some(SelectionState::new()),
+            name: default_name(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            metadata: HashMap::new(),
         }
     }
 
@@ -205,6 +248,13 @@ impl Node {
                 }),
                 layout_options: None,
                 properties,
+                label: label.clone(),
+                source_id: None,
+                target_id: None,
+                route: None,
+                visible: true,
+                z_index: None,
+                style: HashMap::new(),
             },
             position,
             size: Some(Size {
@@ -233,6 +283,13 @@ impl Edge {
                 bounds: None,
                 layout_options: None,
                 properties,
+                label: label.clone(),
+                source_id: Some(source_id.clone()),
+                target_id: Some(target_id.clone()),
+                route: None,
+                visible: true,
+                z_index: None,
+                style: HashMap::new(),
             },
             source_id,
             target_id,
