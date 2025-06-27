@@ -28,31 +28,21 @@ export class DiagramAgent {
     constructor(ollamaClient: OllamaClient, mcpClient: McpClient) {
         this.ollama = ollamaClient;
         this.mcpClient = mcpClient;
-        this.systemPrompt = this.createSystemPrompt();
+        this.systemPrompt = ''; // Will be populated dynamically
     }
 
-    private createSystemPrompt(): string {
-        return `You are an expert diagram creation agent that helps users create diagrams from natural language descriptions.
+    private async getSystemPrompt(): Promise<string> {
+        // Dynamic prompt that gets available tools from the server
+        try {
+            const tools = await this.mcpClient.listTools();
+            const toolDescriptions = tools.map(tool => 
+                `- ${tool.name}: ${tool.description || 'No description available'}`
+            ).join('\n');
+            
+            return `You are an expert diagram creation agent that helps users create diagrams from natural language descriptions.
 
 You have access to the following MCP tools:
-- create_diagram(diagramType, name): Create a new diagram
-- create_node(diagramId, nodeType, position, label): Add nodes to diagrams  
-- create_edge(diagramId, edgeType, sourceId, targetId): Connect nodes
-- apply_layout(diagramId, algorithm): Apply automatic layout
-
-Node types available:
-- "start-event": Process start points
-- "end-event": Process completion points  
-- "task": Work activities
-- "user-task": Manual user activities
-- "service-task": Automated system activities
-- "gateway": Decision points or parallel splits
-- "intermediate-event": Milestones or wait points
-
-Edge types available:
-- "sequence-flow": Normal process flow
-- "conditional-flow": Decision branches
-- "message-flow": Communication between processes
+${toolDescriptions}
 
 When a user describes a process or workflow, you should:
 1. Parse the description to identify the main steps, decisions, and flow
@@ -83,6 +73,13 @@ IMPORTANT:
 - Always include start and end events for processes
 - Add meaningful labels that reflect the user's description
 - Keep it simple but complete`;
+        } catch (error) {
+            console.warn('Failed to fetch tools from server, using fallback prompt');
+            // Fallback to a basic system prompt if server is unavailable
+            return `You are an expert diagram creation agent. Create diagrams using available MCP tools.
+            
+Respond with JSON format containing 'analysis' and 'toolCalls' array.`;
+        }
     }
 
     async createDiagramFromDescription(request: DiagramRequest): Promise<AgentResponse> {
@@ -110,10 +107,13 @@ EXAMPLE of correct JSON response format:
 
 Respond with valid JSON only, no additional text.`;
 
+            // Get dynamic system prompt
+            const systemPrompt = await this.getSystemPrompt();
+            
             // Get AI analysis and tool calls
             const aiResponse = await this.ollama.generateResponse(
                 enhancedPrompt,
-                this.systemPrompt
+                systemPrompt
             );
 
             steps.push("✅ AI analysis complete");
@@ -320,13 +320,15 @@ Respond with valid JSON only, no additional text.`;
         try {
             steps.push("🤖 Getting optimization recommendations...");
 
-            const prompt = await this.mcpClient.getPrompt("optimize_layout", {
-                diagram_id: diagramId,
-                criteria
-            });
+            // Create optimization prompt directly since prompts may not be implemented
+            const optimizationPrompt = `Analyze and optimize the diagram with ID: ${diagramId}
+            
+Optimization criteria: ${criteria}
+            
+Provide specific recommendations for improving the diagram layout, readability, and flow.`;
 
             const aiResponse = await this.ollama.generateResponse(
-                prompt.messages[0].content.text,
+                optimizationPrompt,
                 "You are a diagram optimization expert. Provide specific, actionable recommendations."
             );
 

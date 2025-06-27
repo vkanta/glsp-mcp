@@ -48,6 +48,7 @@ export class CanvasRenderer {
     private selectionRect?: { start: Position; end: Position };
     private isSelectingRect = false;
     private edgeCreationSource?: ModelElement;
+    private edgeCreationType?: string; // Will be used when creating edges
     private edgePreviewTarget?: Position;
     private minScale = 0.1;
     private maxScale = 5.0;
@@ -964,6 +965,30 @@ export class CanvasRenderer {
         this.ctx.stroke();
         
         this.ctx.setLineDash([]);
+    }
+
+    // Start edge creation from the given element
+    public startEdgeCreation(sourceElement: ModelElement, edgeType: string): void {
+        this.edgeCreationSource = sourceElement;
+        this.edgeCreationType = edgeType;
+        console.log('Started edge creation from:', sourceElement.id, 'Type:', edgeType);
+    }
+    
+    // Set interaction mode (pan, select, etc.)
+    public setInteractionMode(mode: string): void {
+        if (mode === 'pan') {
+            this.modeManager.setMode(InteractionMode.Pan);
+            this.canvas.style.cursor = 'grab';
+        } else if (mode === 'select') {
+            this.modeManager.setMode(InteractionMode.Select);
+            this.canvas.style.cursor = 'default';
+        } else if (mode === 'create-node') {
+            this.modeManager.setMode(InteractionMode.CreateNode);
+            this.canvas.style.cursor = 'crosshair';
+        } else if (mode === 'create-edge') {
+            this.modeManager.setMode(InteractionMode.CreateEdge);
+            this.canvas.style.cursor = 'crosshair';
+        }
     }
 
     // Set the MCP client for component status checking

@@ -30,6 +30,9 @@ export class WasmComponentPalette {
         this.mcpClient = mcpClient;
         this.element = this.createElement();
         this.setupEventHandlers();
+        
+        // Start with palette hidden until wasm-component diagram is selected
+        this.element.style.display = 'none';
     }
 
     private createElement(): HTMLElement {
@@ -37,27 +40,66 @@ export class WasmComponentPalette {
         palette.className = 'wasm-component-palette';
         palette.innerHTML = `
             <div class="palette-header">
-                <h3>📦 WASM Components</h3>
-                <button id="refresh-components" class="refresh-btn" title="Refresh component list">🔄</button>
+                <h3>WASM Components</h3>
+                <div class="palette-header-actions">
+                    <button id="refresh-components" class="refresh-btn" title="Refresh component list">🔄</button>
+                    <button class="palette-minimize-btn" title="Minimize">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 13H5v-2h14v2z"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="palette-search">
                 <input type="text" id="component-search" placeholder="Search components..." />
             </div>
             <div class="palette-status">
-                <span id="component-count">Loading...</span>
+                <span id="component-count" class="status-loading">
+                    <span class="loading"></span>
+                    <span style="margin-left: 8px;">Loading...</span>
+                </span>
                 <span id="component-health"></span>
             </div>
             <div class="palette-content" id="component-list">
-                <div class="loading">Loading WASM components...</div>
+                <div class="loading-container">
+                    <div class="loading-pulse">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="loading-text">Loading WASM components...</div>
+                    <div class="loading-timeout-indicator">
+                        <div class="loading-timeout-bar">
+                            <div class="loading-timeout-progress"></div>
+                        </div>
+                        <span class="loading-timeout-text">10s</span>
+                    </div>
+                </div>
             </div>
         `;
+        
+        // Make it minimizable
+        this.setupMinimizable(palette);
+        
+        // Make it draggable
+        this.setupDraggable(palette);
+        
         return palette;
     }
 
     private setupEventHandlers(): void {
         // Refresh button
-        this.element.querySelector('#refresh-components')?.addEventListener('click', () => {
-            this.loadComponents();
+        const refreshBtn = this.element.querySelector('#refresh-components') as HTMLButtonElement;
+        refreshBtn?.addEventListener('click', () => {
+            // Add spinning animation to refresh button
+            refreshBtn.classList.add('refreshing');
+            refreshBtn.disabled = true;
+            
+            this.loadComponents().finally(() => {
+                // Remove spinning animation after loading completes
+                refreshBtn.classList.remove('refreshing');
+                refreshBtn.disabled = false;
+            });
         });
 
         // Search functionality
@@ -68,21 +110,77 @@ export class WasmComponentPalette {
     }
 
     public async loadComponents(): Promise<void> {
+        // Show loading state
+        this.showLoadingState();
+        
+        // Set a timeout timer
+        const timeoutDuration = 10000; // 10 seconds
+        let timeoutId: number | undefined;
+        let isTimedOut = false;
+        
         try {
-            // First trigger a scan to ensure we have latest data
-            await this.mcpClient.callTool('scan_wasm_components', {});
+            // Create timeout promise
+            const timeoutPromise = new Promise<any>((_, reject) => {
+                timeoutId = window.setTimeout(() => {
+                    isTimedOut = true;
+                    reject(new Error('Request timed out after 10 seconds'));
+                }, timeoutDuration);
+            });
             
-            // Get components list
-            const listResource = await this.mcpClient.readResource('wasm://components/list');
-            const data = JSON.parse(listResource.text || '{}');
+            // Create the actual loading promise
+            const loadPromise = (async () => {
+                // First trigger a scan to ensure we have latest data
+                await this.mcpClient.callTool('scan_wasm_components', {});
+                
+                // Get components list
+                const listResource = await this.mcpClient.readResource('wasm://components/list');
+                const data = JSON.parse(listResource.text || '{}');
+                
+                this.components = data.components || [];
+                return data;
+            })();
             
-            this.components = data.components || [];
+            // Race between timeout and actual load
+            const data = await Promise.race([loadPromise, timeoutPromise]);
+            
+            // Clear timeout if successful
+            if (timeoutId) window.clearTimeout(timeoutId);
+            
+            // Clear countdown interval
+            if ((this as any)._countdownInterval) {
+                clearInterval((this as any)._countdownInterval);
+                delete (this as any)._countdownInterval;
+            }
+            
             this.renderComponents();
             this.updateStatus(data);
             
         } catch (error) {
             console.error('Failed to load WASM components:', error);
-            this.showError('Failed to load WASM components');
+            
+            // Clear countdown interval on error
+            if ((this as any)._countdownInterval) {
+                clearInterval((this as any)._countdownInterval);
+                delete (this as any)._countdownInterval;
+            }
+            
+            // Clear timeout if it's still pending
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
+            
+            if (isTimedOut) {
+                console.log('Request timed out - showing timeout error');
+                this.showError('Request timed out. Click refresh to try again.');
+            } else {
+                console.log('Request failed - showing generic error');
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (errorMessage.includes('Method not found') || errorMessage.includes('Not implemented')) {
+                    this.showError('WASM backend not available. Please start the MCP server with WASM component support.');
+                } else {
+                    this.showError('Failed to load WASM components');
+                }
+            }
         }
     }
 
@@ -176,7 +274,9 @@ export class WasmComponentPalette {
         const healthElement = this.element.querySelector('#component-health');
         
         if (countElement) {
-            countElement.textContent = `${data.total || 0} components`;
+            // Remove loading state and update text
+            countElement.classList.remove('status-loading');
+            countElement.innerHTML = `${data.total || 0} components`;
         }
         
         if (healthElement) {
@@ -190,8 +290,88 @@ export class WasmComponentPalette {
     private showError(message: string): void {
         const listElement = this.element.querySelector('#component-list');
         if (listElement) {
-            listElement.innerHTML = `<div class="error">${message}</div>`;
+            const isTimeout = message.includes('timed out');
+            listElement.innerHTML = `
+                <div class="error-container">
+                    <div class="error-icon">${isTimeout ? '⏱️' : '❌'}</div>
+                    <div class="error">${message}</div>
+                    ${isTimeout ? `
+                        <button class="retry-btn" onclick="document.querySelector('#refresh-components').click()">
+                            <span class="retry-icon">🔄</span>
+                            Retry
+                        </button>
+                    ` : ''}
+                </div>
+            `;
         }
+        
+        // Also update the status to show error
+        const countElement = this.element.querySelector('#component-count');
+        if (countElement) {
+            countElement.classList.remove('status-loading');
+            countElement.innerHTML = `<span class="error-text">Failed to load</span>`;
+        }
+    }
+
+    private showLoadingState(): void {
+        const listElement = this.element.querySelector('#component-list');
+        if (!listElement) return;
+        
+        // Reset status to loading
+        const countElement = this.element.querySelector('#component-count');
+        if (countElement) {
+            countElement.classList.add('status-loading');
+            countElement.innerHTML = `
+                <span class="loading"></span>
+                <span style="margin-left: 8px;">Loading...</span>
+            `;
+        }
+        
+        // Show loading with timeout indicator
+        let remainingTime = 10;
+        listElement.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-pulse">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <div class="loading-text">Loading WASM components...</div>
+                <div class="loading-timeout-indicator">
+                    <div class="loading-timeout-bar">
+                        <div class="loading-timeout-progress"></div>
+                    </div>
+                    <span class="loading-timeout-text">${remainingTime}s</span>
+                </div>
+            </div>
+        `;
+        
+        // Update countdown timer
+        const countdownInterval = setInterval(() => {
+            remainingTime--;
+            const timeoutText = listElement.querySelector('.loading-timeout-text');
+            if (timeoutText) {
+                timeoutText.textContent = `${remainingTime}s`;
+            }
+            
+            if (remainingTime <= 0) {
+                clearInterval(countdownInterval);
+                // Stop the progress bar animation by setting width to 0
+                const progressBar = listElement.querySelector('.loading-timeout-progress') as HTMLElement;
+                if (progressBar) {
+                    progressBar.style.animation = 'none';
+                    progressBar.style.width = '0%';
+                }
+                // Add timed-out class to make loading animation more subdued
+                const loadingContainer = listElement.querySelector('.loading-container');
+                if (loadingContainer) {
+                    loadingContainer.classList.add('timed-out');
+                }
+            }
+        }, 1000);
+        
+        // Store interval ID to clear later if needed
+        (this as any)._countdownInterval = countdownInterval;
     }
 
     private showNotification(message: string): void {
@@ -245,5 +425,82 @@ export class WasmComponentPalette {
     // Called by external code when a component add fails
     public onComponentAddFailed(componentName: string, error: string): void {
         this.showNotification(`Failed to add ${componentName}: ${error}`);
+    }
+
+    private setupMinimizable(palette: HTMLElement): void {
+        const minimizeBtn = palette.querySelector('.palette-minimize-btn');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                palette.classList.toggle('minimized');
+                
+                // Update minimize button icon
+                const svg = minimizeBtn.querySelector('svg');
+                if (palette.classList.contains('minimized')) {
+                    // Show expand icon when minimized
+                    svg!.innerHTML = '<path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/>';
+                } else {
+                    // Show minimize icon when expanded
+                    svg!.innerHTML = '<path d="M19 13H5v-2h14v2z"/>';
+                }
+            });
+        }
+    }
+
+    private setupDraggable(palette: HTMLElement): void {
+        const header = palette.querySelector('.palette-header') as HTMLElement;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+
+        header.addEventListener('mousedown', (e) => {
+            // Don't drag if clicking on buttons
+            if ((e.target as HTMLElement).closest('button')) {
+                return;
+            }
+            
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const rect = palette.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+            
+            document.body.style.cursor = 'move';
+            document.body.style.userSelect = 'none';
+            
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newLeft = startLeft + deltaX;
+            let newTop = startTop + deltaY;
+            
+            // Constrain to viewport
+            const maxLeft = window.innerWidth - palette.offsetWidth;
+            const maxTop = window.innerHeight - palette.offsetHeight;
+            
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            newTop = Math.max(0, Math.min(newTop, maxTop));
+            
+            palette.style.left = newLeft + 'px';
+            palette.style.top = newTop + 'px';
+            palette.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
     }
 }

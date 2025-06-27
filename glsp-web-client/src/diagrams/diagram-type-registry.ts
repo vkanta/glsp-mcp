@@ -121,11 +121,13 @@ class DiagramTypeRegistryImpl implements DiagramTypeRegistry {
 
     getNodeTypes(diagramType: string): NodeTypeConfig[] {
         const config = this.types.get(diagramType);
+        console.log(`Getting node types for ${diagramType}:`, config?.nodeTypes?.map(n => n.label) || 'Using DEFAULT_NODE_TYPES');
         return config ? config.nodeTypes : DEFAULT_NODE_TYPES;
     }
 
     getEdgeTypes(diagramType: string): EdgeTypeConfig[] {
         const config = this.types.get(diagramType);
+        console.log(`Getting edge types for ${diagramType}:`, config?.edgeTypes?.map(e => e.label) || 'Using DEFAULT_EDGE_TYPES');
         return config ? config.edgeTypes : DEFAULT_EDGE_TYPES;
     }
 

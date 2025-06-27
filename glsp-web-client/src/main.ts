@@ -2,10 +2,18 @@
  * Main entry point for GLSP Web Client
  */
 
-import { GLSPApp } from './app.js';
+import { AppController } from './AppController.js';
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM Content Loaded - Initializing GLSP application...');
+    
+    // Add visual indicator that JS is loading
+    const statusChip = document.querySelector('.status-chip span');
+    if (statusChip) {
+        statusChip.textContent = 'Initializing...';
+    }
+    
     const canvas = document.getElementById('diagram-canvas') as HTMLCanvasElement;
     
     if (!canvas) {
@@ -13,36 +21,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // Create the GLSP application
-    const app = new GLSPApp(canvas);
+    console.log('Creating AppController...');
+    const app = new AppController(canvas);
 
-    // Mount UI components
-    const toolbarContainer = document.getElementById('toolbar-container');
-    const statusContainer = document.getElementById('status-container');
-    const diagramListContainer = document.getElementById('diagram-list-container');
-    const wasmPaletteContainer = document.getElementById('wasm-palette-container');
-
-    if (toolbarContainer) {
-        toolbarContainer.appendChild(app.getToolbar());
-    }
-
-    if (statusContainer) {
-        statusContainer.appendChild(app.getStatus());
-    }
-
-    if (diagramListContainer) {
-        diagramListContainer.appendChild(app.getDiagramList());
-        diagramListContainer.appendChild(app.getAIPanel());
-    }
-
-    if (wasmPaletteContainer) {
-        wasmPaletteContainer.appendChild(app.getWasmPalette());
-    }
-
-    // Make app globally available for HTML onclick handlers
+    // Make app globally available for HTML onclick handlers (for debugging/console access)
     (window as any).app = app;
 
     console.log('🚀 MCP-GLSP Web Client initialized');
+    
+    // Add visual confirmation
+    setTimeout(() => {
+        const statusChip = document.querySelector('.status-chip span');
+        if (statusChip && statusChip.textContent === 'Initializing...') {
+            statusChip.textContent = 'App Loaded';
+        }
+    }, 1000);
 });
 
 // Handle global errors

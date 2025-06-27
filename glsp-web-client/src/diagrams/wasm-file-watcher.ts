@@ -204,7 +204,7 @@ export class WasmFileWatcher {
         });
     }
 
-    private getMockComponents(): WasmComponentConfig[] {
+    private _getMockComponents(): WasmComponentConfig[] {
         return [
             {
                 name: 'http-server',
@@ -257,7 +257,7 @@ export class WasmFileWatcher {
         ];
     }
 
-    private generateRandomComponent(): WasmComponentConfig {
+    private _generateRandomComponent(): WasmComponentConfig {
         const names = ['processor', 'validator', 'transformer', 'analyzer', 'filter'];
         const name = names[Math.floor(Math.random() * names.length)] + '-' + Date.now();
         

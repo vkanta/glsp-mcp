@@ -39,6 +39,7 @@ export class OllamaClient {
     constructor(baseUrl: string = 'http://127.0.0.1:11434', defaultModel: string = 'llama2') {
         this.baseUrl = baseUrl;
         this.defaultModel = defaultModel;
+        console.log(`OllamaClient initialized with baseUrl: ${this.baseUrl}`);
     }
 
     async chat(messages: OllamaMessage[], model?: string): Promise<OllamaResponse> {
@@ -136,12 +137,66 @@ export class OllamaClient {
 
     async checkConnection(): Promise<boolean> {
         try {
-            const response = await fetch(`${this.baseUrl}/api/tags`, {
+            console.log(`Checking Ollama connection at ${this.baseUrl}/api/tags`);
+            
+            // Create a timeout promise
+            const timeoutPromise = new Promise<Response>((_, reject) => 
+                setTimeout(() => reject(new Error('Connection timeout')), 5000)
+            );
+            
+            // Race between fetch and timeout
+            const fetchPromise = fetch(`${this.baseUrl}/api/tags`, {
                 method: 'GET',
-                signal: AbortSignal.timeout(5000) // 5 second timeout
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json',
+                }
             });
-            return response.ok;
+            
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            console.log(`Ollama connection check response: ${response.status} ${response.statusText}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`Ollama models available: ${data.models?.length || 0}`);
+                return true;
+            } else {
+                console.warn(`Ollama connection check failed: ${response.status}`);
+                return false;
+            }
         } catch (error) {
+            console.error('Ollama connection check failed:', error);
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            
+            // Try alternative health check
+            return await this.tryAlternativeHealthCheck();
+        }
+    }
+
+    private async tryAlternativeHealthCheck(): Promise<boolean> {
+        try {
+            console.log('Trying alternative Ollama health check...');
+            
+            const timeoutPromise = new Promise<Response>((_, reject) => 
+                setTimeout(() => reject(new Error('Health check timeout')), 3000)
+            );
+            
+            const fetchPromise = fetch(`${this.baseUrl}/`, {
+                method: 'GET',
+                mode: 'cors'
+            });
+            
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            console.log(`Ollama health check response: ${response.status}`);
+            
+            // Ollama root endpoint should return something (even if 404, it means server is running)
+            return response.status < 500;
+        } catch (error) {
+            console.error('Alternative health check also failed:', error);
             return false;
         }
     }
