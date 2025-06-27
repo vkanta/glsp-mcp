@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple GLSP Test</title>
+    <style>
+        body { margin: 20px; font-family: sans-serif; }
+        #canvas { border: 2px solid #333; display: block; margin: 20px 0; }
+        #log { background: #f0f0f0; padding: 10px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        button { margin: 5px; padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Simple GLSP Test</h1>
+    
+    <canvas id="canvas" width="800" height="400"></canvas>
+    
+    <div>
+        <button onclick="testDraw()">Test Draw</button>
+        <button onclick="testMCP()">Test MCP Connection</button>
+        <button onclick="testCreateDiagram()">Create Diagram</button>
+        <button onclick="testAddNode()">Add Node</button>
+    </div>
+    
+    <h3>Log:</h3>
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = document.getElementById('log');
+        const canvas = document.getElementById('canvas');
+        
+        function addLog(msg) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `[${time}] ${msg}<br>`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Import modules
+        let renderer, mcpClient, diagramId;
+        
+        try {
+            addLog('Importing modules...');
+            const { CanvasRenderer } = await import('./src/renderer/canvas-renderer.js');
+            const { McpClient } = await import('./src/mcp/client.js');
+            
+            addLog('Creating renderer...');
+            renderer = new CanvasRenderer(canvas);
+            window.renderer = renderer;
+            
+            addLog('Creating MCP client...');
+            mcpClient = new McpClient();
+            window.mcpClient = mcpClient;
+            
+            addLog('Modules loaded successfully!');
+        } catch (error) {
+            addLog(`Error: ${error.message}`);
+        }
+        
+        window.testDraw = () => {
+            addLog('Testing canvas draw...');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a simple shape
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(100, 100, 200, 100);
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Test Shape', 200, 160);
+            
+            addLog('Draw complete!');
+        };
+        
+        window.testMCP = async () => {
+            try {
+                addLog('Initializing MCP client...');
+                const result = await mcpClient.initialize();
+                addLog(`MCP initialized: ${JSON.stringify(result)}`);
+            } catch (error) {
+                addLog(`MCP error: ${error.message}`);
+            }
+        };
+        
+        window.testCreateDiagram = async () => {
+            try {
+                addLog('Creating diagram...');
+                const result = await mcpClient.callTool('create_diagram', {
+                    diagramType: 'workflow',
+                    name: 'Test Diagram'
+                });
+                addLog(`Diagram created: ${JSON.stringify(result)}`);
+                
+                // Extract diagram ID
+                const match = result.content?.[0]?.text?.match(/ID: ([a-f0-9-]+)/);
+                if (match) {
+                    diagramId = match[1];
+                    addLog(`Diagram ID: ${diagramId}`);
+                }
+            } catch (error) {
+                addLog(`Create diagram error: ${error.message}`);
+            }
+        };
+        
+        window.testAddNode = async () => {
+            if (!diagramId) {
+                addLog('No diagram ID - create a diagram first!');
+                return;
+            }
+            
+            try {
+                addLog('Adding node...');
+                const result = await mcpClient.callTool('create_node', {
+                    diagramId: diagramId,
+                    nodeType: 'task',
+                    position: { x: 200, y: 150 },
+                    label: 'Test Node'
+                });
+                addLog(`Node created: ${JSON.stringify(result)}`);
+            } catch (error) {
+                addLog(`Add node error: ${error.message}`);
+            }
+        };
+    </script>
+</body>
+</html>

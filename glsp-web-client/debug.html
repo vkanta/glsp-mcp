@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug GLSP Frontend</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        #output { border: 1px solid #ccc; padding: 10px; margin: 10px 0; min-height: 200px; white-space: pre-line; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>GLSP Frontend Debug</h1>
+    
+    <button onclick="testMCP()">Test MCP Connection</button>
+    <button onclick="testDiagramList()">Test Diagram List API</button>
+    <button onclick="testMainApp()">Check Main App Status</button>
+    
+    <div id="output">Click buttons above to test...</div>
+    
+    <script>
+        window.testMCP = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = 'Testing MCP connection...';
+            
+            try {
+                const response = await fetch('http://127.0.0.1:3000/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'initialize',
+                        id: Date.now(),
+                        params: {
+                            protocolVersion: '2024-11-05',
+                            capabilities: { experimental: {}, sampling: {} },
+                            clientInfo: { name: 'Debug Client', version: '0.1.0' }
+                        }
+                    })
+                });
+                
+                const result = await response.json();
+                output.innerHTML = 'SUCCESS: MCP Connected: ' + result.result.serverInfo.name;
+                
+            } catch (error) {
+                output.innerHTML = 'ERROR: ' + error.message;
+            }
+        };
+        
+        window.testDiagramList = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = 'Testing diagram list...';
+            
+            try {
+                const diagResponse = await fetch('http://127.0.0.1:3000/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'resources/read',
+                        id: Date.now(),
+                        params: { uri: 'diagram://list' }
+                    })
+                });
+                
+                const diagResult = await diagResponse.json();
+                const diagrams = JSON.parse(diagResult.result.contents[0].text).diagrams;
+                output.innerHTML = 'SUCCESS: Found ' + diagrams.length + ' diagrams\n\nFirst 10:\n';
+                diagrams.slice(0,10).forEach((d, i) => {
+                    output.innerHTML += (i+1) + '. ' + d.name + ' (' + d.diagramType + ')\n';
+                });
+                
+            } catch (error) {
+                output.innerHTML = 'ERROR: ' + error.message;
+            }
+        };
+        
+        window.testMainApp = function() {
+            const output = document.getElementById('output');
+            output.innerHTML = 'Checking main app status...\n\n';
+            
+            // Try to open main app and check its elements
+            const mainWindow = window.open('http://localhost:5174', 'mainapp');
+            
+            setTimeout(() => {
+                try {
+                    // Check if we can access the main window
+                    if (mainWindow && mainWindow.document) {
+                        const canvas = mainWindow.document.getElementById('diagram-canvas');
+                        const diagramContainer = mainWindow.document.getElementById('diagram-list-container');
+                        const statusChip = mainWindow.document.querySelector('.status-chip span');
+                        
+                        output.innerHTML += 'Canvas found: ' + (canvas ? 'YES' : 'NO') + '\n';
+                        output.innerHTML += 'Diagram container found: ' + (diagramContainer ? 'YES' : 'NO') + '\n';
+                        output.innerHTML += 'Status text: ' + (statusChip ? statusChip.textContent : 'NOT FOUND') + '\n';
+                        
+                        // Check if global app exists
+                        const app = mainWindow.app;
+                        output.innerHTML += 'Global app object: ' + (app ? 'EXISTS' : 'NOT FOUND') + '\n';
+                        
+                        // Check diagram container content
+                        if (diagramContainer) {
+                            output.innerHTML += 'Container HTML length: ' + diagramContainer.innerHTML.length + '\n';
+                            if (diagramContainer.innerHTML.length > 0) {
+                                output.innerHTML += 'Container has content!\n';
+                            } else {
+                                output.innerHTML += 'Container is empty\n';
+                            }
+                        }
+                    } else {
+                        output.innerHTML += 'Cannot access main window (popup blocked?)\n';
+                        output.innerHTML += 'Please manually check http://localhost:5174\n';
+                    }
+                } catch (e) {
+                    output.innerHTML += 'Error accessing main window: ' + e.message + '\n';
+                }
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
