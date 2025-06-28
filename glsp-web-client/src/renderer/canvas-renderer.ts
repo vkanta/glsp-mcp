@@ -22,10 +22,16 @@ export interface RenderOptions {
 }
 
 export interface InteractionEvent {
-    type: 'click' | 'hover' | 'drag-start' | 'drag-move' | 'drag-end' | 'canvas-click' | 'edge-start' | 'edge-end';
+    type: 'click' | 'hover' | 'drag-start' | 'drag-move' | 'drag-end' | 'canvas-click' | 'edge-start' | 'edge-end' | 'interface-click';
     position: Position;
     element?: ModelElement;
     sourceElement?: ModelElement; // For edge creation
+    interfaceInfo?: {
+        componentId: string;
+        interface: any;
+        interfaceType: 'import' | 'export';
+        connectorPosition: Position;
+    };
     originalEvent: MouseEvent;
 }
 
@@ -50,6 +56,11 @@ export class CanvasRenderer {
     private edgeCreationSource?: ModelElement;
     private edgeCreationType?: string; // Will be used when creating edges
     private edgePreviewTarget?: Position;
+    // Interface linking properties
+    private interfaceLinkingMode = false;
+    private sourceInterfaceInfo?: any;
+    private highlightedInterfaces: Map<string, string[]> = new Map(); // componentId -> interface names
+    private interfaceTooltip?: HTMLElement;
     private minScale = 0.1;
     private maxScale = 5.0;
     private scrollBounds?: { minX: number; minY: number; maxX: number; maxY: number };
@@ -135,10 +146,11 @@ export class CanvasRenderer {
 
     private getMousePosition(event: MouseEvent): Position {
         const rect = this.canvas.getBoundingClientRect();
-        return {
+        const worldPos = {
             x: (event.clientX - rect.left - this.options.offset.x) / this.options.scale,
             y: (event.clientY - rect.top - this.options.offset.y) / this.options.scale
         };
+        return worldPos;
     }
 
     private getElementAt(position: Position): ModelElement | undefined {
@@ -272,15 +284,51 @@ export class CanvasRenderer {
     }
 
     private handleClick(event: MouseEvent): void {
+        console.log('handleClick: Method called');
         // Don't process click if we just finished dragging
         if (this.hasDragged) {
+            console.log('handleClick: Ignoring click due to drag');
             this.hasDragged = false;
             return;
         }
         
         const position = this.getMousePosition(event);
-        const element = this.getElementAt(position);
         const mode = this.modeManager.getMode();
+        console.log('handleClick: Mode detected as:', mode, 'InteractionMode.CreateInterfaceLink:', InteractionMode.CreateInterfaceLink);
+        console.log('handleClick: Mode comparison result:', mode === InteractionMode.CreateInterfaceLink);
+        
+        // For interface linking mode, check interface connectors FIRST before element selection
+        if (mode === InteractionMode.CreateInterfaceLink) {
+            console.log('handleClick: Interface linking mode - checking for connector at', position);
+            const interfaceConnector = this.getInterfaceConnectorAt(position);
+            console.log('handleClick: Interface connector result:', interfaceConnector);
+            if (interfaceConnector) {
+                console.log(`INTERFACE CLICK SUCCESS: ${interfaceConnector.interface.name}`);
+                this.emit({
+                    type: 'interface-click',
+                    position,
+                    element: interfaceConnector.element,
+                    interfaceInfo: {
+                        componentId: interfaceConnector.element.id,
+                        interface: interfaceConnector.interface,
+                        interfaceType: interfaceConnector.side === 'left' ? 'import' : 'export',
+                        connectorPosition: interfaceConnector.connectorPosition
+                    },
+                    originalEvent: event
+                });
+                return; // Important: return early to prevent component selection
+            } else {
+                console.log('handleClick: No interface connector found, canceling linking');
+                // Click on empty space - cancel interface linking
+                this.interfaceLinkingMode = false;
+                this.sourceInterfaceInfo = undefined;
+                this.clearInterfaceHighlights();
+                return;
+            }
+        }
+        
+        // For other modes, get element normally
+        const element = this.getElementAt(position);
         
         // console.log('Click:', { position, element, mode });
 
@@ -342,6 +390,8 @@ export class CanvasRenderer {
                     this.render();
                 }
                 break;
+
+            // Note: InteractionMode.CreateInterfaceLink is handled above the switch statement
         }
     }
 
@@ -433,7 +483,6 @@ export class CanvasRenderer {
 
     private handleMouseDown(event: MouseEvent): void {
         const position = this.getMousePosition(event);
-        const element = this.getElementAt(position);
         const mode = this.modeManager.getMode();
         
         // Handle middle mouse button for panning
@@ -444,6 +493,13 @@ export class CanvasRenderer {
             event.preventDefault();
             return;
         }
+
+        // In interface linking mode, don't process element selection at all
+        if (mode === InteractionMode.CreateInterfaceLink) {
+            return;
+        }
+
+        const element = this.getElementAt(position);
 
         if (element && this.selectionManager.isSelected(element.id) && mode === InteractionMode.Select) {
             this.isDragging = true;
@@ -1100,16 +1156,126 @@ export class CanvasRenderer {
         if (mode === 'pan') {
             this.modeManager.setMode(InteractionMode.Pan);
             this.canvas.style.cursor = 'grab';
+            this.interfaceLinkingMode = false;
         } else if (mode === 'select') {
             this.modeManager.setMode(InteractionMode.Select);
             this.canvas.style.cursor = 'default';
+            this.interfaceLinkingMode = false;
         } else if (mode === 'create-node') {
             this.modeManager.setMode(InteractionMode.CreateNode);
             this.canvas.style.cursor = 'crosshair';
+            this.interfaceLinkingMode = false;
         } else if (mode === 'create-edge') {
             this.modeManager.setMode(InteractionMode.CreateEdge);
             this.canvas.style.cursor = 'crosshair';
+            this.interfaceLinkingMode = false;
+        } else if (mode === 'create-interface-link') {
+            this.modeManager.setMode(InteractionMode.CreateInterfaceLink);
+            this.canvas.style.cursor = 'crosshair';
+            this.interfaceLinkingMode = true;
+            this.clearInterfaceHighlights();
         }
+    }
+
+    // Interface linking methods
+    public startInterfaceLinking(interfaceInfo: any): void {
+        this.sourceInterfaceInfo = interfaceInfo;
+        this.interfaceLinkingMode = true;
+        this.updateInterfaceHighlights();
+        console.log('Started interface linking from:', interfaceInfo);
+    }
+
+    public clearInterfaceHighlights(): void {
+        this.highlightedInterfaces.clear();
+        this.render();
+    }
+
+    private updateInterfaceHighlights(): void {
+        if (!this.sourceInterfaceInfo || !this.currentDiagram) return;
+
+        // Find all compatible interfaces in the diagram
+        // This will be implemented with the compatibility checker
+        this.render();
+    }
+
+    public getInterfaceLinkingMode(): boolean {
+        return this.interfaceLinkingMode;
+    }
+
+    public getSourceInterfaceInfo(): any {
+        return this.sourceInterfaceInfo;
+    }
+
+    // Find interface connector at a given position
+    private findInterfaceConnector(position: Position): { 
+        element: ModelElement; 
+        interface: any; 
+        side: 'left' | 'right'; 
+        connectorPosition: Position 
+    } | undefined {
+        if (!this.currentDiagram) return undefined;
+
+        // Check all WASM components for interface clicks
+        for (const element of Object.values(this.currentDiagram.elements)) {
+            const elementType = element.type || element.element_type;
+            if (elementType !== 'wasm-component' || !element.bounds) continue;
+
+            const interfaces = element.properties?.interfaces || [];
+            if (interfaces.length === 0) continue;
+
+            // Separate inputs and outputs
+            const inputs = interfaces.filter((i: any) => 
+                i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
+            );
+            const outputs = interfaces.filter((i: any) => 
+                i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
+            );
+
+            // Check input interfaces (left side)
+            const result = this.checkInterfacePorts(element, inputs, 'left', position);
+            if (result) return result;
+
+            // Check output interfaces (right side)
+            const outputResult = this.checkInterfacePorts(element, outputs, 'right', position);
+            if (outputResult) return outputResult;
+        }
+
+        return undefined;
+    }
+
+    private checkInterfacePorts(
+        element: ModelElement,
+        interfaces: any[],
+        side: 'left' | 'right',
+        clickPosition: Position
+    ): { element: ModelElement; interface: any; side: 'left' | 'right'; connectorPosition: Position } | undefined {
+        if (!element.bounds) return undefined;
+
+        const headerHeight = 40; // V2 HEADER_HEIGHT
+        const portSpacing = 24;  // V2 PORT_SPACING
+        const portRadius = 8;    // V2 PORT_RADIUS
+        const startY = element.bounds.y + headerHeight + 20;
+
+        for (let i = 0; i < interfaces.length; i++) {
+            const x = side === 'left' ? element.bounds.x : element.bounds.x + element.bounds.width;
+            const y = startY + (i * portSpacing);
+
+            // Check if click is within port radius
+            const distance = Math.sqrt(
+                Math.pow(clickPosition.x - x, 2) + Math.pow(clickPosition.y - y, 2)
+            );
+
+            if (distance <= portRadius) {
+                return {
+                    element,
+                    interface: interfaces[i],
+                    side,
+                    connectorPosition: { x, y }
+                };
+            }
+        }
+
+        return undefined;
     }
 
     // Set the MCP client for component status checking
@@ -1186,13 +1352,19 @@ export class CanvasRenderer {
             if (!element.bounds) continue;
             
             const nodeType = element.type || element.element_type || '';
+            
             if (!this.isWasmComponentType(nodeType) || nodeType === 'import-interface' || nodeType === 'export-interface') {
                 continue;
             }
 
+            const interfaces = element.properties?.interfaces as any[] || [];
+            if (interfaces.length === 0) continue;
+
             // Use the V2 renderer's port detection method
             const portInfo = WasmComponentRendererV2.getPortAtPosition(element, element.bounds, position);
+            
             if (portInfo) {
+                console.log('getInterfaceConnectorAt: Port found, creating connector:', portInfo);
                 // Calculate the actual connector position for the found port
                 const interfaces = element.properties?.interfaces as any[] || [];
                 const inputs = interfaces.filter(i => 
@@ -1215,12 +1387,14 @@ export class CanvasRenderer {
                     const x = isInput ? element.bounds.x : element.bounds.x + element.bounds.width;
                     const y = startY + (portIndex * portSpacing);
 
-                    return {
+                    const connector = {
                         element,
                         interface: portInfo.port,
                         side: isInput ? 'left' : 'right',
                         connectorPosition: { x, y }
                     };
+                    console.log('getInterfaceConnectorAt: Returning connector:', connector);
+                    return connector;
                 }
             }
         }
