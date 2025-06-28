@@ -1,9 +1,16 @@
 use crate::mcp::protocol::{Resource, ResourceContent};
 use crate::mcp::tools::DiagramTools;
+use crate::model::ElementType;
 use serde_json::{json, Value};
 use anyhow::Result;
 
 pub struct DiagramResources;
+
+impl Default for DiagramResources {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DiagramResources {
     pub fn new() -> Self {
@@ -55,16 +62,55 @@ impl DiagramResources {
                 description: Some("Overall status of WASM components".to_string()),
                 mime_type: Some("application/json".to_string()),
             },
+            Resource {
+                uri: "wasm://wit/interfaces".to_string(),
+                name: "WIT Interfaces Overview".to_string(),
+                description: Some("Overview of all WIT interfaces across components".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://wit/types".to_string(),
+                name: "WIT Types Catalog".to_string(),
+                description: Some("Catalog of all WIT types and their definitions".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://wit/dependencies".to_string(),
+                name: "WIT Dependencies Graph".to_string(),
+                description: Some("Dependency relationships between WIT interfaces".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
         ];
 
         // Add resources for individual WASM components
-        // TODO: Get actual WASM components from the file watcher
-        let wasm_components = tools.get_wasm_components(); // This method needs to be added
+        let wasm_components = tools.get_wasm_components();
         for component in wasm_components {
             resources.push(Resource {
                 uri: format!("wasm://component/{}", component.name),
                 name: format!("WASM Component: {}", component.name),
                 description: Some(format!("Details for {} component", component.name)),
+                mime_type: Some("application/json".to_string()),
+            });
+            
+            // Add WIT-specific resources for each component
+            resources.push(Resource {
+                uri: format!("wasm://component/{}/wit", component.name),
+                name: format!("WIT Analysis: {}", component.name),
+                description: Some(format!("WIT interface analysis for {} component", component.name)),
+                mime_type: Some("application/json".to_string()),
+            });
+            
+            resources.push(Resource {
+                uri: format!("wasm://component/{}/wit/raw", component.name),
+                name: format!("Raw WIT: {}", component.name),
+                description: Some(format!("Raw WIT content for {} component", component.name)),
+                mime_type: Some("text/plain".to_string()),
+            });
+            
+            resources.push(Resource {
+                uri: format!("wasm://component/{}/interfaces", component.name),
+                name: format!("Interfaces: {}", component.name),
+                description: Some(format!("All interfaces for {} component", component.name)),
                 mime_type: Some("application/json".to_string()),
             });
         }
@@ -147,6 +193,24 @@ impl DiagramResources {
                 text: Some(self.get_wasm_status(tools)),
                 blob: None,
             }),
+            "wasm://wit/interfaces" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_wit_interfaces_overview(tools)),
+                blob: None,
+            }),
+            "wasm://wit/types" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_wit_types_catalog(tools)),
+                blob: None,
+            }),
+            "wasm://wit/dependencies" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_wit_dependencies_graph(tools)),
+                blob: None,
+            }),
             _ => {
                 if uri.starts_with("diagram://model/") {
                     let diagram_id = uri.strip_prefix("diagram://model/").unwrap();
@@ -161,8 +225,17 @@ impl DiagramResources {
                     let diagram_id = uri.strip_prefix("diagram://validation/").unwrap();
                     self.get_validation_results(diagram_id, tools)
                 } else if uri.starts_with("wasm://component/") {
-                    let component_name = uri.strip_prefix("wasm://component/").unwrap();
-                    self.get_wasm_component_details(component_name, tools)
+                    let path = uri.strip_prefix("wasm://component/").unwrap();
+                    if let Some((component_name, suffix)) = path.split_once('/') {
+                        match suffix {
+                            "wit" => self.get_component_wit_analysis(component_name, tools),
+                            "wit/raw" => self.get_component_raw_wit(component_name, tools),
+                            "interfaces" => self.get_component_interfaces(component_name, tools),
+                            _ => Err(anyhow::anyhow!("Unknown component resource: {}", uri))
+                        }
+                    } else {
+                        self.get_wasm_component_details(path, tools)
+                    }
                 } else {
                     Err(anyhow::anyhow!("Resource not found: {}", uri))
                 }
@@ -290,16 +363,53 @@ impl DiagramResources {
     }
 
     fn get_diagram_list(&self, tools: &DiagramTools) -> String {
-        let diagrams: Vec<Value> = tools.list_diagrams()
+        // Get diagrams from memory (already loaded)
+        let mut diagrams: Vec<Value> = tools.list_diagrams()
             .iter()
             .map(|diagram| json!({
                 "id": diagram.id,
+                "name": diagram.name,
                 "type": diagram.diagram_type,
                 "revision": diagram.revision,
                 "elementCount": diagram.elements.len(),
                 "uri": format!("diagram://model/{}", diagram.id)
             }))
             .collect();
+
+        // Also check for diagrams on disk that might not be loaded yet
+        // This is a simple synchronous check - just list the files
+        if let Ok(entries) = std::fs::read_dir(tools.get_diagrams_path()) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(file_name) = path.file_name() {
+                    let name = file_name.to_string_lossy();
+                    if name.ends_with(".glsp.json") {
+                        // Try to read just the basic info
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
+                                let id = json_value["id"].as_str().unwrap_or("");
+                                let diagram_name = json_value["name"].as_str().unwrap_or("");
+                                let diagram_type = json_value["diagram_type"].as_str().unwrap_or("unknown");
+                                
+                                // Check if this diagram is already in the list
+                                let already_loaded = diagrams.iter().any(|d| d["id"] == id);
+                                
+                                if !already_loaded && !id.is_empty() {
+                                    diagrams.push(json!({
+                                        "id": id,
+                                        "name": diagram_name,
+                                        "type": diagram_type,
+                                        "revision": json_value["revision"].as_u64().unwrap_or(0),
+                                        "elementCount": 0, // We don't know without fully loading
+                                        "uri": format!("diagram://model/{}", id)
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         json!({
             "diagrams": diagrams,
@@ -312,7 +422,7 @@ impl DiagramResources {
             .ok_or_else(|| anyhow::anyhow!("Diagram not found: {}", diagram_id))?;
 
         Ok(ResourceContent {
-            uri: format!("diagram://model/{}", diagram_id),
+            uri: format!("diagram://model/{diagram_id}"),
             mime_type: Some("application/vnd.glsp-model+json".to_string()),
             text: Some(serde_json::to_string_pretty(diagram)?),
             blob: None,
@@ -324,7 +434,7 @@ impl DiagramResources {
             .ok_or_else(|| anyhow::anyhow!("Diagram not found: {}", diagram_id))?;
 
         let elements: Vec<Value> = diagram.elements.values()
-            .filter(|element| element.element_type != "graph")
+            .filter(|element| element.element_type != ElementType::Graph)
             .map(|element| {
                 let mut elem_json = json!({
                     "id": element.id,
@@ -350,7 +460,7 @@ impl DiagramResources {
             .collect();
 
         Ok(ResourceContent {
-            uri: format!("diagram://elements/{}", diagram_id),
+            uri: format!("diagram://elements/{diagram_id}"),
             mime_type: Some("application/json".to_string()),
             text: Some(json!({
                 "elements": elements,
@@ -365,22 +475,22 @@ impl DiagramResources {
             .ok_or_else(|| anyhow::anyhow!("Diagram not found: {}", diagram_id))?;
 
         let node_count = diagram.elements.values()
-            .filter(|e| e.element_type != "graph" && !e.element_type.contains("edge"))
+            .filter(|e| e.element_type.is_node_like())
             .count();
         
         let edge_count = diagram.elements.values()
-            .filter(|e| e.element_type.contains("edge"))
+            .filter(|e| e.element_type.is_edge_like())
             .count();
 
         let element_types: std::collections::HashMap<String, usize> = diagram.elements.values()
-            .filter(|e| e.element_type != "graph")
+            .filter(|e| e.element_type != ElementType::Graph)
             .fold(std::collections::HashMap::new(), |mut acc, element| {
-                *acc.entry(element.element_type.clone()).or_insert(0) += 1;
+                *acc.entry(element.element_type.to_string()).or_insert(0) += 1;
                 acc
             });
 
         Ok(ResourceContent {
-            uri: format!("diagram://metadata/{}", diagram_id),
+            uri: format!("diagram://metadata/{diagram_id}"),
             mime_type: Some("application/json".to_string()),
             text: Some(json!({
                 "id": diagram.id,
@@ -406,12 +516,12 @@ impl DiagramResources {
         let mut issues = Vec::new();
         
         for (element_id, element) in &diagram.elements {
-            if element.element_type != "graph" && !element.element_type.contains("edge") {
+            if element.element_type.is_node_like() {
                 // Check if node has any connections
                 let has_connections = diagram.elements.values()
-                    .any(|e| e.element_type.contains("edge") && 
-                        e.properties.get("sourceId").and_then(|v| v.as_str()) == Some(element_id) ||
-                        e.properties.get("targetId").and_then(|v| v.as_str()) == Some(element_id));
+                    .any(|e| e.element_type.is_edge_like() && 
+                        (e.source_id.as_ref() == Some(element_id) ||
+                         e.target_id.as_ref() == Some(element_id)));
 
                 if !has_connections && diagram.elements.len() > 2 { // more than just root and this element
                     issues.push(json!({
@@ -425,7 +535,7 @@ impl DiagramResources {
         }
 
         Ok(ResourceContent {
-            uri: format!("diagram://validation/{}", diagram_id),
+            uri: format!("diagram://validation/{diagram_id}"),
             mime_type: Some("application/json".to_string()),
             text: Some(json!({
                 "diagramId": diagram_id,
@@ -505,7 +615,7 @@ impl DiagramResources {
             .ok_or_else(|| anyhow::anyhow!("WASM component not found: {}", component_name))?;
 
         Ok(ResourceContent {
-            uri: format!("wasm://component/{}", component_name),
+            uri: format!("wasm://component/{component_name}"),
             mime_type: Some("application/json".to_string()),
             text: Some(json!({
                 "name": component.name,
@@ -518,6 +628,200 @@ impl DiagramResources {
                 "metadata": component.metadata,
                 "witInterfaces": component.wit_interfaces,
                 "dependencies": component.dependencies
+            }).to_string()),
+            blob: None,
+        })
+    }
+
+    // WIT Analysis Methods
+    fn get_wit_interfaces_overview(&self, tools: &DiagramTools) -> String {
+        let components = tools.get_wasm_components();
+        let mut interface_summary = std::collections::HashMap::new();
+        let mut total_imports = 0;
+        let mut total_exports = 0;
+        
+        for component in &components {
+            for interface in &component.interfaces {
+                let entry = interface_summary.entry(interface.name.clone()).or_insert_with(|| {
+                    json!({
+                        "name": interface.name,
+                        "type": interface.interface_type,
+                        "functions": interface.functions.len(),
+                        "components": Vec::<String>::new()
+                    })
+                });
+                
+                if let Some(components_array) = entry["components"].as_array_mut() {
+                    components_array.push(json!(component.name));
+                }
+                
+                match interface.interface_type.as_str() {
+                    "import" => total_imports += 1,
+                    "export" => total_exports += 1,
+                    _ => {}
+                }
+            }
+        }
+        
+        json!({
+            "summary": {
+                "totalInterfaces": interface_summary.len(),
+                "totalImports": total_imports,
+                "totalExports": total_exports,
+                "componentsAnalyzed": components.len()
+            },
+            "interfaces": interface_summary.values().collect::<Vec<_>>()
+        }).to_string()
+    }
+
+    fn get_wit_types_catalog(&self, tools: &DiagramTools) -> String {
+        let components = tools.get_wasm_components();
+        let mut type_definitions = std::collections::HashMap::new();
+        
+        for component in &components {
+            for interface in &component.interfaces {
+                for function in &interface.functions {
+                    // Collect parameter types
+                    for param in &function.params {
+                        type_definitions.insert(param.param_type.clone(), json!({
+                            "type": param.param_type,
+                            "usedIn": "parameter",
+                            "components": [component.name.clone()],
+                            "interfaces": [interface.name.clone()]
+                        }));
+                    }
+                    
+                    // Collect return types
+                    for ret in &function.returns {
+                        type_definitions.insert(ret.param_type.clone(), json!({
+                            "type": ret.param_type,
+                            "usedIn": "return",
+                            "components": [component.name.clone()],
+                            "interfaces": [interface.name.clone()]
+                        }));
+                    }
+                }
+            }
+        }
+        
+        json!({
+            "types": type_definitions.values().collect::<Vec<_>>(),
+            "totalTypes": type_definitions.len()
+        }).to_string()
+    }
+
+    fn get_wit_dependencies_graph(&self, tools: &DiagramTools) -> String {
+        let components = tools.get_wasm_components();
+        let mut dependencies = Vec::new();
+        let mut nodes = std::collections::HashMap::new();
+        
+        for component in &components {
+            nodes.insert(component.name.clone(), json!({
+                "id": component.name,
+                "type": "component",
+                "interfaces": component.interfaces.len(),
+                "dependencies": component.dependencies.len()
+            }));
+            
+            for dep in &component.dependencies {
+                dependencies.push(json!({
+                    "source": component.name,
+                    "target": dep,
+                    "type": "dependency"
+                }));
+            }
+        }
+        
+        json!({
+            "nodes": nodes.values().collect::<Vec<_>>(),
+            "edges": dependencies,
+            "statistics": {
+                "totalNodes": nodes.len(),
+                "totalEdges": dependencies.len()
+            }
+        }).to_string()
+    }
+
+    fn get_component_wit_analysis(&self, component_name: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let component = tools.get_wasm_component(component_name)
+            .ok_or_else(|| anyhow::anyhow!("WASM component not found: {}", component_name))?;
+
+        // Analyze WIT interfaces specifically
+        let mut imports = Vec::new();
+        let mut exports = Vec::new();
+        
+        for interface in &component.interfaces {
+            let interface_data = json!({
+                "name": interface.name,
+                "functions": interface.functions.iter().map(|f| json!({
+                    "name": f.name,
+                    "parameters": f.params.iter().map(|p| json!({
+                        "name": p.name,
+                        "type": p.param_type
+                    })).collect::<Vec<_>>(),
+                    "returns": f.returns.iter().map(|r| json!({
+                        "name": r.name,
+                        "type": r.param_type
+                    })).collect::<Vec<_>>()
+                })).collect::<Vec<_>>()
+            });
+            
+            match interface.interface_type.as_str() {
+                "import" => imports.push(interface_data),
+                "export" => exports.push(interface_data),
+                _ => {}
+            }
+        }
+
+        Ok(ResourceContent {
+            uri: format!("wasm://component/{component_name}/wit"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(json!({
+                "componentName": component.name,
+                "witAnalysis": {
+                    "imports": imports,
+                    "exports": exports,
+                    "summary": {
+                        "totalImports": imports.len(),
+                        "totalExports": exports.len(),
+                        "totalFunctions": component.interfaces.iter()
+                            .map(|i| i.functions.len())
+                            .sum::<usize>()
+                    }
+                },
+                "metadata": component.metadata,
+                "dependencies": component.dependencies
+            }).to_string()),
+            blob: None,
+        })
+    }
+
+    fn get_component_raw_wit(&self, component_name: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let component = tools.get_wasm_component(component_name)
+            .ok_or_else(|| anyhow::anyhow!("WASM component not found: {}", component_name))?;
+
+        let wit_content = component.wit_interfaces.clone()
+            .unwrap_or_else(|| "// No WIT content available for this component".to_string());
+
+        Ok(ResourceContent {
+            uri: format!("wasm://component/{component_name}/wit/raw"),
+            mime_type: Some("text/plain".to_string()),
+            text: Some(wit_content),
+            blob: None,
+        })
+    }
+
+    fn get_component_interfaces(&self, component_name: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let component = tools.get_wasm_component(component_name)
+            .ok_or_else(|| anyhow::anyhow!("WASM component not found: {}", component_name))?;
+
+        Ok(ResourceContent {
+            uri: format!("wasm://component/{component_name}/interfaces"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(json!({
+                "componentName": component.name,
+                "interfaces": component.interfaces,
+                "totalInterfaces": component.interfaces.len()
             }).to_string()),
             blob: None,
         })

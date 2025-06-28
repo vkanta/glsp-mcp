@@ -6,6 +6,7 @@ import { CanvasRenderer } from './renderer/canvas-renderer.js';
 import { AIService } from './services/AIService.js';
 import { WasmRuntimeManager } from './wasm/WasmRuntimeManager.js';
 import { statusManager } from './services/StatusManager.js';
+import { BaseDialog } from './ui/dialogs/base/BaseDialog.js';
 
 export class AppController {
     private mcpService: McpService;
@@ -21,7 +22,7 @@ export class AppController {
         this.diagramService = new DiagramService(this.mcpService);
         this.uiManager = new UIManager();
         this.renderer = new CanvasRenderer(canvas);
-        this.interactionManager = new InteractionManager(this.renderer, this.diagramService);
+        this.interactionManager = new InteractionManager(this.renderer, this.diagramService, this.mcpService);
         this.aiService = new AIService(this.mcpService);
         this.wasmRuntimeManager = new WasmRuntimeManager(this.mcpService, this.diagramService, {
             enableClientSideTranspilation: true,
@@ -34,6 +35,31 @@ export class AppController {
         (window as any).appController = this;
         (window as any).wasmRuntime = this.wasmRuntimeManager;
         (window as any).uploadWasm = () => this.wasmRuntimeManager.showUploadPanel();
+        (window as any).testSidebar = () => this.testSidebarIntegration();
+        (window as any).theme = this.uiManager.getThemeController();
+        (window as any).toggleSidebar = () => this.uiManager.toggleSidebar();
+        (window as any).checkSidebar = () => {
+            console.log('Sidebar collapsed:', this.uiManager.isSidebarCollapsed());
+            console.log('Body classes:', document.body.className);
+            const btn = document.querySelector('.sidebar-collapse-btn');
+            console.log('Collapse button:', btn);
+            console.log('Button visible:', btn ? window.getComputedStyle(btn).display !== 'none' : 'Not found');
+        };
+        (window as any).headerIcons = this.uiManager.getHeaderIconManager();
+        (window as any).testAIMinimize = () => {
+            console.log('Testing AI minimize manually...');
+            this.uiManager.getHeaderIconManager().addIcon({
+                id: 'test-ai',
+                title: 'Test AI',
+                icon: '🤖',
+                color: 'var(--accent-wasm)',
+                onClick: () => console.log('Test AI clicked'),
+                onClose: () => console.log('Test AI closed')
+            });
+        };
+        
+        // Dialog debugging
+        (window as any).debugDialogs = () => BaseDialog.debugDialogState();
 
         this.mountUI();
 
@@ -43,40 +69,185 @@ export class AppController {
     private mountUI(): void {
         console.log('AppController: Mounting UI elements');
         
-        const toolbarContainer = document.getElementById('toolbar-container');
-        if (toolbarContainer) {
-            toolbarContainer.appendChild(this.uiManager.getToolbarElement());
-            console.log('AppController: Toolbar mounted');
+        // Initialize modern sidebar
+        const sidebarContainer = document.querySelector('.sidebar');
+        if (sidebarContainer) {
+            console.log('AppController: Initializing modern sidebar');
+            // Clear existing sidebar content
+            sidebarContainer.innerHTML = '';
+            // Initialize modern sidebar with diagram type change handler
+            this.uiManager.initializeModernSidebar(
+                sidebarContainer as HTMLElement,
+                async (newType: string) => await this.handleDiagramTypeChange(newType)
+            );
+            console.log('AppController: Modern sidebar initialized');
         } else {
-            console.warn('AppController: toolbar-container not found');
+            // Fallback to old UI
+            console.log('AppController: Using legacy UI (sidebar not found)');
+            const toolbarContainer = document.getElementById('toolbar-container');
+            if (toolbarContainer) {
+                toolbarContainer.appendChild(this.uiManager.getToolbarElement());
+                console.log('AppController: Toolbar mounted');
+            }
+
+            const diagramListContainer = document.getElementById('diagram-list-container');
+            if (diagramListContainer) {
+                const diagramListElement = this.uiManager.getDiagramListElement();
+                diagramListContainer.appendChild(diagramListElement);
+                console.log('AppController: Diagram list mounted');
+            }
         }
 
+        // Always mount status bar
         const statusContainer = document.getElementById('status-container');
         if (statusContainer) {
             statusContainer.appendChild(this.uiManager.getStatusElement());
             console.log('AppController: Status bar mounted');
-        } else {
-            console.warn('AppController: status-container not found');
-        }
-
-        const diagramListContainer = document.getElementById('diagram-list-container');
-        console.log('AppController: Looking for diagram-list-container, found:', !!diagramListContainer);
-        if (diagramListContainer) {
-            const diagramListElement = this.uiManager.getDiagramListElement();
-            console.log('AppController: Got diagram list element:', !!diagramListElement);
-            diagramListContainer.appendChild(diagramListElement);
-            console.log('AppController: Diagram list mounted');
-        } else {
-            console.error('AppController: diagram-list-container not found in DOM');
         }
 
         // Mount AI panel as floating element
         document.body.appendChild(this.uiManager.getAIPanelElement());
         console.log('AppController: AI panel mounted as floating element');
 
-        // Mount WASM palette as floating element
-        document.body.appendChild(this.wasmRuntimeManager.getPaletteElement());
-        console.log('AppController: WASM palette mounted as floating element');
+        // Mount WASM palette as floating element (only if not using modern sidebar)
+        if (!sidebarContainer) {
+            document.body.appendChild(this.wasmRuntimeManager.getPaletteElement());
+            console.log('AppController: WASM palette mounted as floating element');
+        } else {
+            console.log('AppController: Skipping WASM palette (using sidebar components instead)');
+        }
+    }
+    
+    private async loadWasmComponentsToSidebar(): Promise<void> {
+        try {
+            console.log('=== LOADING WASM COMPONENTS TO SIDEBAR ===');
+            
+            // Clear any existing error components first
+            this.uiManager.clearWasmComponents();
+            
+            // Trigger component scan to ensure we have the latest data
+            console.log('Triggering component scan...');
+            const scanResult = await this.mcpService.callTool('scan_wasm_components', {});
+            console.log('Scan result:', scanResult);
+            
+            // Read the components list from MCP resource
+            console.log('Reading wasm://components/list resource...');
+            const componentsList = await this.mcpService.readResource('wasm://components/list');
+            console.log('Raw MCP response:', JSON.stringify(componentsList, null, 2));
+            
+            // Note: The components list already includes status information for each component
+            // No need for a separate status resource
+            
+            if (componentsList && componentsList.text) {
+                console.log('Raw text content:', componentsList.text);
+                
+                // Parse the text content which contains the JSON
+                const componentsData = JSON.parse(componentsList.text);
+                console.log('Parsed components data:', JSON.stringify(componentsData, null, 2));
+                
+                const components = componentsData.components || [];
+                console.log(`Found ${components.length} WASM components in parsed data`);
+                console.log('First few components:', components.slice(0, 3));
+                
+                if (components.length === 0) {
+                    console.warn('Components array is empty!');
+                    this.uiManager.addWasmComponentToLibrary({
+                        id: 'no-components',
+                        name: 'No WASM components found',
+                        description: 'Upload a component or check your backend connection',
+                        interfaces: [],
+                        status: 'error',
+                        version: '',
+                        category: 'Status'
+                    });
+                    return;
+                }
+                
+                components.forEach((component: any, index: number) => {
+                    console.log(`Processing component ${index + 1}:`, JSON.stringify(component, null, 2));
+                    
+                    // Extract component info from the MCP data
+                    const name = component.name || 'Unknown Component';
+                    const status = component.status || 'available';
+                    
+                    const componentData = {
+                        id: component.name || name,
+                        name: name,
+                        description: component.description || `WASM component: ${name}`,
+                        interfaces: component.interfaces || 0, // This is the count from the server
+                        status: status,
+                        version: '1.0.0', // Default version as server doesn't provide this yet
+                        category: this.categorizeWasmComponent(component)
+                    };
+                    
+                    console.log(`Adding component to sidebar:`, componentData);
+                    this.uiManager.addWasmComponentToLibrary(componentData);
+                    
+                    console.log(`✅ Added WASM component to sidebar: ${name} (${status})`);
+                });
+                
+                console.log(`🎉 Successfully loaded ${components.length} WASM components to sidebar`);
+            } else {
+                console.warn('Invalid MCP response structure:', {
+                    hasComponentsList: !!componentsList,
+                    hasText: !!(componentsList?.text),
+                    textLength: componentsList?.text?.length
+                });
+                
+                this.uiManager.addWasmComponentToLibrary({
+                    id: 'no-components',
+                    name: 'No WASM components found',
+                    description: 'Upload a component or check your backend connection',
+                    interfaces: [],
+                    status: 'error',
+                    version: '',
+                    category: 'Status'
+                });
+            }
+        } catch (error) {
+            console.error('❌ Failed to load WASM components to sidebar:', error);
+            console.error('Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined
+            });
+            
+            // Add an error indicator component
+            this.uiManager.addWasmComponentToLibrary({
+                id: 'error-loading',
+                name: 'Error Loading Components',
+                description: `Failed to connect to backend: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                interfaces: [],
+                status: 'error',
+                version: '',
+                category: 'Status'
+            });
+        }
+    }
+    
+    private categorizeWasmComponent(component: any): string {
+        const name = component.name?.toLowerCase() || '';
+        const path = component.path?.toLowerCase() || '';
+        
+        // Categorize based on component name and path patterns  
+        if (name.includes('camera') || path.includes('camera')) {
+            return 'Vision';
+        } else if (name.includes('object-detection') || name.includes('detection') || path.includes('detection')) {
+            return 'AI/ML';
+        } else if (name.includes('adas') || name.includes('vehicle') || name.includes('automotive') || path.includes('adas')) {
+            return 'Automotive';
+        } else if (name.includes('compute') || name.includes('math') || name.includes('calc')) {
+            return 'Computation';
+        } else if (name.includes('image') || name.includes('media') || name.includes('vision')) {
+            return 'Media';
+        } else if (name.includes('validate') || name.includes('data')) {
+            return 'Utilities';
+        } else if (name.includes('crypto') || name.includes('security')) {
+            return 'Security';
+        } else if (name.includes('ai') || name.includes('ml') || name.includes('neural')) {
+            return 'AI/ML';
+        } else {
+            return 'WASM Components';
+        }
     }
 
     private async initialize(): Promise<void> {
@@ -88,6 +259,7 @@ export class AppController {
 
             this.interactionManager.setupEventHandlers();
             this.interactionManager.setWasmComponentManager(this.wasmRuntimeManager);
+            this.interactionManager.setUIManager(this.uiManager);
             this.wasmRuntimeManager.setupCanvasDragAndDrop(this.canvas);
 
             // Setup connection status monitoring
@@ -100,6 +272,11 @@ export class AppController {
                 statusManager.setAiStatus(connected);
             });
 
+            // Check current MCP connection status since the listener was added after initialization
+            const mcpConnected = this.mcpService.isConnected();
+            console.log('AppController: Current MCP connection status after listener setup:', mcpConnected);
+            statusManager.setMcpStatus(mcpConnected);
+
             this.uiManager.setupToolbarEventHandlers(async (newType: string) => {
                 await this.handleDiagramTypeChange(newType);
             });
@@ -110,6 +287,15 @@ export class AppController {
                 async () => await this.handleAIAnalyzeDiagram(),
                 async () => await this.handleAIOptimizeLayout()
             );
+            
+            // Setup diagram close event handler
+            window.addEventListener('diagram-close-requested', () => {
+                console.log('AppController: Diagram close requested - clearing canvas');
+                this.renderer.clear();
+            });
+
+            // Show the AI panel
+            this.uiManager.showAIPanel();
 
             const connections = await this.aiService.checkConnections();
             // AI status will be set automatically by the connection listener
@@ -123,48 +309,56 @@ export class AppController {
             }
 
             await this.wasmRuntimeManager.initializeEnhancedWasmComponents();
+            
+            // Connect header icon manager to WASM runtime manager
+            this.wasmRuntimeManager.setHeaderIconManager(this.uiManager.getHeaderIconManager());
+            
+            // Load WASM components into the sidebar if modern sidebar is active
+            await this.loadWasmComponentsToSidebar();
 
-            console.log('AppController: Creating sample diagram...');
-            const diagram = await this.diagramService.createSampleDiagram();
-            console.log('AppController: Sample diagram result:', diagram);
-            if (diagram !== undefined) {
-                this.renderer.setDiagram(diagram);
-                this.uiManager.updateStatus(`Loaded diagram`);
-                console.log('AppController: Sample diagram loaded successfully');
-                console.log('AppController: Current diagram ID:', this.diagramService.getCurrentDiagramId());
-            } else {
-                console.warn('AppController: Failed to create sample diagram');
-                // Still update status so user knows the app is ready
-                this.uiManager.updateStatus('Ready - click canvas to create nodes');
-            }
-
+            // Load existing diagrams instead of creating a new one
+            console.log('AppController: Loading available diagrams...');
             const diagrams = await this.diagramService.getAvailableDiagrams();
             console.log('AppController: Retrieved diagrams:', diagrams);
+            
+            // Update the diagram list UI
             this.uiManager.updateDiagramList(
-                diagrams, 
-                async (diagramId) => {
-                    console.log('AppController: Loading diagram:', diagramId);
-                    const loadedDiagram = await this.diagramService.loadDiagram(diagramId);
-                    if (loadedDiagram) {
-                        console.log('AppController: Diagram loaded successfully:', loadedDiagram);
-                        this.renderer.setDiagram(loadedDiagram);
-                    } else {
-                        console.warn('AppController: Failed to load diagram:', diagramId);
-                    }
-                },
-                async (diagramId, diagramName) => {
-                    console.log('AppController: Deleting diagram:', diagramId, diagramName);
-                    const success = await this.diagramService.deleteDiagram(diagramId);
-                    if (success) {
-                        console.log('AppController: Diagram deleted successfully');
-                        // Refresh the diagram list
-                        await this.refreshDiagramList();
-                    } else {
-                        console.error('AppController: Failed to delete diagram');
-                        alert('Failed to delete diagram. Please try again.');
+                diagrams,
+                this.loadDiagramCallback.bind(this),
+                this.deleteDiagramCallback.bind(this)
+            );
+            
+            // If there are existing diagrams, load the first one
+            if (diagrams.length > 0) {
+                console.log('AppController: Loading first available diagram:', diagrams[0].id);
+                const firstDiagram = await this.diagramService.loadDiagram(diagrams[0].id);
+                if (firstDiagram) {
+                    this.renderer.setDiagram(firstDiagram);
+                    this.uiManager.updateStatus(`Loaded diagram: ${firstDiagram.name}`);
+                    console.log('AppController: Diagram loaded successfully');
+                    
+                    // Update the toolbar to show the correct node/edge types for this diagram type
+                    // Handle both camelCase and snake_case naming conventions
+                    const diagramType = firstDiagram.diagramType || firstDiagram.diagram_type || 'workflow';
+                    console.log('AppController: Updating toolbar for initial diagram type:', diagramType);
+                    this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
+                    
+                    // Refresh WASM component interfaces if this is a WASM diagram
+                    if (diagramType === 'wasm-component' && this.wasmComponentManager) {
+                        console.log('AppController: Refreshing WASM component interfaces...');
+                        try {
+                            await this.wasmComponentManager.refreshComponentInterfaces();
+                        } catch (error) {
+                            console.error('Failed to refresh component interfaces:', error);
+                        }
                     }
                 }
-            );
+            } else {
+                console.log('AppController: No existing diagrams found');
+                this.uiManager.updateStatus('No diagrams found - Create a new diagram to start');
+                // Clear the canvas to show empty state
+                this.renderer.clear();
+            }
 
             // Setup create new diagram button
             this.uiManager.setupCreateDiagramButton(async () => {
@@ -303,14 +497,8 @@ export class AppController {
                     this.uiManager.updateStatus(`Created new ${diagramType} diagram`);
                     console.log('New diagram created and loaded:', newDiagram);
                     
-                    // Update the diagram list
-                    const diagrams = await this.diagramService.getAvailableDiagrams();
-                    this.uiManager.updateDiagramList(diagrams, async (diagramId) => {
-                        const diagram = await this.diagramService.loadDiagram(diagramId);
-                        if (diagram) {
-                            this.renderer.setDiagram(diagram);
-                        }
-                    });
+                    // Refresh the diagram list (will use the callbacks from initialize())
+                    await this.refreshDiagramList();
                 }
             }
         } catch (error) {
@@ -323,59 +511,153 @@ export class AppController {
         try {
             const diagrams = await this.diagramService.getAvailableDiagrams();
             console.log('AppController: Refreshing diagram list with', diagrams.length, 'diagrams');
+            
+            // Use the same callbacks as the initial setup to avoid duplicate event handlers
             this.uiManager.updateDiagramList(
                 diagrams,
-                async (diagramId) => {
-                    console.log('AppController: Loading diagram:', diagramId);
-                    const loadedDiagram = await this.diagramService.loadDiagram(diagramId);
-                    if (loadedDiagram) {
-                        this.renderer.setDiagram(loadedDiagram);
-                    }
-                },
-                async (diagramId, diagramName) => {
-                    console.log('AppController: Deleting diagram:', diagramId, diagramName);
-                    const success = await this.diagramService.deleteDiagram(diagramId);
-                    if (success) {
-                        await this.refreshDiagramList();
-                    } else {
-                        alert('Failed to delete diagram. Please try again.');
-                    }
-                }
+                this.loadDiagramCallback.bind(this),
+                this.deleteDiagramCallback.bind(this)
             );
         } catch (error) {
             console.error('Failed to refresh diagram list:', error);
         }
     }
 
-    private async handleCreateNewDiagram(): Promise<void> {
-        const diagramTypes = this.diagramService.getAvailableDiagramTypes();
-        
-        // Create a simple selection dialog
-        const diagramType = prompt(
-            `Choose diagram type:\n${diagramTypes.map((type, i) => `${i + 1}. ${type.label}`).join('\n')}\n\nEnter number (1-${diagramTypes.length}):`,
-            '1'
-        );
-        
-        if (!diagramType) return; // User cancelled
-        
-        const typeIndex = parseInt(diagramType) - 1;
-        if (typeIndex < 0 || typeIndex >= diagramTypes.length) {
-            alert('Invalid diagram type selection');
+    // Extract callbacks as class methods to reuse them
+    private async loadDiagramCallback(diagramId: string): Promise<void> {
+        console.log('AppController: Loading diagram:', diagramId);
+        const loadedDiagram = await this.diagramService.loadDiagram(diagramId);
+        if (loadedDiagram) {
+            console.log('AppController: Diagram loaded successfully:', loadedDiagram);
+            this.renderer.setDiagram(loadedDiagram);
+            
+            // Update the toolbar to show the correct node/edge types for this diagram type
+            // Handle both camelCase and snake_case naming conventions
+            const diagramType = loadedDiagram.diagramType || loadedDiagram.diagram_type || 'workflow';
+            console.log('AppController: Updating toolbar for loaded diagram type:', diagramType);
+            this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
+        } else {
+            console.warn('AppController: Failed to load diagram:', diagramId);
+        }
+    }
+
+    private async deleteDiagramCallback(diagramId: string, diagramName: string): Promise<void> {
+        // Prevent double deletion
+        const deleteKey = `deleting-${diagramId}`;
+        if ((window as any)[deleteKey]) {
+            console.log('AppController: Delete already in progress for', diagramId);
             return;
         }
-        
-        const selectedType = diagramTypes[typeIndex];
-        const diagramName = prompt(`Enter name for new ${selectedType.label} diagram:`, `New ${selectedType.label}`);
-        
-        if (!diagramName) return; // User cancelled
-        
+        (window as any)[deleteKey] = true;
+
         try {
-            console.log('AppController: Creating new diagram:', selectedType.value, diagramName);
-            const result = await this.mcpService.createDiagram(selectedType.value, diagramName);
-            console.log('AppController: Create diagram result:', result);
+            console.log('AppController: Delete request for diagram:', diagramId, diagramName);
             
-            if (result.content && result.content[0] && result.content[0].text) {
+            // Check if this is the current diagram being worked on
+            const isCurrentDiagram = this.diagramService.isCurrentDiagramDeletable(diagramId);
+            const hasUnsavedChanges = this.diagramService.hasUnsavedChanges();
+            
+            let confirmMessage = 'This diagram and all its content will be permanently removed.';
+            let confirmTitle = `Delete "${diagramName}"?`;
+            
+            // Enhanced warning for current diagram
+            if (isCurrentDiagram) {
+                confirmTitle = `⚠️ Delete Current Diagram "${diagramName}"?`;
+                confirmMessage = `You are about to delete the diagram you are currently working on.\n\n`;
+                
+                if (hasUnsavedChanges) {
+                    confirmMessage += `⚠️ WARNING: You have unsaved changes that will be lost!\n\n`;
+                }
+                
+                confirmMessage += `This action will:\n• Permanently delete the diagram from the server\n• Clear the current canvas\n• Remove all diagram content\n\nThis cannot be undone.`;
+            }
+            
+            // Show confirmation dialog with enhanced messaging
+            const confirmed = await this.uiManager.showDeleteConfirm(
+                diagramName,
+                confirmMessage
+            );
+            
+            if (!confirmed) {
+                console.log('AppController: Diagram deletion cancelled by user');
+                return;
+            }
+            
+            console.log('AppController: User confirmed deletion, proceeding...');
+            
+            // If this is the current diagram, clear the canvas BEFORE calling the service
+            // to prevent any visual artifacts during the deletion process
+            if (isCurrentDiagram) {
+                console.log('AppController: Pre-clearing canvas for current diagram deletion');
+                this.renderer.clear(); // This sets currentDiagram = undefined and re-renders
+            }
+            
+            const success = await this.diagramService.deleteDiagram(diagramId);
+            console.log('AppController: Delete operation result:', success);
+            
+            if (success) {
+                console.log('AppController: Diagram deleted successfully');
+                
+                // Canvas is already cleared if it was the current diagram
+                if (isCurrentDiagram) {
+                    console.log('AppController: Canvas was pre-cleared for current diagram');
+                }
+                
+                // Refresh the diagram list
+                await this.refreshDiagramList();
+                await this.uiManager.showSuccess(`Successfully deleted "${diagramName}"`);
+            } else {
+                console.error('AppController: Failed to delete diagram - server error or unknown tool');
+                await this.uiManager.showError(
+                    'Failed to delete diagram', 
+                    'The server does not support diagram deletion yet. This feature needs to be implemented on the backend.'
+                );
+            }
+        } finally {
+            // Clear the lock
+            delete (window as any)[deleteKey];
+        }
+    }
+
+    private async handleCreateNewDiagram(): Promise<void> {
+        try {
+            // Get existing diagram names for validation
+            const existingDiagrams = await this.diagramService.getAvailableDiagrams();
+            const existingNames = existingDiagrams.map(d => d.name);
+            
+            // Show professional diagram creation dialog
+            const result = await this.uiManager.showDiagramTypeSelector(existingNames);
+            
+            if (!result) return; // User cancelled
+            
+            const { type: selectedType, name: diagramName } = result;
+            
+            console.log('AppController: Creating new diagram:', selectedType.type, diagramName);
+            const createResult = await this.mcpService.createDiagram(selectedType.type, diagramName);
+            console.log('AppController: Create diagram result:', createResult);
+            
+            if (createResult.content && createResult.content[0] && createResult.content[0].text) {
+                // Extract the diagram ID from the response
+                const match = createResult.content[0].text.match(/ID: ([a-f0-9-]+)/);
+                if (match) {
+                    const diagramId = match[1];
+                    console.log('AppController: New diagram ID:', diagramId);
+                    
+                    // Load the newly created diagram
+                    const newDiagram = await this.diagramService.loadDiagram(diagramId);
+                    if (newDiagram) {
+                        this.renderer.setDiagram(newDiagram);
+                        console.log('AppController: Loaded new diagram successfully');
+                        
+                        // Update the toolbar to show the correct node/edge types for this diagram type
+                        console.log('AppController: Updating toolbar for diagram type:', selectedType.type);
+                        this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), selectedType.type);
+                    }
+                }
+                
                 this.uiManager.updateStatus(`Created: ${diagramName}`);
+                await this.uiManager.showSuccess(`Successfully created "${diagramName}"!`);
+                
                 // Refresh the diagram list to show the new diagram
                 await this.refreshDiagramList();
             } else {
@@ -383,7 +665,31 @@ export class AppController {
             }
         } catch (error) {
             console.error('Failed to create new diagram:', error);
-            alert(`Failed to create diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            await this.uiManager.showError(
+                'Failed to create diagram', 
+                error instanceof Error ? error.message : 'Unknown error'
+            );
         }
+    }
+    
+    public testSidebarIntegration(): void {
+        console.log('=== SIDEBAR INTEGRATION TEST ===');
+        console.log('Sidebar container:', document.querySelector('.sidebar'));
+        console.log('UIManager sidebar:', this.uiManager);
+        
+        // Test adding another WASM component
+        this.uiManager.addWasmComponentToLibrary({
+            name: 'Test Component',
+            description: 'Runtime test component',
+            interfaces: ['test'],
+            status: 'available',
+            category: 'Testing'
+        });
+        
+        console.log('Test component added');
+        
+        // Debug AI panel callback
+        console.log('AI Panel events check:', this.uiManager.getAIPanelElement());
+        console.log('Header icon manager:', this.uiManager.getHeaderIconManager());
     }
 }

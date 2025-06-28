@@ -152,6 +152,37 @@ export class ComponentUploadPanel {
                 "></div>
             </div>
 
+            <div class="validation-section" style="display: none; margin-bottom: 20px;">
+                <div class="validation-header" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                ">
+                    <span class="validation-icon">🔍</span>
+                    <span style="font-weight: 500; color: var(--text-primary, #E5E9F0);">Validation Results</span>
+                </div>
+                <div class="validation-details" style="
+                    background: var(--bg-primary, #0F1419);
+                    border: 1px solid var(--border-color, #2A3441);
+                    border-radius: 6px;
+                    padding: 12px;
+                    font-size: 13px;
+                ">
+                    <div class="security-score" style="display: none; margin-bottom: 8px;">
+                        Security Score: <span class="score-value" style="font-weight: 600;"></span>/100
+                    </div>
+                    <div class="validation-warnings" style="display: none;">
+                        <div style="color: var(--accent-warning, #F0B72F); margin-bottom: 4px;">⚠️ Warnings:</div>
+                        <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary, #A0A9BA);"></ul>
+                    </div>
+                    <div class="validation-errors" style="display: none;">
+                        <div style="color: var(--accent-error, #F85149); margin-bottom: 4px;">❌ Errors:</div>
+                        <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary, #A0A9BA);"></ul>
+                    </div>
+                </div>
+            </div>
+
             <div class="action-buttons" style="
                 display: flex;
                 gap: 10px;
@@ -229,6 +260,11 @@ export class ComponentUploadPanel {
         // Enable upload button when name is entered
         componentNameInput.addEventListener('input', () => {
             uploadBtn.disabled = !componentNameInput.value.trim();
+        });
+
+        // Bring to front on click
+        this.element.addEventListener('mousedown', () => {
+            this.bringToFront();
         });
     }
 
@@ -345,11 +381,65 @@ export class ComponentUploadPanel {
         
         errorMessage.textContent = message;
         errorSection.style.display = 'block';
+        
+        // Hide validation section when showing error
+        this.hideValidation();
     }
 
     private hideError(): void {
         const errorSection = this.element.querySelector('.error-section') as HTMLElement;
         errorSection.style.display = 'none';
+    }
+    
+    private showValidation(validation: any): void {
+        const validationSection = this.element.querySelector('.validation-section') as HTMLElement;
+        const securityScoreDiv = this.element.querySelector('.security-score') as HTMLElement;
+        const scoreValue = this.element.querySelector('.score-value') as HTMLElement;
+        const warningsDiv = this.element.querySelector('.validation-warnings') as HTMLElement;
+        const warningsList = warningsDiv.querySelector('ul') as HTMLElement;
+        const errorsDiv = this.element.querySelector('.validation-errors') as HTMLElement;
+        const errorsList = errorsDiv.querySelector('ul') as HTMLElement;
+        
+        // Show validation section
+        validationSection.style.display = 'block';
+        
+        // Show security score if available
+        if (validation.securityScan) {
+            securityScoreDiv.style.display = 'block';
+            scoreValue.textContent = validation.securityScan.score.toString();
+            
+            // Color code the score
+            if (validation.securityScan.score >= 80) {
+                scoreValue.style.color = 'var(--accent-success, #3FB950)';
+            } else if (validation.securityScan.score >= 60) {
+                scoreValue.style.color = 'var(--accent-warning, #F0B72F)';
+            } else {
+                scoreValue.style.color = 'var(--accent-error, #F85149)';
+            }
+        } else {
+            securityScoreDiv.style.display = 'none';
+        }
+        
+        // Show warnings
+        if (validation.warnings && validation.warnings.length > 0) {
+            warningsDiv.style.display = 'block';
+            warningsList.innerHTML = validation.warnings.map((w: string) => `<li>${w}</li>`).join('');
+        } else {
+            warningsDiv.style.display = 'none';
+        }
+        
+        // Show errors
+        if (validation.errors && validation.errors.length > 0) {
+            errorsDiv.style.display = 'block';
+            errorsList.innerHTML = validation.errors.map((e: string) => `<li>${e}</li>`).join('');
+        } else {
+            errorsDiv.style.display = 'none';
+        }
+    }
+    
+    private hideValidation(): void {
+        const validationSection = this.element.querySelector('.validation-section') as HTMLElement;
+        validationSection.style.display = 'none';
     }
 
     private formatFileSize(bytes: number): string {
@@ -360,7 +450,23 @@ export class ComponentUploadPanel {
 
     show(): void {
         this.element.style.display = 'block';
+        this.bringToFront();
         document.body.appendChild(this.element);
+    }
+
+    private bringToFront(): void {
+        // Find highest z-index among all floating panels
+        const panels = document.querySelectorAll('.floating-panel, .ai-assistant-panel, .wasm-component-panel, .component-upload-panel');
+        let maxZ = 1000;
+        
+        panels.forEach(panel => {
+            if (panel !== this.element) {
+                const z = parseInt((panel as HTMLElement).style.zIndex || '0');
+                if (z >= maxZ) maxZ = z;
+            }
+        });
+        
+        this.element.style.zIndex = (maxZ + 1).toString();
     }
 
     hide(): void {
@@ -380,6 +486,7 @@ export class ComponentUploadPanel {
         uploadBtn.disabled = true;
         
         this.hideError();
+        this.hideValidation();
         (this.element as any)._selectedFile = null;
     }
 

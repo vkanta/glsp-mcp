@@ -1,6 +1,7 @@
 import { DiagramState, DiagramModel } from '../model/diagram.js';
 import { McpService } from './McpService.js';
 import { diagramTypeRegistry } from '../diagrams/diagram-type-registry.js';
+import { statusManager, DiagramSyncStatus } from './StatusManager.js';
 
 export class DiagramService {
     private diagramState: DiagramState;
@@ -27,22 +28,47 @@ export class DiagramService {
     public async loadDiagram(diagramId: string): Promise<DiagramModel | undefined> {
         try {
             console.log('DiagramService: Loading diagram:', diagramId);
+            
+            // Set loading status
+            statusManager.setDiagramSyncStatus('loading');
+            
             const diagram: DiagramModel = await this.mcpService.getDiagramModel(diagramId);
             console.log('DiagramService: Got diagram from MCP service:', diagram);
             if (diagram) {
+                console.log('DiagramService: About to update diagram state and set current diagram');
                 this.diagramState.updateDiagram(diagram);
                 this.currentDiagramId = diagramId;
+                
+                // Update status manager with current diagram info
+                // The diagram object uses different property names - check for various possibilities
+                const diagramName = diagram.name || diagram.title || diagram.metadata?.name || 'Unnamed Diagram';
+                console.log('DiagramService: Setting current diagram to:', diagramId, diagramName);
+                statusManager.setCurrentDiagram(diagramId, diagramName);
+                
                 console.log(`DiagramService: Successfully loaded diagram: ${diagram.diagramType || 'unknown-type'}`);
+                
+                // Pre-load WIT data for WASM components if this is a wasm-component diagram
+                if (diagram.diagramType === 'wasm-component') {
+                    // Trigger preloading of WIT data after a short delay to allow rendering to complete
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('diagram-loaded-preload-wit'));
+                    }, 100);
+                }
+                console.log('DiagramService: Diagram load completed successfully, returning diagram');
                 return diagram;
             } else {
                 console.warn('DiagramService: getDiagramModel returned null/undefined for:', diagramId);
+                statusManager.setDiagramSyncStatus('error', 'Failed to load diagram');
             }
         } catch (error) {
             console.error('DiagramService: Failed to load diagram:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
+            
             // If the diagram doesn't exist on the server, clear our local reference
             if (this.currentDiagramId === diagramId) {
                 console.warn(`DiagramService: Diagram ${diagramId} no longer exists on server, clearing local reference`);
                 this.currentDiagramId = undefined;
+                statusManager.clearCurrentDiagram();
             }
         }
         console.log('DiagramService: Returning undefined for diagram:', diagramId);
@@ -123,21 +149,6 @@ export class DiagramService {
         }
     }
 
-    public async updateSelectedElementPositions(diagramId: string, selectedElements: any[]): Promise<void> {
-        if (!diagramId) return;
-        
-        try {
-            for (const element of selectedElements) {
-                if (element?.bounds) {
-                    await this.mcpService.updateElement(diagramId, element.id, { x: element.bounds.x, y: element.bounds.y });
-                }
-            }
-            await this.loadDiagram(diagramId);
-            console.log(`Moved ${selectedElements.length} element(s)`);
-        } catch (error) {
-            console.error('Failed to update element positions:', error);
-        }
-    }
 
     public async createNewDiagram(diagramType: string, name: string): Promise<string | undefined> {
         try {
@@ -159,10 +170,13 @@ export class DiagramService {
         if (!diagramId) return;
 
         try {
+            statusManager.setDiagramSyncStatus('saving');
             const result = await this.mcpService.exportDiagram(diagramId, 'json');
             console.log('Diagram saved:', result);
+            statusManager.setDiagramSaved(); // Use the new method for actual saves
         } catch (error) {
             console.error('Failed to save diagram:', error);
+            statusManager.setDiagramSyncStatus('error', 'Failed to save diagram');
         }
     }
 
@@ -193,10 +207,14 @@ export class DiagramService {
         if (!diagramId) return;
         
         try {
+            statusManager.setDiagramSyncStatus('saving');
             await this.mcpService.createNode(diagramId, nodeType, position, label);
             await this.loadDiagram(diagramId);
+            // Node creation IS a save operation to the server
+            statusManager.setDiagramSaved();
         } catch (error) {
             console.error('Failed to create node:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
         }
     }
 
@@ -204,10 +222,14 @@ export class DiagramService {
         if (!diagramId) return;
 
         try {
+            statusManager.setDiagramSyncStatus('saving');
             await this.mcpService.createEdge(diagramId, edgeType, sourceId, targetId, label);
             await this.loadDiagram(diagramId);
+            // Edge creation IS a save operation to the server
+            statusManager.setDiagramSaved();
         } catch (error) {
             console.error('Failed to create edge:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
         }
     }
 
@@ -226,12 +248,20 @@ export class DiagramService {
             const result = await this.mcpService.deleteDiagram(diagramId);
             console.log('DiagramService: Delete result:', result);
             
+            // Check if the deletion actually succeeded
+            if (result.is_error || (result.content && result.content.some((c: any) => c.text && c.text.includes('Unknown tool')))) {
+                console.error('DiagramService: Server returned error for delete:', result);
+                return false;
+            }
+            
             // Clear from local state if it's the current diagram
             if (this.currentDiagramId === diagramId) {
                 this.currentDiagramId = undefined;
-                // The diagram will be removed from the list when we refresh
+                statusManager.clearCurrentDiagram();
+                console.log('DiagramService: Cleared current diagram after deletion');
             }
             
+            console.log('DiagramService: Diagram deleted successfully');
             return true;
         } catch (error) {
             console.error('Failed to delete diagram:', error);
@@ -241,5 +271,79 @@ export class DiagramService {
 
     public getAvailableDiagramTypes(): any[] {
         return diagramTypeRegistry.getAvailableTypes();
+    }
+
+    // Dirty state tracking methods
+    public markDiagramDirty(): void {
+        statusManager.setDiagramDirty(true);
+        console.log('DiagramService: Marked diagram as dirty (unsaved changes)');
+    }
+
+    public markDiagramClean(): void {
+        statusManager.setDiagramDirty(false);
+        console.log('DiagramService: Marked diagram as clean (saved)');
+    }
+
+    public hasUnsavedChanges(): boolean {
+        return statusManager.hasUnsavedChanges();
+    }
+
+    // Method to be called when diagram operations complete successfully
+    public onDiagramOperationSuccess(operationType: string): void {
+        console.log(`DiagramService: ${operationType} operation completed successfully`);
+        // Operations like move, create, etc. change the diagram but don't save it
+        // Mark as having unsaved changes instead of claiming it's "saved"
+        statusManager.setDiagramDirty(true);
+        statusManager.setDiagramSyncStatus('unsaved');
+    }
+
+    // Method to be called when diagram operations start
+    public onDiagramOperationStart(operationType: string): void {
+        console.log(`DiagramService: ${operationType} operation started`);
+        // Don't claim we're "saving" when we're just doing operations
+        statusManager.setDiagramSyncStatus('loading');
+    }
+
+    // Method to be called when diagram operations fail
+    public onDiagramOperationError(operationType: string, error: string): void {
+        console.error(`DiagramService: ${operationType} operation failed:`, error);
+        statusManager.setDiagramSyncStatus('error', error);
+    }
+
+    // Check if current diagram is deletable (has warning implications)
+    public isCurrentDiagramDeletable(diagramId: string): boolean {
+        return this.currentDiagramId === diagramId;
+    }
+
+    // Get the MCP client for making direct tool calls
+    public getMcpClient(): any {
+        return this.mcpService.getClient();
+    }
+
+    // Update positions of selected elements and save to server
+    public async updateSelectedElementPositions(diagramId: string, selectedElements: any[]): Promise<void> {
+        try {
+            console.log('DiagramService: Updating positions for selected elements:', selectedElements.length);
+            statusManager.setDiagramSyncStatus('saving');
+
+            // Update each element's position on the server
+            for (const element of selectedElements) {
+                if (element.bounds && element.id) {
+                    await this.mcpService.updateElement(diagramId, element.id, {
+                        x: element.bounds.x,
+                        y: element.bounds.y
+                    });
+                    console.log(`DiagramService: Updated position for element ${element.id} to (${element.bounds.x}, ${element.bounds.y})`);
+                }
+            }
+
+            // Mark diagram as saved after all updates complete
+            statusManager.setDiagramSaved();
+            console.log('DiagramService: All element positions updated and saved to server');
+        } catch (error) {
+            console.error('DiagramService: Failed to update element positions:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
+            throw error;
+        }
     }
 }

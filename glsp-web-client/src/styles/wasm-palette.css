@@ -469,7 +469,7 @@
     font-size: 13px;
     box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.4));
     animation: slideUp 0.3s ease;
-    z-index: 1001;
+    z-index: 1500;
 }
 
 @keyframes slideUp {

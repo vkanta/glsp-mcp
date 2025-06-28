@@ -154,6 +154,24 @@ export class CanvasRenderer {
             }
         }
 
+        // Check edges if no node was found
+        for (const element of Object.values(this.currentDiagram.elements)) {
+            const elementType = element.type || element.element_type || '';
+            
+            // Check for various edge types
+            const isEdge = elementType.includes('edge') || 
+                          elementType === 'flow' || 
+                          elementType === 'association' || 
+                          elementType === 'dependency' ||
+                          elementType === 'sequence-flow' ||
+                          elementType === 'message-flow' ||
+                          elementType === 'conditional-flow';
+            
+            if (isEdge && this.isPointOnEdge(position, element)) {
+                return element;
+            }
+        }
+
         return undefined;
     }
 
@@ -162,6 +180,95 @@ export class CanvasRenderer {
                point.x <= bounds.x + bounds.width &&
                point.y >= bounds.y && 
                point.y <= bounds.y + bounds.height;
+    }
+
+    private isPointOnEdge(point: Position, edge: any): boolean {
+        const tolerance = 8; // Pixels tolerance for edge selection (scaled)
+        const scaledTolerance = tolerance / this.options.scale;
+        
+        // Get source and target elements
+        const sourceId = edge.sourceId || edge.properties?.sourceId;
+        const targetId = edge.targetId || edge.properties?.targetId;
+        
+        if (!sourceId || !targetId) return false;
+        
+        const sourceElement = this.currentDiagram?.elements[sourceId];
+        const targetElement = this.currentDiagram?.elements[targetId];
+        
+        if (!sourceElement?.bounds || !targetElement?.bounds) return false;
+        
+        // Calculate source and target centers
+        const sourceCenter = {
+            x: sourceElement.bounds.x + sourceElement.bounds.width / 2,
+            y: sourceElement.bounds.y + sourceElement.bounds.height / 2
+        };
+        
+        const targetCenter = {
+            x: targetElement.bounds.x + targetElement.bounds.width / 2,
+            y: targetElement.bounds.y + targetElement.bounds.height / 2
+        };
+        
+        // Create line segments to check
+        const segments: Array<{start: Position, end: Position}> = [];
+        
+        if (edge.routingPoints && edge.routingPoints.length > 0) {
+            // Edge has routing points
+            let prevPoint = sourceCenter;
+            
+            for (const routingPoint of edge.routingPoints) {
+                segments.push({ start: prevPoint, end: routingPoint });
+                prevPoint = routingPoint;
+            }
+            
+            // Final segment to target
+            segments.push({ start: prevPoint, end: targetCenter });
+        } else {
+            // Direct line from source to target
+            segments.push({ start: sourceCenter, end: targetCenter });
+        }
+        
+        // Check if point is close to any segment
+        for (const segment of segments) {
+            if (this.distanceToLineSegment(point, segment.start, segment.end) <= scaledTolerance) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    private distanceToLineSegment(point: Position, lineStart: Position, lineEnd: Position): number {
+        const A = point.x - lineStart.x;
+        const B = point.y - lineStart.y;
+        const C = lineEnd.x - lineStart.x;
+        const D = lineEnd.y - lineStart.y;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        if (lenSq === 0) {
+            // Line start and end are the same point
+            return Math.sqrt(A * A + B * B);
+        }
+        
+        let param = dot / lenSq;
+
+        let xx, yy;
+
+        if (param < 0) {
+            xx = lineStart.x;
+            yy = lineStart.y;
+        } else if (param > 1) {
+            xx = lineEnd.x;
+            yy = lineEnd.y;
+        } else {
+            xx = lineStart.x + param * C;
+            yy = lineStart.y + param * D;
+        }
+
+        const dx = point.x - xx;
+        const dy = point.y - yy;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     private handleClick(event: MouseEvent): void {
@@ -434,6 +541,12 @@ export class CanvasRenderer {
         this.render();
     }
 
+    clear(): void {
+        this.currentDiagram = undefined;
+        this.selectionManager.clearSelection();
+        this.render();
+    }
+
     setSelected(elementIds: string[]): void {
         this.selectionManager.selectMultiple(elementIds, false);
     }
@@ -508,13 +621,18 @@ export class CanvasRenderer {
     }
 
     render(): void {
-        if (!this.currentDiagram) return;
-
         this.ctx.save();
         
         // Clear canvas
         this.ctx.fillStyle = this.options.backgroundColor;
         this.ctx.fillRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+
+        // If no diagram, show empty state
+        if (!this.currentDiagram) {
+            this.drawEmptyState();
+            this.ctx.restore();
+            return;
+        }
 
         // Apply transformations
         this.ctx.translate(this.options.offset.x, this.options.offset.y);
@@ -698,15 +816,21 @@ export class CanvasRenderer {
         if (this.isWasmComponentType(nodeType)) {
             const colors = WasmComponentRendererV2.getDefaultColors();
             
-            // Check if component file is missing
+            // Check if component file is missing or not loaded
             const isMissing = this.isComponentMissingFile(node);
+            const isLoaded = node.properties?.isLoaded === true;
+            
+            // Update node properties to include load status
+            if (!node.properties) {
+                node.properties = {};
+            }
             
             const context = {
                 ctx: this.ctx,
                 scale: this.options.scale,
                 isSelected,
                 isHovered,
-                isMissing,
+                isMissing: isMissing, // Only show as missing if file is actually missing
                 colors
             };
 
@@ -772,7 +896,6 @@ export class CanvasRenderer {
             
             if (!isEdge) return;
             
-            console.log('Drawing edge:', element);
             this.drawEdge(element as Edge);
         });
     }
@@ -796,7 +919,7 @@ export class CanvasRenderer {
         const isHovered = this.selectionManager.isHovered(edge.id);
 
         this.ctx.strokeStyle = isSelected || isHovered ? this.options.selectedColor : this.options.edgeColor;
-        this.ctx.lineWidth = isSelected ? 2 : 1;
+        this.ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1);
 
         // Calculate connection points
         const sourceCenter = {
@@ -1165,5 +1288,31 @@ export class CanvasRenderer {
             document.body.removeChild(this.interfaceTooltip);
             this.interfaceTooltip = undefined;
         }
+    }
+
+    private drawEmptyState(): void {
+        const centerX = this.canvas.clientWidth / 2;
+        const centerY = this.canvas.clientHeight / 2;
+        
+        this.ctx.save();
+        
+        // Draw message
+        this.ctx.font = '18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.fillStyle = this.options.textColor;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        this.ctx.fillText('No diagram loaded', centerX, centerY - 20);
+        
+        this.ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.fillStyle = this.options.textColor + '80'; // Add transparency
+        this.ctx.fillText('Select or create a diagram to get started', centerX, centerY + 10);
+        
+        // Draw decorative icon
+        this.ctx.font = '48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.fillStyle = this.options.textColor + '40'; // More transparent
+        this.ctx.fillText('📊', centerX, centerY - 80);
+        
+        this.ctx.restore();
     }
 }

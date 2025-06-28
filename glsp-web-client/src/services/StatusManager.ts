@@ -3,6 +3,17 @@
  * Manages connection status across all UI components
  */
 
+export type DiagramSyncStatus = 'synced' | 'saving' | 'unsaved' | 'error' | 'loading' | 'none';
+
+export interface DiagramStatus {
+    currentDiagramId?: string;
+    currentDiagramName?: string;
+    syncStatus: DiagramSyncStatus;
+    lastSaved?: Date;
+    hasUnsavedChanges: boolean;
+    errorMessage?: string;
+}
+
 export interface ConnectionStatus {
     mcp: boolean;
     ai: boolean;
@@ -10,14 +21,24 @@ export interface ConnectionStatus {
     lastUpdated: Date;
 }
 
-export type StatusListener = (status: ConnectionStatus) => void;
+export interface CombinedStatus {
+    connection: ConnectionStatus;
+    diagram: DiagramStatus;
+}
+
+export type StatusListener = (status: CombinedStatus) => void;
 
 export class StatusManager {
-    private status: ConnectionStatus = {
+    private connectionStatus: ConnectionStatus = {
         mcp: false,
         ai: false,
         message: 'Initializing...',
         lastUpdated: new Date()
+    };
+
+    private diagramStatus: DiagramStatus = {
+        syncStatus: 'none',
+        hasUnsavedChanges: false
     };
     
     private listeners: StatusListener[] = [];
@@ -25,7 +46,7 @@ export class StatusManager {
     addListener(listener: StatusListener): void {
         this.listeners.push(listener);
         // Immediately call with current status
-        listener(this.status);
+        listener(this.getCombinedStatus());
     }
 
     removeListener(listener: StatusListener): void {
@@ -36,50 +57,134 @@ export class StatusManager {
     }
 
     private notifyListeners(): void {
-        this.status.lastUpdated = new Date();
-        this.listeners.forEach(listener => listener(this.status));
+        this.connectionStatus.lastUpdated = new Date();
+        this.listeners.forEach(listener => listener(this.getCombinedStatus()));
     }
+
 
     setMcpStatus(connected: boolean): void {
         console.log('StatusManager: Setting MCP status to:', connected);
-        this.status.mcp = connected;
+        this.connectionStatus.mcp = connected;
         this.updateMessage();
         this.notifyListeners();
     }
 
     setAiStatus(connected: boolean): void {
         console.log('StatusManager: Setting AI status to:', connected);
-        this.status.ai = connected;
+        this.connectionStatus.ai = connected;
         this.updateMessage();
         this.notifyListeners();
     }
 
     private updateMessage(): void {
-        if (this.status.mcp && this.status.ai) {
-            this.status.message = 'All services connected';
-        } else if (this.status.mcp) {
-            this.status.message = 'MCP connected, AI offline';
-        } else if (this.status.ai) {
-            this.status.message = 'AI connected, MCP offline';
+        if (this.connectionStatus.mcp && this.connectionStatus.ai) {
+            this.connectionStatus.message = 'All services connected';
+        } else if (this.connectionStatus.mcp) {
+            this.connectionStatus.message = 'MCP connected, AI offline';
+        } else if (this.connectionStatus.ai) {
+            this.connectionStatus.message = 'AI connected, MCP offline';
         } else {
-            this.status.message = 'Connecting to services...';
+            this.connectionStatus.message = 'Connecting to services...';
         }
     }
 
+    // Diagram status methods
+    setCurrentDiagram(diagramId?: string, diagramName?: string, lastSaved?: Date): void {
+        console.log('StatusManager: Setting current diagram:', diagramName, diagramId);
+        this.diagramStatus.currentDiagramId = diagramId;
+        this.diagramStatus.currentDiagramName = diagramName;
+        this.diagramStatus.syncStatus = diagramId ? 'synced' : 'none';
+        this.diagramStatus.hasUnsavedChanges = false;
+        this.diagramStatus.errorMessage = undefined;
+        // Only set lastSaved if explicitly provided (from actual save operation)
+        if (lastSaved) {
+            this.diagramStatus.lastSaved = lastSaved;
+        }
+        this.notifyListeners();
+    }
+
+    setDiagramSyncStatus(status: DiagramSyncStatus, errorMessage?: string): void {
+        console.log('StatusManager: Setting diagram sync status to:', status);
+        this.diagramStatus.syncStatus = status;
+        this.diagramStatus.errorMessage = errorMessage;
+        // Don't automatically update lastSaved - use setDiagramSaved() for actual saves
+        this.notifyListeners();
+    }
+
+    setDiagramSaved(): void {
+        console.log('StatusManager: Diagram successfully saved to server');
+        this.diagramStatus.syncStatus = 'synced';
+        this.diagramStatus.hasUnsavedChanges = false;
+        this.diagramStatus.lastSaved = new Date();
+        this.diagramStatus.errorMessage = undefined;
+        this.notifyListeners();
+    }
+
+    setDiagramDirty(isDirty: boolean): void {
+        if (this.diagramStatus.hasUnsavedChanges !== isDirty) {
+            console.log('StatusManager: Setting diagram dirty state to:', isDirty);
+            this.diagramStatus.hasUnsavedChanges = isDirty;
+            if (isDirty && this.diagramStatus.syncStatus === 'synced') {
+                this.diagramStatus.syncStatus = 'unsaved';
+            }
+            this.notifyListeners();
+        }
+    }
+
+    clearCurrentDiagram(): void {
+        console.log('StatusManager: Clearing current diagram');
+        console.trace('StatusManager: clearCurrentDiagram called from:');
+        this.diagramStatus.currentDiagramId = undefined;
+        this.diagramStatus.currentDiagramName = undefined;
+        this.diagramStatus.syncStatus = 'none';
+        this.diagramStatus.hasUnsavedChanges = false;
+        this.diagramStatus.lastSaved = undefined;
+        this.diagramStatus.errorMessage = undefined;
+        this.notifyListeners();
+    }
+
+    // Legacy methods for backward compatibility
     getStatus(): ConnectionStatus {
-        return { ...this.status };
+        return { ...this.connectionStatus };
+    }
+
+    getCombinedStatus(): CombinedStatus {
+        return {
+            connection: { ...this.connectionStatus },
+            diagram: { ...this.diagramStatus }
+        };
+    }
+
+    getDiagramStatus(): DiagramStatus {
+        return { ...this.diagramStatus };
     }
 
     isFullyConnected(): boolean {
-        return this.status.mcp && this.status.ai;
+        return this.connectionStatus.mcp && this.connectionStatus.ai;
     }
 
     isMcpConnected(): boolean {
-        return this.status.mcp;
+        return this.connectionStatus.mcp;
     }
 
     isAiConnected(): boolean {
-        return this.status.ai;
+        return this.connectionStatus.ai;
+    }
+
+    getCurrentDiagramId(): string | undefined {
+        return this.diagramStatus.currentDiagramId;
+    }
+
+    getCurrentDiagramName(): string | undefined {
+        return this.diagramStatus.currentDiagramName;
+    }
+
+    hasCurrentDiagram(): boolean {
+        return !!this.diagramStatus.currentDiagramId;
+    }
+
+    hasUnsavedChanges(): boolean {
+        return this.diagramStatus.hasUnsavedChanges;
     }
 }
 

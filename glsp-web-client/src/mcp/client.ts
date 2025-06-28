@@ -113,6 +113,7 @@ export class McpClient {
     private maxReconnectAttempts: number = 5;
     private connectionListeners: ((connected: boolean) => void)[] = [];
     private sessionId: string | null = null;
+    private notificationListeners: Map<string, ((notification: any) => void)[]> = new Map();
 
     constructor(baseUrl: string = 'http://127.0.0.1:3000') {
         this.baseUrl = baseUrl;
@@ -317,7 +318,17 @@ export class McpClient {
     }
 
     async ping(): Promise<any> {
-        return await this.sendRequest('ping', {});
+        // Try ping first, fall back to a simpler method if ping isn't supported
+        try {
+            return await this.sendRequest('ping', {});
+        } catch (error: any) {
+            // If ping method is not supported, try listing tools as a health check
+            if (error.message && error.message.includes('Unknown method')) {
+                console.log('MCP server does not support ping method, using listTools as health check');
+                return await this.listTools();
+            }
+            throw error;
+        }
     }
 
     async initialize(): Promise<any> {
@@ -342,6 +353,10 @@ export class McpClient {
             
             // Send initialized notification (as a notification, not a request)
             await this.sendNotification('initialized', {});
+            
+            // Explicitly set connection to true after successful initialization
+            console.log('MCP client successfully initialized and connected');
+            this.notifyConnectionChange(true);
             
             // Start pinging to maintain connection
             this.startPing();
@@ -393,5 +408,36 @@ export class McpClient {
     async healthCheck(): Promise<any> {
         // Use ping instead of separate health endpoint
         return await this.ping();
+    }
+    
+    public addNotificationListener(method: string, listener: (notification: any) => void): void {
+        if (!this.notificationListeners.has(method)) {
+            this.notificationListeners.set(method, []);
+        }
+        this.notificationListeners.get(method)!.push(listener);
+    }
+    
+    public removeNotificationListener(method: string, listener: (notification: any) => void): void {
+        const listeners = this.notificationListeners.get(method);
+        if (listeners) {
+            const index = listeners.indexOf(listener);
+            if (index > -1) {
+                listeners.splice(index, 1);
+            }
+        }
+    }
+    
+    private handleNotification(notification: any): void {
+        console.log('Received MCP notification:', notification);
+        const listeners = this.notificationListeners.get(notification.method);
+        if (listeners) {
+            listeners.forEach(listener => {
+                try {
+                    listener(notification);
+                } catch (error) {
+                    console.error('Error in notification listener:', error);
+                }
+            });
+        }
     }
 }

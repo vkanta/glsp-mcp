@@ -4,6 +4,12 @@ use std::collections::HashMap;
 
 pub struct DiagramPrompts;
 
+impl Default for DiagramPrompts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiagramPrompts {
     pub fn new() -> Self {
         Self
@@ -130,10 +136,10 @@ impl DiagramPrompts {
         let prompt_text = format!(
             r#"You are an expert diagram designer. Create a workflow diagram based on this description:
 
-"{}"
+"{description}"
 
 Instructions:
-1. First, create a new diagram using the 'create_diagram' tool with type '{}'
+1. First, create a new diagram using the 'create_diagram' tool with type '{style}'
 2. Analyze the description to identify the main steps, decision points, and flow
 3. Use 'create_node' to add nodes for each step:
    - Start/End events
@@ -160,8 +166,7 @@ Remember to:
 - Keep the flow logical and easy to follow
 - Use clear, descriptive labels
 - Position elements for good readability
-- Include all necessary decision points"#,
-            description, style
+- Include all necessary decision points"#
         );
 
         Ok(GetPromptResult {
@@ -182,10 +187,10 @@ Remember to:
         let criteria = args.get("criteria").cloned().unwrap_or_else(|| "readability".to_string());
 
         let prompt_text = format!(
-            r#"You are a diagram layout expert. Optimize the layout of diagram '{}' focusing on {}.
+            r#"You are a diagram layout expert. Optimize the layout of diagram '{diagram_id}' focusing on {criteria}.
 
 Instructions:
-1. First, examine the current diagram state using the resource 'diagram://model/{}'
+1. First, examine the current diagram state using the resource 'diagram://model/{diagram_id}'
 2. Analyze the current element positions and relationships
 3. Apply the most appropriate layout algorithm:
    - For hierarchical flows: use 'hierarchical' layout
@@ -210,8 +215,7 @@ For 'flow':
 - Ensure logical progression is visually clear
 - Minimize backtracking in the flow
 
-Use the 'apply_layout' tool with the appropriate algorithm, then make manual adjustments as needed."#,
-            diagram_id, criteria, diagram_id
+Use the 'apply_layout' tool with the appropriate algorithm, then make manual adjustments as needed."#
         );
 
         Ok(GetPromptResult {
@@ -232,10 +236,10 @@ Use the 'apply_layout' tool with the appropriate algorithm, then make manual adj
         let error_types = args.get("error_types").cloned().unwrap_or_else(|| "validation,system".to_string());
 
         let prompt_text = format!(
-            r#"You are a workflow design expert specializing in error handling and resilience patterns. Add comprehensive error handling to diagram '{}' for these error types: {}.
+            r#"You are a workflow design expert specializing in error handling and resilience patterns. Add comprehensive error handling to diagram '{diagram_id}' for these error types: {error_types}.
 
 Instructions:
-1. First, examine the current diagram using 'diagram://model/{}'
+1. First, examine the current diagram using 'diagram://model/{diagram_id}'
 2. Identify all task nodes that could potentially fail
 3. For each error type, add appropriate error handling:
 
@@ -271,8 +275,7 @@ Use these node types:
 - 'compensation-task' for rollbacks
 - 'timer-event' for delays/timeouts
 
-Remember to maintain the original workflow logic while making it more robust."#,
-            diagram_id, error_types, diagram_id
+Remember to maintain the original workflow logic while making it more robust."#
         );
 
         Ok(GetPromptResult {
@@ -293,12 +296,12 @@ Remember to maintain the original workflow logic while making it more robust."#,
         let focus = args.get("focus").cloned().unwrap_or_else(|| "general".to_string());
 
         let prompt_text = format!(
-            r#"You are a diagram analysis expert. Perform a comprehensive analysis of diagram '{}' with focus on {}.
+            r#"You are a diagram analysis expert. Perform a comprehensive analysis of diagram '{diagram_id}' with focus on {focus}.
 
 Instructions:
-1. Examine the diagram structure using 'diagram://model/{}'
-2. Review validation results using 'diagram://validation/{}'
-3. Check element metadata using 'diagram://metadata/{}'
+1. Examine the diagram structure using 'diagram://model/{diagram_id}'
+2. Review validation results using 'diagram://validation/{diagram_id}'
+3. Check element metadata using 'diagram://metadata/{diagram_id}'
 4. Analyze the diagram based on the focus area:
 
 General Analysis:
@@ -336,8 +339,7 @@ Analysis Output:
 4. Best Practices: Suggestions for alignment with industry standards
 5. Risk Assessment: Potential risks and mitigation strategies
 
-Format your analysis clearly with specific element IDs and actionable recommendations."#,
-            diagram_id, focus, diagram_id, diagram_id, diagram_id
+Format your analysis clearly with specific element IDs and actionable recommendations."#
         );
 
         Ok(GetPromptResult {
@@ -358,9 +360,9 @@ Format your analysis clearly with specific element IDs and actionable recommenda
         let detail_level = args.get("detail_level").cloned().unwrap_or_else(|| "medium".to_string());
 
         let prompt_text = format!(
-            r#"You are a process decomposition expert. Break down this complex task into a detailed subprocess: "{}"
+            r#"You are a process decomposition expert. Break down this complex task into a detailed subprocess: "{task_description}"
 
-Detail Level: {}
+Detail Level: {detail_level}
 
 Instructions:
 1. Create a new diagram using 'create_diagram' with type 'subprocess'
@@ -406,8 +408,7 @@ Remember to:
 - Keep the subprocess focused and cohesive
 - Ensure all paths lead to a proper conclusion
 - Include appropriate checkpoints and validations
-- Design for reusability where possible"#,
-            task_description, detail_level
+- Design for reusability where possible"#
         );
 
         Ok(GetPromptResult {
@@ -428,12 +429,12 @@ Remember to:
         let target_type = args.get("target_type").cloned().unwrap_or_default();
 
         let prompt_text = format!(
-            r#"You are a diagram conversion expert. Convert diagram '{}' to {} format while preserving the essential meaning and flow.
+            r#"You are a diagram conversion expert. Convert diagram '{diagram_id}' to {target_type} format while preserving the essential meaning and flow.
 
 Instructions:
-1. Examine the source diagram using 'diagram://model/{}'
+1. Examine the source diagram using 'diagram://model/{diagram_id}'
 2. Understand the current structure and semantics
-3. Create a new diagram with type '{}'
+3. Create a new diagram with type '{target_type}'
 4. Map elements according to the target format conventions:
 
 BPMN Conversion:
@@ -468,8 +469,7 @@ Conversion Guidelines:
 After conversion:
 - Apply appropriate layout using 'apply_layout'
 - Validate the result for completeness
-- Provide a summary of the conversion changes"#,
-            diagram_id, target_type, diagram_id, target_type
+- Provide a summary of the conversion changes"#
         );
 
         Ok(GetPromptResult {

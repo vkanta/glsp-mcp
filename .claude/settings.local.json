@@ -26,7 +26,11 @@
       "Bash(open http://localhost:5174/)",
       "Bash(npm run:*)",
       "WebFetch(domain:bytecodealliance.github.io)",
-      "WebFetch(domain:component-model.bytecodealliance.org)"
+      "WebFetch(domain:component-model.bytecodealliance.org)",
+      "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

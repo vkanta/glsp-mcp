@@ -130,6 +130,31 @@
                 opacity: 1;
             }
         }
+        
+        /* Header icons animations */
+        @keyframes slideInFromTop {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+                scale: 0.8;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+                scale: 1;
+            }
+        }
+        
+        @keyframes zoomIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
 
         @keyframes slideOutToRight {
             from {
@@ -217,6 +242,16 @@
             animation: pulse 1.5s infinite;
         }
 
+        /* Box sizing for floating panels */
+        .floating-panel,
+        .floating-panel *,
+        .ai-assistant-panel,
+        .ai-assistant-panel *,
+        .wasm-component-panel,
+        .wasm-component-panel * {
+            box-sizing: border-box;
+        }
+
         /* Enhanced Scrollbars */
         .component-upload-panel *::-webkit-scrollbar {
             width: 6px;
@@ -247,26 +282,57 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             height: 100vh;
-            display: grid;
-            grid-template-areas: 
-                "header header"
-                "sidebar canvas"
-                "sidebar status";
-            grid-template-rows: 56px 1fr auto;
-            grid-template-columns: 350px 1fr;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
         }
 
+        .main-container {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+
         .header {
-            grid-area: header;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 20px;
+            height: 56px;
             z-index: 1000;
+            flex-shrink: 0;
         }
+
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .canvas-and-status {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .glsp-status {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
 
         .brand {
             display: flex;
@@ -309,16 +375,287 @@
             font-size: 13px;
         }
 
+        /* Theme Control Slider */
+        .theme-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            transition: all 0.3s ease;
+        }
+
+        .theme-control:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-bright);
+        }
+
+        .theme-icon {
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .theme-slider {
+            width: 140px;
+            height: 8px;
+            background: linear-gradient(to right, 
+                #FFF8E7 0%,    /* Cream */
+                #FFD700 14%,   /* Gold */
+                #FF6B6B 28%,   /* Coral */
+                #4ECDC4 42%,   /* Teal */
+                #45B7D1 56%,   /* Sky Blue */
+                #6C5CE7 70%,   /* Purple */
+                #2C3E50 84%,   /* Dark Blue */
+                #0A0E1A 100%   /* Deep Dark */
+            );
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .theme-slider:hover {
+            transform: scaleY(1.2);
+            box-shadow: 0 2px 8px rgba(101, 79, 240, 0.3);
+        }
+
+        .theme-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid var(--accent-wasm);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .theme-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 3px 12px rgba(101, 79, 240, 0.5);
+        }
+
+        .theme-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid var(--accent-wasm);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .theme-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        /* Theme-specific styles for smooth transitions */
+        * {
+            transition: background-color 0.4s ease, 
+                       color 0.4s ease, 
+                       border-color 0.4s ease,
+                       box-shadow 0.4s ease;
+        }
+
+        /* Theme variants */
+        [data-theme="cream"] {
+            --bg-primary: #FFF8E7;
+            --bg-secondary: #F5F0D8;
+            --bg-tertiary: #EDE4C3;
+            --bg-canvas: #FFFFFF;
+            --text-primary: #2C3E50;
+            --text-secondary: #5D6D7E;
+            --text-dim: #85929E;
+            --border: #D5DBDB;
+            --border-bright: #BDC3C7;
+            --accent-wasm: #E67E22;
+        }
+
+        [data-theme="sunset"] {
+            --bg-primary: #FFE5B4;
+            --bg-secondary: #FFD1A3;
+            --bg-tertiary: #FFBD85;
+            --bg-canvas: #FFF2E6;
+            --text-primary: #8B4513;
+            --text-secondary: #A0522D;
+            --text-dim: #CD853F;
+            --border: #DEB887;
+            --border-bright: #D2B48C;
+            --accent-wasm: #FF6347;
+        }
+
+        [data-theme="coral"] {
+            --bg-primary: #FFE5E5;
+            --bg-secondary: #FFD1D1;
+            --bg-tertiary: #FFBDBD;
+            --bg-canvas: #FFF0F0;
+            --text-primary: #8B0000;
+            --text-secondary: #A52A2A;
+            --text-dim: #CD5C5C;
+            --border: #F0A0A0;
+            --border-bright: #E87A7A;
+            --accent-wasm: #FF6B6B;
+        }
+
+        [data-theme="ocean"] {
+            --bg-primary: #E0F7FA;
+            --bg-secondary: #B2EBF2;
+            --bg-tertiary: #80DEEA;
+            --bg-canvas: #F0FDFF;
+            --text-primary: #004D40;
+            --text-secondary: #00695C;
+            --text-dim: #00796B;
+            --border: #4DD0E1;
+            --border-bright: #26C6DA;
+            --accent-wasm: #4ECDC4;
+        }
+
+        [data-theme="sky"] {
+            --bg-primary: #E3F2FD;
+            --bg-secondary: #BBDEFB;
+            --bg-tertiary: #90CAF9;
+            --bg-canvas: #F8FDFF;
+            --text-primary: #0D47A1;
+            --text-secondary: #1565C0;
+            --text-dim: #1976D2;
+            --border: #64B5F6;
+            --border-bright: #42A5F5;
+            --accent-wasm: #45B7D1;
+        }
+
+        [data-theme="purple"] {
+            --bg-primary: #F3E5F5;
+            --bg-secondary: #E1BEE7;
+            --bg-tertiary: #CE93D8;
+            --bg-canvas: #FCF4FF;
+            --text-primary: #4A148C;
+            --text-secondary: #6A1B9A;
+            --text-dim: #7B1FA2;
+            --border: #BA68C8;
+            --border-bright: #AB47BC;
+            --accent-wasm: #6C5CE7;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0A0E1A;
+            --bg-secondary: #151B2C;
+            --bg-tertiary: #1C2333;
+            --bg-canvas: #0D1117;
+            --text-primary: #E6EDF3;
+            --text-secondary: #7D8590;
+            --text-dim: #484F58;
+            --border: #30363D;
+            --border-bright: #3D444D;
+            --accent-wasm: #654FF0;
+        }
+
         .sidebar {
             grid-area: sidebar;
             background: var(--bg-secondary);
             border-right: 1px solid var(--border);
             overflow-y: auto;
             box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
+        }
+
+        /* Collapsed sidebar styles */
+        .modern-sidebar.collapsed {
+            overflow: visible;
+        }
+
+        .modern-sidebar.collapsed .sidebar-header {
+            padding: 12px 8px !important;
+            justify-content: center !important;
+            display: flex !important;
+            align-items: center !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        .modern-sidebar.collapsed .sidebar-collapse-btn {
+            margin: 0 !important;
+            z-index: 10;
+            position: relative;
+            background: var(--bg-tertiary) !important;
+            border-radius: 6px !important;
+            padding: 10px !important;
+            width: 34px !important;
+            height: 34px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        .modern-sidebar.collapsed .sidebar-collapse-btn:hover {
+            background: var(--accent-wasm) !important;
+            color: white !important;
+        }
+
+        /* Hover effect for collapsed sidebar */
+        .sidebar-collapsed .sidebar:hover {
+            box-shadow: var(--shadow-lg);
+            border-right-color: var(--accent-wasm);
+        }
+
+        /* Add a subtle glow when collapsed */
+        .modern-sidebar.collapsed {
+            border-right: 2px solid var(--border-bright);
+            position: relative;
+        }
+
+        .modern-sidebar.collapsed::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -1px;
+            width: 1px;
+            height: 100%;
+            background: linear-gradient(180deg, 
+                transparent 0%, 
+                var(--accent-wasm) 50%, 
+                transparent 100%);
+            opacity: 0.3;
+        }
+
+        /* Add floating tooltip for collapsed sidebar */
+        .sidebar-collapsed .modern-sidebar .sidebar-collapse-btn {
+            position: relative;
+        }
+
+        .sidebar-collapsed .modern-sidebar .sidebar-collapse-btn:hover::after {
+            content: 'Expand';
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            margin-left: 8px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
         }
 
         .canvas-container {
-            grid-area: canvas;
             background: var(--bg-canvas);
             position: relative;
             overflow: hidden;
@@ -326,6 +663,8 @@
             border-radius: var(--radius-md);
             margin: 8px;
             box-shadow: var(--shadow-lg);
+            flex: 1;
+            min-height: 0;
         }
 
         /* WASM palette is now a floating panel - see wasm-palette.css */
@@ -464,17 +803,6 @@
             box-shadow: var(--shadow-sm);
         }
 
-        .glsp-status {
-            grid-area: status;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-            padding: 0.75rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
 
         /* Professional loading spinner with timeout indicator */
         .loading {
@@ -1274,17 +1602,16 @@
         }
 
         @media (max-width: 768px) {
-            body {
-                grid-template-areas: 
-                    "header"
-                    "canvas"
-                    "status";
-                grid-template-columns: 1fr;
-                grid-template-rows: auto 1fr auto;
+            .main-container {
+                flex-direction: column;
             }
 
             .sidebar {
                 display: none;
+            }
+            
+            .canvas-and-status {
+                flex: 1;
             }
 
             .ai-assistant {
@@ -1304,6 +1631,11 @@
             <div class="brand-name">WASM Component Designer</div>
         </div>
         <div class="header-actions">
+            <div class="theme-control">
+                <div class="theme-icon">☀️</div>
+                <input type="range" class="theme-slider" id="theme-slider" min="0" max="6" value="6" step="1">
+                <div class="theme-icon">🌙</div>
+            </div>
             <div class="status-chip">
                 <div class="status-indicator" id="connection-indicator"></div>
                 <span>MCP Connected</span>
@@ -1311,27 +1643,30 @@
         </div>
     </div>
 
-    <div class="sidebar">
-        <div id="toolbar-container"></div>
-        <div id="diagram-list-container"></div>
-        
-        <div class="shortcuts">
-            <h4>Quick Help</h4>
-            <div style="padding: 12px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
-                Press <kbd style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; color: var(--text-primary); font-family: var(--font-mono);">H</kbd> to view all keyboard shortcuts
+    <div class="main-container">
+        <div class="sidebar">
+            <div id="toolbar-container"></div>
+            <div id="diagram-list-container"></div>
+            
+            <div class="shortcuts">
+                <h4>Quick Help</h4>
+                <div style="padding: 12px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
+                    Press <kbd style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; color: var(--text-primary); font-family: var(--font-mono);">H</kbd> to view all keyboard shortcuts
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="canvas-container">
-        <canvas id="diagram-canvas"></canvas>
-    </div>
+        <div class="canvas-and-status">
+            <div class="canvas-container">
+                <canvas id="diagram-canvas"></canvas>
+            </div>
 
-
-    <div id="status-container" class="glsp-status">
-        <div class="connection-status">
-            <div class="status-indicator" id="connection-indicator-status"></div>
-            <span>Connected to MCP Server</span>
+            <div id="status-container" class="glsp-status">
+                <div class="connection-status">
+                    <div class="status-indicator" id="connection-indicator-status"></div>
+                    <span>Connected to MCP Server</span>
+                </div>
+            </div>
         </div>
     </div>
 

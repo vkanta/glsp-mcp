@@ -117,6 +117,30 @@ export class SelectionManager {
         return Array.from(this.state.selectedElements);
     }
 
+    getSelectedElements(diagramElements?: Record<string, any>): any[] {
+        const selectedIds = this.getSelectedIds();
+        if (!diagramElements) {
+            // Return basic objects with just IDs if no diagram provided
+            return selectedIds.map(id => ({ id }));
+        }
+        
+        // Return full element objects with position data
+        return selectedIds.map(id => {
+            const element = diagramElements[id];
+            if (element) {
+                return {
+                    id: element.id,
+                    type: element.type || element.element_type,
+                    bounds: element.bounds || { x: 0, y: 0, width: 50, height: 30 },
+                    properties: element.properties || {},
+                    ...element
+                };
+            }
+            // Fallback for missing elements
+            return { id, bounds: { x: 0, y: 0, width: 50, height: 30 } };
+        });
+    }
+
     getSelectedCount(): number {
         return this.state.selectedElements.size;
     }

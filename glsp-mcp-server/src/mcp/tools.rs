@@ -1,4 +1,4 @@
-use crate::model::{DiagramModel, Node, Edge, Position};
+use crate::model::{DiagramModel, Node, Edge, Position, ElementType};
 use crate::mcp::protocol::{Tool, CallToolParams, CallToolResult, TextContent};
 use crate::selection::SelectionMode;
 use crate::wasm::{WasmFileWatcher, WasmComponent};
@@ -13,6 +13,12 @@ pub struct DiagramTools {
     wasm_watcher: WasmFileWatcher,
 }
 
+impl Default for DiagramTools {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiagramTools {
     pub fn new() -> Self {
         // Default WASM watch path - can be configured via CLI args
@@ -22,7 +28,7 @@ impl DiagramTools {
             .or_else(|| std::env::var("WASM_WATCH_PATH").ok().map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from("../workspace/adas-wasm-components"));
 
-        println!("WASM watch path: {:?}", wasm_path);
+        println!("WASM watch path: {wasm_path:?}");
 
         Self {
             models: HashMap::new(),
@@ -457,7 +463,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Created diagram '{}' with ID: {}", diagram_type, diagram_id),
+                text: format!("Created diagram '{diagram_type}' with ID: {diagram_id}"),
             }],
             is_error: None,
         })
@@ -491,7 +497,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Created {} node with ID: {}", node_type, node_id),
+                text: format!("Created {node_type} node with ID: {node_id}"),
             }],
             is_error: None,
         })
@@ -518,7 +524,7 @@ impl DiagramTools {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Source element {} not found", source_id),
+                    text: format!("Source element {source_id} not found"),
                 }],
                 is_error: Some(true),
             });
@@ -528,7 +534,7 @@ impl DiagramTools {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Target element {} not found", target_id),
+                    text: format!("Target element {target_id} not found"),
                 }],
                 is_error: Some(true),
             });
@@ -548,7 +554,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Created {} edge with ID: {}", edge_type, edge_id),
+                text: format!("Created {edge_type} edge with ID: {edge_id}"),
             }],
             is_error: None,
         })
@@ -568,14 +574,14 @@ impl DiagramTools {
             Some(_) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Deleted element with ID: {}", element_id),
+                    text: format!("Deleted element with ID: {element_id}"),
                 }],
                 is_error: None,
             }),
             None => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Element {} not found", element_id),
+                    text: format!("Element {element_id} not found"),
                 }],
                 is_error: Some(true),
             }),
@@ -613,7 +619,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Updated element with ID: {}", element_id),
+                text: format!("Updated element with ID: {element_id}"),
             }],
             is_error: None,
         })
@@ -637,7 +643,7 @@ impl DiagramTools {
                 return Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
-                        text: format!("Layout algorithm '{}' not implemented yet", algorithm),
+                        text: format!("Layout algorithm '{algorithm}' not implemented yet"),
                     }],
                     is_error: Some(true),
                 });
@@ -647,7 +653,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Applied {} layout to diagram {}", algorithm, diagram_id),
+                text: format!("Applied {algorithm} layout to diagram {diagram_id}"),
             }],
             is_error: None,
         })
@@ -669,7 +675,7 @@ impl DiagramTools {
                 Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
-                        text: format!("Exported diagram as JSON:\n{}", json_str),
+                        text: format!("Exported diagram as JSON:\n{json_str}"),
                     }],
                     is_error: None,
                 })
@@ -679,7 +685,7 @@ impl DiagramTools {
                 Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
-                        text: format!("Exported diagram as SVG:\n{}", svg),
+                        text: format!("Exported diagram as SVG:\n{svg}"),
                     }],
                     is_error: None,
                 })
@@ -687,7 +693,7 @@ impl DiagramTools {
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Export format '{}' not supported yet", format),
+                    text: format!("Export format '{format}' not supported yet"),
                 }],
                 is_error: Some(true),
             }),
@@ -703,7 +709,7 @@ impl DiagramTools {
         let mut col = 0;
 
         for (_, element) in diagram.elements.iter_mut() {
-            if element.element_type != "graph" && element.bounds.is_some() {
+            if element.element_type != ElementType::Graph && element.bounds.is_some() {
                 if let Some(bounds) = &mut element.bounds {
                     bounds.x = x;
                     bounds.y = y;
@@ -729,7 +735,7 @@ impl DiagramTools {
         let spacing_x = 150.0;
 
         for (_, element) in diagram.elements.iter_mut() {
-            if element.element_type != "graph" && element.bounds.is_some() {
+            if element.element_type != ElementType::Graph && element.bounds.is_some() {
                 if let Some(bounds) = &mut element.bounds {
                     bounds.x = x;
                     bounds.y = y;
@@ -744,10 +750,10 @@ impl DiagramTools {
         let mut svg = String::from(r#"<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">"#);
         
         // Add elements
-        for (_, element) in &diagram.elements {
-            if element.element_type != "graph" {
+        for element in diagram.elements.values() {
+            if element.element_type != ElementType::Graph {
                 if let Some(bounds) = &element.bounds {
-                    if element.element_type.contains("node") || element.element_type == "task" {
+                    if element.element_type.is_node_like() {
                         svg.push_str(&format!(
                             r#"<rect x="{}" y="{}" width="{}" height="{}" fill="lightblue" stroke="black" stroke-width="1"/>"#,
                             bounds.x, bounds.y, bounds.width, bounds.height
@@ -778,6 +784,10 @@ impl DiagramTools {
 
     pub fn list_diagrams(&self) -> Vec<&DiagramModel> {
         self.models.values().collect()
+    }
+
+    pub fn get_diagrams_path(&self) -> &std::path::Path {
+        std::path::Path::new("./diagrams") // Default path
     }
 
     // Selection tool implementations
@@ -818,7 +828,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Selected {} element(s): {:?}", selected_count, selected_ids),
+                    text: format!("Selected {selected_count} element(s): {selected_ids:?}"),
                 }],
                 is_error: None,
             })
@@ -850,7 +860,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Selected all {} elements", count),
+                    text: format!("Selected all {count} elements"),
                 }],
                 is_error: None,
             })
@@ -946,7 +956,7 @@ impl DiagramTools {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
                     text: match element_id {
-                        Some(id) => format!("Hovering element: {}", id),
+                        Some(id) => format!("Hovering element: {id}"),
                         None => "Hover cleared".to_string(),
                     },
                 }],
@@ -1058,7 +1068,7 @@ impl DiagramTools {
             Err(err) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to scan WASM components: {}", err),
+                    text: format!("Failed to scan WASM components: {err}"),
                 }],
                 is_error: Some(true),
             }),
@@ -1094,7 +1104,7 @@ impl DiagramTools {
             None => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("WASM component '{}' not found", component_name),
+                    text: format!("WASM component '{component_name}' not found"),
                 }],
                 is_error: Some(true),
             }),
@@ -1110,7 +1120,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Successfully removed missing component: {}", component_name),
+                    text: format!("Successfully removed missing component: {component_name}"),
                 }],
                 is_error: None,
             })
@@ -1118,7 +1128,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Component '{}' not found or not missing", component_name),
+                    text: format!("Component '{component_name}' not found or not missing"),
                 }],
                 is_error: Some(true),
             })
@@ -1145,7 +1155,7 @@ impl DiagramTools {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Cannot load component '{}': file is missing at {}", component_name, component.path),
+                    text: format!("Cannot load component '{component_name}': file is missing at {}", component.path),
                 }],
                 is_error: Some(true),
             });
@@ -1190,7 +1200,7 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Loaded WASM component '{}' into diagram with ID: {}", component_name, node_id),
+                text: format!("Loaded WASM component '{component_name}' into diagram with ID: {node_id}"),
             }],
             is_error: None,
         })

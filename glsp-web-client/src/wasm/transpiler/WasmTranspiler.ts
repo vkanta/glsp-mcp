@@ -1,5 +1,7 @@
 // Note: @bytecodealliance/jco will be imported dynamically to avoid build errors
 // import { transpile } from '@bytecodealliance/jco';
+import { ComponentValidator, ValidationResult as ValidatorResult, ValidationRules } from '../validation/ComponentValidator.js';
+import { SecurityScanner, SecurityScanResult } from '../validation/SecurityScanner.js';
 
 export interface ComponentMetadata {
     name: string;
@@ -12,10 +14,11 @@ export interface ComponentMetadata {
     hash: string;
 }
 
-export interface ValidationResult {
+export interface ValidationResult extends ValidatorResult {
     isValid: boolean;
     errors: string[];
     warnings: string[];
+    securityScan?: SecurityScanResult;
 }
 
 export interface TranspiledComponent {
@@ -25,10 +28,18 @@ export interface TranspiledComponent {
     typeDefinitions: string;
     wasmCore: ArrayBuffer;
     created: Date;
+    validation?: ValidationResult;
 }
 
 export class WasmTranspiler {
     private cache = new Map<string, TranspiledComponent>();
+    private validator: ComponentValidator;
+    private securityScanner: SecurityScanner;
+    
+    constructor(validationRules?: Partial<ValidationRules>) {
+        this.validator = new ComponentValidator(validationRules);
+        this.securityScanner = new SecurityScanner();
+    }
 
     async transpileComponent(wasmBytes: ArrayBuffer, name?: string): Promise<TranspiledComponent> {
         const hash = await this.computeHash(wasmBytes);
@@ -43,14 +54,22 @@ export class WasmTranspiler {
         console.log('Transpiling WASM component...', { size: wasmBytes.byteLength, name });
 
         try {
-            // Validate component before transpilation
-            const validation = await this.validateComponent(wasmBytes);
+            // Extract metadata before transpilation
+            const metadata = await this.extractMetadata(wasmBytes, name);
+            
+            // Validate component with metadata
+            const validation = await this.validateComponent(wasmBytes, metadata);
             if (!validation.isValid) {
                 throw new Error(`Component validation failed: ${validation.errors.join(', ')}`);
             }
-
-            // Extract metadata before transpilation
-            const metadata = await this.extractMetadata(wasmBytes, name);
+            
+            // Log security scan results if available
+            if (validation.securityScan) {
+                console.log(`Security scan score: ${validation.securityScan.score}/100`);
+                if (!validation.securityScan.safe) {
+                    console.warn('Security risks detected:', validation.securityScan.risks);
+                }
+            }
 
             // Transpile using jco (dynamically imported)
             const { transpile } = await import('@bytecodealliance/jco');
@@ -72,7 +91,8 @@ export class WasmTranspiler {
                 jsModule: typeof jsModule === 'string' ? jsModule : '',
                 typeDefinitions: typeof typeDefinitions === 'string' ? typeDefinitions : '',
                 wasmCore: wasmBytes,
-                created: new Date()
+                created: new Date(),
+                validation
             };
 
             // Cache the result
@@ -86,49 +106,62 @@ export class WasmTranspiler {
         }
     }
 
-    async validateComponent(wasmBytes: ArrayBuffer): Promise<ValidationResult> {
-        const result: ValidationResult = {
-            isValid: true,
-            errors: [],
-            warnings: []
-        };
-
+    async validateComponent(wasmBytes: ArrayBuffer, metadata?: ComponentMetadata): Promise<ValidationResult> {
         try {
-            // Basic size check
-            if (wasmBytes.byteLength === 0) {
-                result.errors.push('Empty WASM file');
-                result.isValid = false;
-                return result;
-            }
-
-            if (wasmBytes.byteLength > 50 * 1024 * 1024) { // 50MB limit
-                result.errors.push('Component too large (>50MB)');
-                result.isValid = false;
-            }
-
-            // Check WASM magic number
-            const view = new DataView(wasmBytes);
-            const magic = view.getUint32(0, true);
-            if (magic !== 0x6d736100) { // '\0asm'
-                result.errors.push('Invalid WASM magic number');
-                result.isValid = false;
-            }
-
-            // Check version
-            const version = view.getUint32(4, true);
-            if (version !== 1) {
-                result.warnings.push(`Unexpected WASM version: ${version}`);
-            }
-
-            // Additional component-specific validation could be added here
-            // For now, we rely on jco's validation during transpilation
+            // Run comprehensive validation
+            const validatorResult = await this.validator.validateComponent(wasmBytes, metadata);
             
+            // Parse WASM module for security scanning
+            let securityScan: SecurityScanResult | undefined;
+            
+            try {
+                const module = await WebAssembly.compile(wasmBytes);
+                const imports = WebAssembly.Module.imports(module);
+                const exports = WebAssembly.Module.exports(module);
+                
+                // Run security scan
+                securityScan = await this.securityScanner.scanComponent(wasmBytes, imports, exports);
+                
+                // Add security risks to validation warnings/errors
+                securityScan.risks.forEach(risk => {
+                    if (risk.type === 'high') {
+                        validatorResult.errors.push({
+                            code: 'SECURITY_RISK_HIGH',
+                            message: `${risk.category}: ${risk.description}`,
+                            severity: 'error'
+                        });
+                    } else if (risk.type === 'medium') {
+                        validatorResult.warnings.push({
+                            code: 'SECURITY_RISK_MEDIUM',
+                            message: `${risk.category}: ${risk.description}`,
+                            severity: 'warning'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.warn('Security scan failed:', error);
+                // Don't fail validation if security scan fails
+            }
+            
+            // Convert to legacy format for compatibility
+            const result: ValidationResult = {
+                valid: validatorResult.valid,
+                isValid: validatorResult.valid,
+                errors: validatorResult.errors.map(e => e.message),
+                warnings: validatorResult.warnings.map(w => w.message),
+                metadata: validatorResult.metadata,
+                securityScan
+            };
+            
+            return result;
         } catch (error) {
-            result.errors.push(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            result.isValid = false;
+            return {
+                valid: false,
+                isValid: false,
+                errors: [`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`],
+                warnings: []
+            };
         }
-
-        return result;
     }
 
     async extractMetadata(wasmBytes: ArrayBuffer, providedName?: string): Promise<ComponentMetadata> {
@@ -168,5 +201,26 @@ export class WasmTranspiler {
 
     getCacheSize(): number {
         return this.cache.size;
+    }
+    
+    updateValidationRules(rules: Partial<ValidationRules>): void {
+        this.validator.updateRules(rules);
+    }
+    
+    getValidationRules(): ValidationRules {
+        return this.validator.getRules();
+    }
+    
+    async generateSecurityReport(wasmBytes: ArrayBuffer): Promise<string> {
+        try {
+            const module = await WebAssembly.compile(wasmBytes);
+            const imports = WebAssembly.Module.imports(module);
+            const exports = WebAssembly.Module.exports(module);
+            
+            const scanResult = await this.securityScanner.scanComponent(wasmBytes, imports, exports);
+            return this.securityScanner.generateReport(scanResult);
+        } catch (error) {
+            return `Failed to generate security report: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
     }
 }

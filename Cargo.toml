@@ -26,6 +26,8 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 chrono = { version = "0.4", features = ["serde"] }
 wasm-tools = "1.0"
 wasmparser = "0.118"
+wit-component = "0.218"
+wit-parser = "0.218"
 
 # Authentication and security dependencies
 sha2 = "0.10"

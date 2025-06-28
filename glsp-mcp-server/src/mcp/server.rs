@@ -7,7 +7,7 @@ use axum::{
     routing::{post, get},
     Router,
     extract::Query,
-    http::{header, HeaderMap},
+    http::{header, HeaderMap, HeaderValue},
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -31,6 +31,12 @@ pub struct McpServer {
     pub prompts: DiagramPrompts,
     pub capabilities: ServerCapabilities,
     pub sessions: HashMap<String, Session>,
+}
+
+impl Default for McpServer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl McpServer {
@@ -273,15 +279,21 @@ async fn handle_post_request(
 
     // Return with session ID header - either existing or newly created
     let mut headers = HeaderMap::new();
-    headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
     
     if let Some(sid) = new_session_id {
         // New session from initialize
         info!("Returning new session ID in headers: {}", sid);
-        headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+        match HeaderValue::from_str(&sid) {
+            Ok(value) => { headers.insert("Mcp-Session-Id", value); }
+            Err(e) => { error!("Invalid session ID format: {}", e); }
+        }
     } else if let Some(sid) = session_id {
         // Existing session
-        headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+        match HeaderValue::from_str(&sid) {
+            Ok(value) => { headers.insert("Mcp-Session-Id", value); }
+            Err(e) => { error!("Invalid session ID format: {}", e); }
+        }
     }
     
     (headers, Json(response)).into_response()
@@ -300,10 +312,13 @@ async fn handle_get_request(
     // For GET requests, we'll implement streaming later
     // For now, return a simple JSON response indicating the endpoint is ready
     let mut response_headers = HeaderMap::new();
-    response_headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+    response_headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
     
     if let Some(sid) = session_id {
-        response_headers.insert("Mcp-Session-Id", sid.parse().unwrap());
+        match HeaderValue::from_str(&sid) {
+            Ok(value) => { response_headers.insert("Mcp-Session-Id", value); }
+            Err(e) => { error!("Invalid session ID format: {}", e); }
+        }
     }
 
     (

@@ -33,7 +33,20 @@ tower-http = { workspace = true }
 # WASM processing
 wasm-tools = { workspace = true }
 wasmparser = { workspace = true }
+wit-component = { workspace = true }
+wit-parser = { workspace = true }
 chrono = { workspace = true }
+
+# Filesystem watching
+notify = "6.1"
+
+# SSE support
+axum-extra = { version = "0.9", features = ["typed-header"] }
+async-stream = "0.3"
+tokio-stream = "0.1"
+
+# CLI argument parsing
+clap = { version = "4.0", features = ["derive"] }
 
 [lib]
 name = "glsp_mcp_server"

@@ -1,0 +1,87 @@
+[workspace]
+resolver = "2"
+
+# ADAS WebAssembly Components Workspace
+# Fixed Execution Order (FEO) automotive components
+
+members = [
+    # Sensor Layer
+    "components/sensors/camera-front",
+    "components/sensors/camera-surround", 
+    "components/sensors/radar-front",
+    "components/sensors/radar-corner",
+    "components/sensors/lidar",
+    "components/sensors/ultrasonic",
+    
+    # AI Processing Layer  
+    "components/ai/object-detection",
+    "components/ai/behavior-prediction",
+    
+    # Fusion & Perception Layer
+    "components/fusion/sensor-fusion",
+    "components/fusion/perception-fusion", 
+    "components/fusion/tracking-prediction",
+    
+    # Planning & Control Layer
+    "components/control/planning-decision",
+    "components/control/vehicle-control",
+    
+    # Input Layer
+    "components/input/video-decoder",
+    
+    # System Layer
+    "components/system/safety-monitor",
+    "components/system/can-gateway", 
+    "components/system/hmi-interface",
+    "components/system/domain-controller",
+    "components/system/feo-demo",
+]
+
+# Shared dependencies for all components
+[workspace.dependencies]
+wit-bindgen = "0.33"
+
+# Profile settings for all workspace members
+[profile.release]
+# Optimize for size (important for WebAssembly)
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+# Faster debug builds
+opt-level = 1
+debug = true
+strip = false
+
+[workspace.metadata]
+# Project metadata
+name = "ADAS WebAssembly Components"
+version = "0.1.0"
+description = "Automotive ADAS system built with WebAssembly Component Model and Fixed Execution Order (FEO)"
+license = "Apache-2.0"
+repository = "https://github.com/your-org/adas-wasm-components"
+
+# Component architecture
+architecture = "Fixed Execution Order (FEO)"
+target = "wasm32-wasip2"
+interface = "WebAssembly Interface Types (WIT)"
+protocol = "WebAssembly Component Model"
+
+# Build information
+build_system = "Cargo + wasm-tools"
+components_total = 18
+feo_enabled = ["video-decoder", "object-detection", "feo-demo"]
+
+# Key features
+features = [
+    "Fixed Execution Order (FEO)",
+    "WebAssembly Component Model",
+    "ASIL-B Safety Patterns", 
+    "Real Video Processing",
+    "YOLOv5n Object Detection",
+    "Automotive ECU Simulation",
+    "Deterministic Execution",
+]

@@ -1,0 +1,114 @@
+/// Fixed Execution Order (FEO) Control Interface
+/// Standardized interface for external orchestration of ADAS components
+package adas:execution-control@0.1.0;
+
+interface execution-control {
+    /// Component execution states
+    enum execution-state {
+        idle,              // Component is idle, ready to accept work
+        ready,             // Component has input data and is ready to process  
+        processing,        // Component is currently executing
+        completed,         // Component completed current cycle
+        error,            // Component encountered an error
+        disabled          // Component is disabled and won't execute
+    }
+    
+    /// Execution result codes for cycle completion
+    enum execution-result {
+        success,           // Normal execution completed successfully
+        no-input-data,     // No input data available to process
+        no-output-space,   // Output buffer full, cannot write results
+        processing-error,  // Internal processing error occurred
+        component-disabled // Component is disabled, execution skipped
+    }
+    
+    /// Execution metrics for performance monitoring
+    record execution-metrics {
+        execution-time-us: u64,        // Execution time in microseconds
+        input-items-consumed: u32,     // Number of input items processed
+        output-items-produced: u32,    // Number of output items generated
+        errors-encountered: u32,       // Number of errors during execution
+        memory-used-bytes: u64,        // Peak memory usage during execution
+        cpu-cycles-estimated: u64,     // Estimated CPU cycles used
+    }
+    
+    /// Component information for introspection
+    record component-info {
+        component-id: string,          // Unique component identifier
+        component-type: string,        // Component category (sensor, ai, control, etc.)
+        version: string,               // Component version
+        input-interfaces: list<string>, // List of input interface names
+        output-interfaces: list<string>, // List of output interface names
+        execution-time-budget-us: u64, // Expected execution time budget
+        memory-budget-bytes: u64,      // Expected memory usage budget
+    }
+    
+    /// Data slot information for buffer management
+    record data-slot-info {
+        slot-name: string,             // Name of the data slot
+        slot-type: string,             // Type of data (frame, detection, control, etc.)
+        buffer-size: u32,              // Current buffer size
+        buffer-capacity: u32,          // Maximum buffer capacity
+        items-available: u32,          // Number of items ready for consumption
+        items-pending: u32,            // Number of items waiting to be written
+    }
+    
+    // === CORE FEO INTERFACE ===
+    // Called by external scheduler/runtime
+    
+    /// Execute one processing cycle
+    /// This is the main entry point for Fixed Execution Order control
+    execute-cycle: func() -> result<execution-metrics, string>;
+    
+    /// Check if component is ready to execute (has input data)
+    can-execute: func() -> bool;
+    
+    /// Check if component has output data ready for next stage
+    has-output: func() -> bool;
+    
+    // === COMPONENT CONTROL ===
+    
+    /// Reset component to initial state
+    reset-component: func() -> result<_, string>;
+    
+    /// Enable component for execution
+    enable-component: func() -> result<_, string>;
+    
+    /// Disable component (will skip execution)
+    disable-component: func() -> result<_, string>;
+    
+    /// Flush all internal buffers and state
+    flush-component: func() -> result<_, string>;
+    
+    // === STATUS AND INTROSPECTION ===
+    
+    /// Get current execution state
+    get-execution-state: func() -> execution-state;
+    
+    /// Get metrics from last execution cycle
+    get-last-metrics: func() -> execution-metrics;
+    
+    /// Get component information and capabilities  
+    get-component-info: func() -> component-info;
+    
+    /// Get status of all data slots
+    get-data-slot-status: func() -> list<data-slot-info>;
+    
+    /// Get human-readable diagnostic information
+    get-diagnostics: func() -> result<string, string>;
+    
+    // === DATA SLOT MANAGEMENT ===
+    // For components that need to manage data flow
+    
+    /// Check if input slot has data available
+    has-input-data: func(slot-name: string) -> result<bool, string>;
+    
+    /// Check if output slot has space available
+    has-output-space: func(slot-name: string) -> result<bool, string>;
+    
+    /// Get size of specific data slot
+    get-slot-size: func(slot-name: string) -> result<u32, string>;
+    
+    /// Clear specific data slot
+    clear-slot: func(slot-name: string) -> result<_, string>;
+}

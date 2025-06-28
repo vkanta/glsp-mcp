@@ -184,6 +184,15 @@ export class WasmComponentPalette {
         }
     }
 
+    public async refreshComponents(): Promise<void> {
+        console.log('Refreshing WASM components...');
+        try {
+            await this.loadComponents();
+        } catch (error) {
+            console.error('Failed to refresh components:', error);
+        }
+    }
+    
     private renderComponents(): void {
         const listElement = this.element.querySelector('#component-list');
         if (!listElement) return;

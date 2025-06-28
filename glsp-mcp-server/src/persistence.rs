@@ -4,7 +4,7 @@
 //! - Content file (.glsp.json): Semantic model (nodes, edges, properties)
 //! - Layout file (.glsp.layout.json): Graphical representation (positions, sizes)
 
-use crate::model::{DiagramModel, ModelElement, Bounds};
+use crate::model::{DiagramModel, ModelElement, Bounds, ElementType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -79,6 +79,10 @@ impl PersistenceManager {
             base_path: base_path.as_ref().to_path_buf(),
         }
     }
+    
+    pub fn get_base_path(&self) -> &Path {
+        &self.base_path
+    }
 
     /// Ensure the storage directory exists
     pub async fn ensure_storage_dir(&self) -> std::io::Result<()> {
@@ -88,8 +92,8 @@ impl PersistenceManager {
     /// Generate file paths for a diagram
     fn get_file_paths(&self, diagram_name: &str) -> (PathBuf, PathBuf) {
         let safe_name = sanitize_filename(diagram_name);
-        let content_path = self.base_path.join(format!("{}.glsp.json", safe_name));
-        let layout_path = self.base_path.join(format!("{}.glsp.layout.json", safe_name));
+        let content_path = self.base_path.join(format!("{safe_name}.glsp.json"));
+        let layout_path = self.base_path.join(format!("{safe_name}.glsp.layout.json"));
         (content_path, layout_path)
     }
 
@@ -205,8 +209,8 @@ impl PersistenceManager {
             }
             
             // Extract content based on element type
-            match element.element_type.as_str() {
-                "edge" => {
+            match &element.element_type {
+                ElementType::Edge => {
                     edges.push(EdgeContent {
                         id: id.clone(),
                         edge_type: element.properties.get("edgeType")
@@ -219,14 +223,14 @@ impl PersistenceManager {
                         properties: element.properties.clone(),
                     });
                 }
-                "graph" => {
+                ElementType::Graph => {
                     // Skip the root graph element
                 }
                 _ => {
                     // Everything else is a node
                     nodes.push(NodeContent {
                         id: id.clone(),
-                        node_type: element.element_type.clone(),
+                        node_type: element.element_type.to_string(),
                         label: element.label.clone(),
                         properties: element.properties.clone(),
                     });
@@ -263,7 +267,7 @@ impl PersistenceManager {
         let root_id = format!("{}_root", content.id);
         let root = ModelElement {
             id: root_id.clone(),
-            element_type: "graph".to_string(),
+            element_type: ElementType::Graph,
             children: Some(vec![]),
             bounds: None,
             layout_options: None,
@@ -297,7 +301,7 @@ impl PersistenceManager {
         for node in content.nodes {
             let mut element = ModelElement {
                 id: node.id.clone(),
-                element_type: node.node_type,
+                element_type: ElementType::from(node.node_type),
                 children: None,
                 bounds: None,
                 layout_options: None,
@@ -335,7 +339,7 @@ impl PersistenceManager {
         for edge in content.edges {
             let mut element = ModelElement {
                 id: edge.id.clone(),
-                element_type: "edge".to_string(),
+                element_type: ElementType::Edge,
                 children: None,
                 bounds: None,
                 layout_options: None,

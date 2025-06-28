@@ -1,0 +1,277 @@
+/// Common functional safety types for ASIL-B compliance
+/// ISO 26262 compliant error handling and diagnostic interfaces
+package adas:safety-types@0.1.0;
+
+interface safety-types {
+    /// Main safety result type - every fallible operation returns this
+    variant safety-result<T> {
+        ok(T),
+        degraded(degraded-result<T>),
+        error(safety-error),
+    }
+    
+    /// Degraded operation - partial functionality with warnings
+    record degraded-result<T> {
+        value: T,
+        warnings: list<safety-warning>,
+        confidence: f32,  // 0.0 to 1.0
+    }
+    
+    /// Safety error with full diagnostic information
+    record safety-error {
+        code: error-code,
+        severity: error-severity,
+        message: string,
+        timestamp: u64,
+        component: string,
+        diagnostic-data: option<list<u8>>,
+    }
+    
+    /// Error severity levels aligned with ASIL-B
+    enum error-severity {
+        critical,    // System must transition to safe state immediately
+        major,       // Function degraded but operational
+        minor,       // Performance impact only
+        info,        // Diagnostic information
+    }
+    
+    /// Safety warning for non-critical issues
+    record safety-warning {
+        code: warning-code,
+        message: string,
+        timestamp: u64,
+    }
+    
+    /// Standardized error codes across all components
+    enum error-code {
+        // Configuration errors
+        invalid-configuration,
+        missing-configuration,
+        
+        // Resource errors
+        resource-unavailable,
+        resource-exhausted,
+        allocation-failed,
+        
+        // Data errors
+        invalid-data,
+        corrupted-data,
+        stale-data,
+        data-out-of-range,
+        
+        // Communication errors
+        timeout,
+        connection-lost,
+        protocol-error,
+        
+        // Processing errors
+        processing-failed,
+        algorithm-error,
+        numerical-instability,
+        
+        // Hardware errors
+        sensor-fault,
+        actuator-fault,
+        hardware-failure,
+        
+        // System errors
+        component-fault,
+        dependency-failure,
+        internal-error,
+        
+        // Safety errors
+        safety-violation,
+        redundancy-lost,
+        diagnostic-failed,
+    }
+    
+    /// Warning codes for degraded operations
+    enum warning-code {
+        degraded-operation,
+        reduced-accuracy,
+        increased-latency,
+        partial-data,
+        fallback-mode,
+        maintenance-required,
+        calibration-needed,
+    }
+    
+    /// Component health status
+    enum component-health {
+        healthy,
+        degraded,
+        faulty,
+        unknown,
+    }
+    
+    /// Data validity information
+    record data-validity {
+        confidence: f32,        // 0.0 to 1.0
+        quality-flags: u32,     // Bit flags for quality indicators
+        age-ms: u32,           // Data age in milliseconds
+    }
+    
+    /// Stream health information
+    record stream-health {
+        status: component-health,
+        last-data-timestamp: u64,
+        sequence-gaps: u32,
+        timeout-count: u32,
+        error-count: u32,
+    }
+    
+    /// Diagnostic test result
+    record test-result {
+        test-name: string,
+        outcome: test-outcome,
+        duration-ms: u32,
+        details: string,
+    }
+    
+    enum test-outcome {
+        passed,
+        failed,
+        warning,
+        skipped,
+    }
+    
+    /// Performance metrics for safety monitoring
+    record performance-metrics {
+        processing-time-ms: f32,
+        cpu-usage-percent: f32,
+        memory-usage-mb: u32,
+        queue-depth: u32,
+        dropped-frames: u32,
+    }
+}
+
+/// Safety stream interface for continuous data with monitoring
+interface safety-stream {
+    /// Generic result from stream operations  
+    variant stream-result {
+        data,
+        timeout,
+        end-of-stream,
+        error(safety-error),
+    }
+    
+    /// Stream configuration
+    record stream-config {
+        timeout-ms: u32,
+        max-retries: u8,
+        buffer-size: u32,
+        priority: stream-priority,
+    }
+    
+    enum stream-priority {
+        safety-critical,
+        high,
+        normal,
+        low,
+    }
+    
+    /// Detailed diagnostics for streams
+    record stream-diagnostics {
+        total-frames: u64,
+        valid-frames: u64,
+        dropped-frames: u64,
+        errors: u64,
+        warnings: u64,
+        average-latency-ms: f32,
+        max-latency-ms: f32,
+        uptime-ms: u64,
+    }
+}
+
+/// Diagnostic interface that all safety-critical components must implement
+interface safety-diagnostics {
+    /// Perform comprehensive self-test
+    self-test: func() -> safety-result<diagnostic-report>;
+    
+    /// Get current health status
+    get-health: func() -> component-health-status;
+    
+    /// Get performance metrics
+    get-metrics: func() -> performance-metrics;
+    
+    /// Configure diagnostic parameters
+    configure-diagnostics: func(config: diagnostic-config) -> result<_, safety-error>;
+    
+    /// Clear diagnostic counters
+    clear-diagnostics: func() -> result<_, safety-error>;
+    
+    /// Component health with detailed status
+    record component-health-status {
+        overall-health: component-health,
+        sub-components: list<sub-component-health>,
+        last-self-test: u64,
+        uptime-ms: u64,
+        error-count: u32,
+        warning-count: u32,
+        last-error: option<safety-error>,
+    }
+    
+    /// Sub-component health information
+    record sub-component-health {
+        name: string,
+        health: component-health,
+        details: string,
+    }
+    
+    /// Comprehensive diagnostic report
+    record diagnostic-report {
+        timestamp: u64,
+        test-results: list<test-result>,
+        recommendations: list<string>,
+        overall-status: component-health,
+        requires-maintenance: bool,
+    }
+    
+    /// Diagnostic configuration
+    record diagnostic-config {
+        self-test-interval-ms: u32,
+        health-check-interval-ms: u32,
+        metric-collection-interval-ms: u32,
+        verbose-logging: bool,
+        performance-profiling: bool,
+    }
+}
+
+/// Watchdog interface for timeout protection
+interface watchdog {
+    /// Watchdog handle for timeout monitoring
+    resource watchdog-handle {
+        /// Reset watchdog timer
+        kick: func() -> result<_, safety-error>;
+        
+        /// Stop watchdog
+        stop: func() -> result<_, safety-error>;
+        
+        /// Get watchdog status
+        status: func() -> watchdog-status;
+        
+        /// Update timeout
+        set-timeout: func(timeout-ms: u32) -> result<_, safety-error>;
+    }
+    
+    /// Create watchdog with timeout
+    create: func(timeout-ms: u32, action: timeout-action) -> result<watchdog-handle, safety-error>;
+    
+    /// Timeout actions
+    enum timeout-action {
+        notify,           // Just send notification
+        degrade,          // Switch to degraded mode
+        safe-state,       // Transition to safe state
+        reset-component,  // Reset the component
+    }
+    
+    /// Watchdog status information
+    record watchdog-status {
+        active: bool,
+        timeout-ms: u32,
+        time-remaining-ms: u32,
+        kick-count: u64,
+        timeout-count: u32,
+        action: timeout-action,
+    }
+}

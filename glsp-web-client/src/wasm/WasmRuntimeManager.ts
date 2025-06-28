@@ -3,9 +3,11 @@ import { WasmTranspiler } from './transpiler/WasmTranspiler.js';
 import { ComponentRegistry } from './runtime/ComponentRegistry.js';
 import { ExecutionEngine, ExecutionContext, ExecutionResult } from './runtime/ExecutionEngine.js';
 import { ComponentUploadPanel } from './ui/ComponentUploadPanel.js';
+import { WasmComponentPanel } from '../ui/WasmComponentPanelRefactored.js';
 import { McpService } from '../services/McpService.js';
 import { DiagramService } from '../services/DiagramService.js';
 import { CanvasRenderer } from '../renderer/canvas-renderer.js';
+import { HeaderIconManager } from '../ui/HeaderIconManager.js';
 
 export interface WasmRuntimeConfig {
     maxConcurrentExecutions?: number;
@@ -18,7 +20,9 @@ export class WasmRuntimeManager extends WasmComponentManager {
     private registry: ComponentRegistry;
     private executionEngine: ExecutionEngine;
     private uploadPanel: ComponentUploadPanel;
+    private enhancedPalette: WasmComponentPanel;
     private config: WasmRuntimeConfig;
+    private headerIconManager?: HeaderIconManager;
 
     constructor(
         mcpService: McpService, 
@@ -35,8 +39,15 @@ export class WasmRuntimeManager extends WasmComponentManager {
             ...config
         };
 
-        // Initialize new runtime services
-        this.transpiler = new WasmTranspiler();
+        // Initialize new runtime services with validation configuration
+        this.transpiler = new WasmTranspiler({
+            maxFileSize: 50 * 1024 * 1024, // 50MB
+            allowedImports: ['wasi_snapshot_preview1', 'wasi_snapshot_preview2', 'env'],
+            checkMemoryLimits: true,
+            allowUnsafeOperations: false,
+            maxMemoryPages: 16384, // 1GB with 64KB pages
+            maxTableSize: 10000
+        });
         this.registry = new ComponentRegistry();
         this.executionEngine = new ExecutionEngine(this.registry);
         
@@ -51,7 +62,65 @@ export class WasmRuntimeManager extends WasmComponentManager {
             (error) => this.onComponentUploadError(error)
         );
 
+        // Create enhanced floating palette
+        this.enhancedPalette = new WasmComponentPanel(
+            this.mcpService as any, // Cast to McpClient interface
+            () => this.showUploadPanel(),
+            {
+                title: 'WASM Components',
+                initialPosition: { x: 20, y: 100 }
+            },
+            {
+                onMinimizeToHeader: () => this.minimizeWasmPaletteToHeader()
+            }
+        );
+        
+        // Set up component lifecycle callbacks
+        this.enhancedPalette.setComponentLifecycleCallbacks({
+            onLoad: async (elementId: string) => await this.handleLoadComponentFromPalette(elementId),
+            onUnload: async (elementId: string) => await this.handleUnloadComponentFromPalette(elementId),
+            onTranspile: async (elementId: string) => await this.handleTranspileComponentFromPalette(elementId),
+            onRelease: async (elementId: string) => await this.handleReleaseComponentFromPalette(elementId)
+        });
+
         document.body.appendChild(this.uploadPanel.getElement());
+    }
+
+    public setHeaderIconManager(headerIconManager: HeaderIconManager): void {
+        this.headerIconManager = headerIconManager;
+    }
+
+    private minimizeWasmPaletteToHeader(): void {
+        if (!this.headerIconManager) {
+            console.warn('Header icon manager not set for WASM palette');
+            return;
+        }
+        
+        this.headerIconManager.addIcon({
+            id: 'wasm-components',
+            title: 'WASM Components',
+            icon: '📦',
+            color: 'var(--accent-wasm)',
+            onClick: () => this.restoreWasmPalette(),
+            onClose: () => this.closeWasmPalette()
+        });
+        console.log('WASM Components palette minimized to header');
+    }
+    
+    private restoreWasmPalette(): void {
+        this.enhancedPalette.show();
+        if (this.headerIconManager) {
+            this.headerIconManager.removeIcon('wasm-components');
+        }
+        console.log('WASM Components palette restored from header');
+    }
+    
+    private closeWasmPalette(): void {
+        this.enhancedPalette.close();
+        if (this.headerIconManager) {
+            this.headerIconManager.removeIcon('wasm-components');
+        }
+        console.log('WASM Components palette closed');
     }
 
     // Enhanced component loading with client-side transpilation support
@@ -218,46 +287,198 @@ export class WasmRuntimeManager extends WasmComponentManager {
 
     // Enhanced palette integration
     async showEnhancedPalette(): Promise<void> {
-        // Show both traditional palette and upload option
-        await super.showPalette();
+        // Show the new floating panel instead of old palette
+        this.enhancedPalette.show();
         
-        // Could add upload button to the palette here
-        this.addUploadButtonToPalette();
+        // Update client-side components
+        this.refreshClientSideComponents();
+        
+        // Update with current diagram components
+        this.updatePaletteWithDiagramComponents();
+    }
+    
+    // Get the enhanced palette for external updates
+    public getEnhancedPalette(): WasmComponentPanel {
+        return this.enhancedPalette;
     }
 
-    private addUploadButtonToPalette(): void {
-        const paletteElement = this.getPaletteElement();
+    // Override to use enhanced palette
+    public getPaletteElement(): HTMLElement {
+        return this.enhancedPalette.getElement();
+    }
+
+    // Override to use enhanced palette
+    public async showPalette(): Promise<void> {
+        await this.showEnhancedPalette();
+    }
+
+    // Override to use enhanced palette
+    public hidePalette(): void {
+        this.enhancedPalette.hide();
+    }
+
+    private refreshClientSideComponents(): void {
+        const components = this.registry.getLoadedComponents();
+        const componentArray = components.map(metadata => ({
+            id: metadata.hash,
+            metadata,
+            isLoaded: true
+        }));
         
-        // Check if upload button already exists
-        if (paletteElement.querySelector('.upload-component-btn')) {
-            return;
-        }
-
-        const uploadButton = document.createElement('button');
-        uploadButton.className = 'upload-component-btn';
-        uploadButton.textContent = '📁 Upload Component';
-        uploadButton.style.cssText = `
-            width: 100%;
-            padding: 8px 12px;
-            margin-bottom: 10px;
-            background: linear-gradient(90deg, #4A9EFF, #00D4AA);
-            border: none;
-            border-radius: 4px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        `;
-
-        uploadButton.addEventListener('click', () => {
-            this.showUploadPanel();
+        this.enhancedPalette.updateClientSideComponents(componentArray);
+        
+        // Update transpiled components in palette
+        const transpiledComponents = componentArray.map(comp => ({
+            name: comp.metadata.name,
+            interfaces: comp.metadata.exports || [],
+            source: 'Client Upload'
+        }));
+        this.enhancedPalette.updateTranspiledComponents(transpiledComponents);
+        
+        // Generate test harnesses for transpiled components
+        const testHarnesses = this.generateTestHarnesses(componentArray);
+        this.enhancedPalette.updateTestHarnesses(testHarnesses);
+    }
+    
+    private updatePaletteWithDiagramComponents(): void {
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) return;
+        
+        const wasmComponents: Array<{
+            elementId: string;
+            name: string;
+            status: 'available' | 'missing' | 'loaded' | 'transpiled';
+            isLoaded: boolean;
+            isTranspiled: boolean;
+        }> = [];
+        
+        // Find all WASM components in the diagram
+        Object.entries(currentDiagram.elements).forEach(([elementId, element]) => {
+            if (element.type === 'wasm-component' || element.type === 'WASM Component') {
+                const componentName = element.properties?.componentName || element.properties?.name || 'Unknown';
+                const isLoaded = this.isComponentLoaded(elementId);
+                const isTranspiled = this.registry.hasComponent(componentName as string);
+                
+                wasmComponents.push({
+                    elementId,
+                    name: componentName as string,
+                    status: isTranspiled ? 'transpiled' : isLoaded ? 'loaded' : 'available',
+                    isLoaded,
+                    isTranspiled
+                });
+            }
         });
+        
+        this.enhancedPalette.updateDiagramComponents(wasmComponents);
+    }
+    
+    private generateTestHarnesses(components: any[]): Array<{
+        interfaceName: string;
+        componentName: string;
+        methods: string[];
+    }> {
+        const harnesses: Array<{
+            interfaceName: string;
+            componentName: string;
+            methods: string[];
+        }> = [];
+        
+        components.forEach(comp => {
+            if (comp.metadata.exports) {
+                comp.metadata.exports.forEach((exportInterface: string) => {
+                    harnesses.push({
+                        interfaceName: exportInterface,
+                        componentName: comp.metadata.name,
+                        methods: ['test', 'execute', 'validate'] // TODO: Get actual methods from interface
+                    });
+                });
+            }
+        });
+        
+        return harnesses;
+    }
 
-        // Insert at the top of the palette
-        const paletteContent = paletteElement.querySelector('.wasm-components-list');
-        if (paletteContent) {
-            paletteContent.insertBefore(uploadButton, paletteContent.firstChild);
-        }
+    // Component lifecycle handlers from palette
+    private async handleLoadComponentFromPalette(elementId: string): Promise<void> {
+        // Get component info from the diagram
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) throw new Error('No active diagram');
+        
+        const element = currentDiagram.elements[elementId];
+        if (!element) throw new Error('Element not found in diagram');
+        
+        const componentName = element.properties?.componentName || element.properties?.name;
+        if (!componentName) throw new Error('Component name not found');
+        
+        // Use the existing load method from WasmComponentManager
+        await this.loadComponent(elementId, componentName as string);
+        
+        // The canvas will be updated by refreshDiagramAfterStateChange in loadComponent
+        // Just update the palette display
+        this.updatePaletteWithDiagramComponents();
+    }
+    
+    private async handleUnloadComponentFromPalette(elementId: string): Promise<void> {
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) throw new Error('No active diagram');
+        
+        const element = currentDiagram.elements[elementId];
+        if (!element) throw new Error('Element not found in diagram');
+        
+        const componentName = element.properties?.componentName || element.properties?.name;
+        if (!componentName) throw new Error('Component name not found');
+        
+        await this.unloadComponent(elementId, componentName as string);
+        this.updatePaletteWithDiagramComponents();
+    }
+    
+    private async handleTranspileComponentFromPalette(elementId: string): Promise<void> {
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) throw new Error('No active diagram');
+        
+        const element = currentDiagram.elements[elementId];
+        if (!element) throw new Error('Element not found in diagram');
+        
+        const componentName = element.properties?.componentName || element.properties?.name;
+        if (!componentName) throw new Error('Component name not found');
+        
+        // Get the loaded component
+        const loadedComponent = this.getLoadedComponent(elementId);
+        if (!loadedComponent) throw new Error('Component not loaded');
+        
+        // Transpile using the transpiler
+        const transpiledResult = await this.transpiler.transpile(
+            new Uint8Array(loadedComponent.module), // Assuming module contains the WASM bytes
+            componentName as string
+        );
+        
+        // Register the transpiled component
+        await this.registry.registerComponent(transpiledResult.metadata, transpiledResult.jsCode);
+        
+        // Update displays
+        this.refreshClientSideComponents();
+        this.updatePaletteWithDiagramComponents();
+    }
+    
+    private async handleReleaseComponentFromPalette(elementId: string): Promise<void> {
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) throw new Error('No active diagram');
+        
+        const element = currentDiagram.elements[elementId];
+        if (!element) throw new Error('Element not found in diagram');
+        
+        const componentName = element.properties?.componentName || element.properties?.name;
+        if (!componentName) throw new Error('Component name not found');
+        
+        // Unload the component first
+        await this.unloadComponent(elementId, componentName as string);
+        
+        // Remove from registry
+        this.registry.removeComponent(componentName as string);
+        
+        // Update displays
+        this.refreshClientSideComponents();
+        this.updatePaletteWithDiagramComponents();
     }
 
     // Event handlers
@@ -275,13 +496,31 @@ export class WasmRuntimeManager extends WasmComponentManager {
         console.error(`Component upload failed: ${error}`);
         this.showNotification(`Upload failed: ${error}`, 'error');
     }
+    
+    async validateComponent(file: File): Promise<{ valid: boolean; report?: string }> {
+        try {
+            const arrayBuffer = await this.readFileAsArrayBuffer(file);
+            const report = await this.transpiler.generateSecurityReport(arrayBuffer);
+            
+            // Try to validate the component
+            const validation = await this.transpiler.validateComponent(arrayBuffer);
+            
+            return {
+                valid: validation.isValid,
+                report
+            };
+        } catch (error) {
+            return {
+                valid: false,
+                report: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            };
+        }
+    }
 
     private refreshComponentDisplays(): void {
-        // This would refresh any UI components that display the component list
+        // Refresh the enhanced palette with updated component lists
         console.log('Refreshing component displays...');
-        
-        // Update palette if it's showing
-        // Could trigger a refresh of the component library panel here
+        this.refreshClientSideComponents();
     }
 
     private showNotification(message: string, type: 'success' | 'error' | 'info'): void {
@@ -295,7 +534,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
             border-radius: 6px;
             color: white;
             font-weight: 500;
-            z-index: 10000;
+            z-index: 2000;
             animation: slideIn 0.3s ease;
             ${type === 'success' ? 'background: #10B981;' : 
               type === 'error' ? 'background: #EF4444;' : 
