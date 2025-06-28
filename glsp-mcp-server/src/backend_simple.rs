@@ -437,6 +437,20 @@ impl McpBackend for GlspBackend {
                     "required": ["diagramId", "elementId"]
                 }),
             },
+            Tool {
+                name: "debug_wit_analysis".to_string(),
+                description: "Debug WIT interface analysis for a specific WASM component file".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentPath": {
+                            "type": "string",
+                            "description": "Full file path to the WASM component file to analyze"
+                        }
+                    },
+                    "required": ["componentPath"]
+                }),
+            },
         ];
         
         Ok(ListToolsResult {
@@ -466,6 +480,7 @@ impl McpBackend for GlspBackend {
             "refresh_wasm_interfaces" => self.refresh_wasm_interfaces(request.arguments).await,
             "get_component_path" => self.get_component_path(request.arguments).await,
             "get_component_wit_info" => self.get_component_wit_info(request.arguments).await,
+            "debug_wit_analysis" => self.debug_wit_analysis(request.arguments).await,
             _ => Err(GlspError::NotImplemented(format!("Tool not implemented: {}", request.name)))
         }
     }
@@ -1497,6 +1512,79 @@ impl GlspBackend {
             Err(error) => {
                 Ok(CallToolResult {
                     content: vec![Content::text(format!("Failed to analyze component WIT interfaces: {error}"))],
+                    is_error: Some(true),
+                })
+            }
+        }
+    }
+
+    /// Debug tool to analyze WIT interfaces for a specific component file
+    async fn debug_wit_analysis(&self, args: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        use crate::wasm::WitAnalyzer;
+        use std::path::PathBuf;
+        
+        let args = args.ok_or_else(|| GlspError::ToolExecution("Missing arguments".to_string()))?;
+        
+        let component_path = args["componentPath"].as_str()
+            .ok_or_else(|| GlspError::ToolExecution("Missing componentPath parameter".to_string()))?;
+        
+        let path = PathBuf::from(component_path);
+        
+        if !path.exists() {
+            return Ok(CallToolResult {
+                content: vec![Content::text(format!("Component file not found: {}", component_path))],
+                is_error: Some(true),
+            });
+        }
+        
+        // Analyze the component with the WIT analyzer
+        match WitAnalyzer::analyze_component(&path).await {
+            Ok(analysis) => {
+                let debug_info = json!({
+                    "analysis": "WIT Debug Analysis",
+                    "componentName": analysis.component_name,
+                    "worldName": analysis.world_name,
+                    "filePath": component_path,
+                    "imports": analysis.imports.iter().map(|interface| json!({
+                        "name": interface.name,
+                        "type": "import",
+                        "functions": interface.functions.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+                        "functionCount": interface.functions.len(),
+                        "types": interface.types.iter().map(|t| t.name.clone()).collect::<Vec<_>>(),
+                        "typeCount": interface.types.len()
+                    })).collect::<Vec<_>>(),
+                    "exports": analysis.exports.iter().map(|interface| json!({
+                        "name": interface.name,
+                        "type": "export",
+                        "functions": interface.functions.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
+                        "functionCount": interface.functions.len(),
+                        "types": interface.types.iter().map(|t| t.name.clone()).collect::<Vec<_>>(),
+                        "typeCount": interface.types.len()
+                    })).collect::<Vec<_>>(),
+                    "summary": {
+                        "totalImports": analysis.imports.len(),
+                        "totalExports": analysis.exports.len(),
+                        "totalInterfaces": analysis.imports.len() + analysis.exports.len(),
+                        "totalTypes": analysis.types.len(),
+                        "totalDependencies": analysis.dependencies.len(),
+                        "hasRawWit": analysis.raw_wit.is_some()
+                    },
+                    "expectedForVideoAIPipeline": {
+                        "expectedImports": ["video-decoder", "object-detection"],
+                        "expectedExports": ["pipeline-control"],
+                        "note": "If this is the video-ai-pipeline component, we should see exactly these interfaces"
+                    }
+                });
+                
+                Ok(CallToolResult {
+                    content: vec![Content::text(serde_json::to_string_pretty(&debug_info)
+                        .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize debug info: {e}")))?)],
+                    is_error: Some(false),
+                })
+            }
+            Err(error) => {
+                Ok(CallToolResult {
+                    content: vec![Content::text(format!("WIT Analysis Failed: {error}\n\nThis might indicate:\n1. File is not a valid WASM component\n2. Component doesn't have WIT interfaces\n3. WIT parser error\n\nFalling back to basic file info..."))],
                     is_error: Some(true),
                 })
             }

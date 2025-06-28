@@ -587,6 +587,45 @@ impl WitAnalyzer {
         wit_text.push_str("}\n");
         Ok(wit_text)
     }
+
+    /// Debug method to test interface extraction from a specific component
+    pub async fn debug_component_interfaces<P: AsRef<Path>>(path: P) -> Result<()> {
+        let analysis = Self::analyze_component(path.as_ref()).await?;
+        
+        println!("🐛 DEBUG: Component Analysis Results");
+        println!("=====================================");
+        println!("Component: {}", analysis.component_name);
+        println!("World: {:?}", analysis.world_name);
+        println!();
+        
+        println!("📥 IMPORTS ({})", analysis.imports.len());
+        for (i, import) in analysis.imports.iter().enumerate() {
+            println!("  {}. {}", i + 1, import.name);
+            println!("     Functions: {}", import.functions.len());
+            for func in &import.functions {
+                println!("       - {}", func.name);
+            }
+        }
+        println!();
+        
+        println!("📤 EXPORTS ({})", analysis.exports.len());
+        for (i, export) in analysis.exports.iter().enumerate() {
+            println!("  {}. {}", i + 1, export.name);
+            println!("     Functions: {}", export.functions.len());
+            for func in &export.functions {
+                println!("       - {}", func.name);
+            }
+        }
+        println!();
+        
+        println!("🔗 DEPENDENCIES ({})", analysis.dependencies.len());
+        for dep in &analysis.dependencies {
+            println!("  - {}", dep.package);
+        }
+        
+        println!("=====================================");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
