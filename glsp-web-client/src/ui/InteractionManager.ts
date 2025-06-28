@@ -1,20 +1,28 @@
 import { CanvasRenderer, InteractionEvent } from '../renderer/canvas-renderer.js';
 import { DiagramService } from '../services/DiagramService.js';
 import { WasmComponentManager } from '../wasm/WasmComponentManager.js';
+import { UIManager } from './UIManager.js';
+import { statusManager } from '../services/StatusManager.js';
+import { McpService } from '../services/McpService.js';
 
 export class InteractionManager {
     private renderer: CanvasRenderer;
     private diagramService: DiagramService;
+    private mcpService: McpService;
     private wasmComponentManager?: WasmComponentManager;
+    private uiManager?: UIManager;
     private currentMode: string = 'select';
     private currentNodeType: string = '';
     private currentEdgeType: string = '';
     private spacePressed: boolean = false;
     private originalMode: string = 'select';
+    private autoSaveTimeout?: number;
+    private pendingAutoSave = false;
 
-    constructor(renderer: CanvasRenderer, diagramService: DiagramService) {
+    constructor(renderer: CanvasRenderer, diagramService: DiagramService, mcpService: McpService) {
         this.renderer = renderer;
         this.diagramService = diagramService;
+        this.mcpService = mcpService;
     }
 
     public setupEventHandlers(): void {
@@ -84,11 +92,25 @@ export class InteractionManager {
                 await this.diagramService.applyLayout(diagramId, 'hierarchical');
             }
         });
+        
+        window.addEventListener('toolbar-delete-selected', () => {
+            this.deleteSelected().catch(console.error);
+        });
+        
+        // Listen for diagram load events to pre-load WIT data
+        window.addEventListener('diagram-loaded-preload-wit', () => {
+            this.preloadWitDataForDiagram().catch(console.error);
+        });
     }
 
     // Set the WASM component manager reference
     public setWasmComponentManager(manager: WasmComponentManager): void {
         this.wasmComponentManager = manager;
+    }
+
+    // Set the UI manager reference for updating properties panel
+    public setUIManager(uiManager: UIManager): void {
+        this.uiManager = uiManager;
     }
 
     private async handleRendererInteraction(event: InteractionEvent): Promise<void> {
@@ -98,9 +120,16 @@ export class InteractionManager {
         switch (event.type) {
             case 'click':
                 await this.handleElementClick(event);
+                // Update properties panel when element is clicked
+                if (event.element && this.uiManager) {
+                    this.updatePropertiesPanel(event.element).catch(console.error);
+                } else if (!event.element && this.uiManager) {
+                    // Clear selection when clicking empty canvas
+                    this.uiManager.clearSelectedElement();
+                }
                 break;
             case 'drag-end':
-                // This will be handled by a dedicated method
+                await this.handleDragEnd(event);
                 break;
             case 'canvas-click':
                 await this.handleCanvasClick(event);
@@ -170,16 +199,230 @@ export class InteractionManager {
                 return; // Don't process other click actions for load switch
             }
             
-            // Check if this is a click on a loaded component (for execution view)
-            const nodeType = element.type || element.element_type || '';
-            if (nodeType === 'wasm-component' && this.wasmComponentManager.isComponentLoaded(element.id)) {
-                console.log('Loaded WASM component clicked - opening execution view:', element.id);
-                this.openComponentExecutionView(element.id);
-                return;
-            }
+            // Note: Removed automatic execution view opening to allow normal selection
+            // The execution view can be opened from the properties panel instead
         }
 
-        // Handle other types of clicks here...
+        // Allow normal selection to proceed for all elements including WASM components
+    }
+
+    private async updatePropertiesPanel(element: any): Promise<void> {
+        if (!this.uiManager) return;
+
+        const elementType = element.type || element.element_type || 'unknown';
+        const isNode = !elementType.includes('edge') && !elementType.includes('flow') && 
+                      !elementType.includes('association') && !elementType.includes('dependency') &&
+                      !elementType.includes('sequence-flow') && !elementType.includes('message-flow') &&
+                      !elementType.includes('conditional-flow');
+        
+        console.log('Updating properties panel for element:', element.id, 'type:', elementType, 'isNode:', isNode);
+
+        // Determine if this is a node or edge
+        const objectType = isNode ? 'node' : 'edge';
+        
+        let additionalProperties = {};
+        
+        // For WASM components, fetch WIT information if not already available
+        if (elementType === 'wasm-component') {
+            // Check if we already have interface data
+            if (!element.properties?.interfaces || element.properties.interfaces.length === 0) {
+                await this.fetchAndStoreWitInfo(element);
+            }
+            
+            additionalProperties = {
+                componentName: element.label || element.properties?.componentName,
+                isLoaded: element.properties?.isLoaded || false,
+                status: element.properties?.status || 'unknown',
+                interfaces: element.properties?.interfaces || [],
+                witInfo: element.properties?.witInfo,
+                witError: element.properties?.witError,
+                // Include summary statistics for display
+                importsCount: element.properties?.importsCount || 0,
+                exportsCount: element.properties?.exportsCount || 0,
+                totalFunctions: element.properties?.totalFunctions || 0,
+                dependenciesCount: element.properties?.dependenciesCount || 0
+            };
+        } else if (objectType === 'edge') {
+            additionalProperties = {
+                sourceId: element.sourceId || element.properties?.sourceId,
+                targetId: element.targetId || element.properties?.targetId,
+                routingPoints: element.routingPoints
+            };
+        }
+        
+        // Update the properties panel with element information
+        this.uiManager.updateSelectedElement(element.id, objectType, {
+            label: element.label || element.properties?.label || 'Untitled',
+            type: elementType,
+            bounds: element.bounds,
+            properties: element.properties || {},
+            ...additionalProperties
+        });
+    }
+
+    // Extract WIT fetching logic into a separate method
+    private async fetchAndStoreWitInfo(element: any): Promise<void> {
+        // Log element type for debugging
+        const elementType = element.type || element.element_type || '';
+        console.log(`Fetching WIT info for element: ${element.id}, type='${element.type}', element_type='${element.element_type}'`);
+        
+        try {
+            const diagramId = this.diagramService.getCurrentDiagramId();
+            if (!diagramId) return;
+
+            console.log('Fetching WIT info for WASM component:', element.id);
+            const mcpClient = this.diagramService.getMcpClient();
+            const witInfo = await mcpClient.callTool('get_component_wit_info', {
+                diagramId: diagramId,
+                elementId: element.id
+            });
+            
+            if (witInfo) {
+                // Check if it's an error response
+                if (witInfo.isError) {
+                    const errorMessage = witInfo.content[0].text;
+                    if (errorMessage.includes('not a WASM component')) {
+                        console.log('Skipping WIT info - not a WASM component:', errorMessage);
+                        return; // This is expected for non-WASM components
+                    } else {
+                        console.warn('Error fetching WIT info:', errorMessage);
+                        element.properties = {
+                            ...element.properties,
+                            interfaces: [],
+                            status: 'error',
+                            witError: errorMessage
+                        };
+                        return;
+                    }
+                }
+                
+                // Parse the successful response
+                const witData = JSON.parse(witInfo.content[0].text);
+                console.log('WIT data received:', witData);
+                
+                // Convert WIT data to interface format expected by renderer
+                const interfaces: any[] = [];
+                
+                // Add imports as input interfaces
+                if (witData.imports) {
+                    witData.imports.forEach((imp: any) => {
+                        interfaces.push({
+                            name: imp.name || imp.interface_name || 'import',
+                            interface_type: 'import',
+                            type: 'import',
+                            direction: 'input',
+                            functions: imp.functions || []
+                        });
+                    });
+                }
+                
+                // Add exports as output interfaces
+                if (witData.exports) {
+                    witData.exports.forEach((exp: any) => {
+                        interfaces.push({
+                            name: exp.name || exp.interface_name || 'export',
+                            interface_type: 'export',
+                            type: 'export',
+                            direction: 'output',
+                            functions: exp.functions || []
+                        });
+                    });
+                }
+                
+                console.log('Processed interfaces:', interfaces);
+                
+                // Update the element's properties with WIT data
+                element.properties = {
+                    ...element.properties,
+                    interfaces: interfaces,
+                    witInfo: witData,
+                    status: 'available',
+                    importsCount: witData.summary?.importsCount || 0,
+                    exportsCount: witData.summary?.exportsCount || 0,
+                    totalFunctions: witData.summary?.totalFunctions || 0,
+                    dependenciesCount: witData.summary?.dependenciesCount || 0
+                };
+                
+                console.log('Updated element properties with interfaces:', element.properties.interfaces);
+                
+                // Update the element in the backend to persist the interface data
+                try {
+                    await mcpClient.callTool('update_element', {
+                        diagramId: diagramId,
+                        elementId: element.id,
+                        properties: {
+                            interfaces: interfaces,
+                            witInfo: witData,
+                            status: 'available',
+                            importsCount: witData.summary?.importsCount || 0,
+                            exportsCount: witData.summary?.exportsCount || 0,
+                            totalFunctions: witData.summary?.totalFunctions || 0,
+                            dependenciesCount: witData.summary?.dependenciesCount || 0
+                        }
+                    });
+                    console.log('Persisted interface data to backend for element:', element.id);
+                    
+                    // No need to reload entire diagram - just trigger a re-render
+                    if (this.renderer) {
+                        this.renderer.render();
+                        console.log('Re-rendered diagram with updated interfaces');
+                    }
+                } catch (updateError) {
+                    console.error('Failed to persist interface data:', updateError);
+                }
+            } else {
+                console.warn('Failed to fetch WIT info:', witInfo?.content[0]?.text);
+                element.properties = {
+                    ...element.properties,
+                    interfaces: [],
+                    status: 'error',
+                    witError: 'Could not load WIT information'
+                };
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const isFileNotFound = errorMessage.includes('file not found') || errorMessage.includes('not found');
+            const isJsonError = error instanceof SyntaxError && errorMessage.includes('JSON');
+            
+            // Handle different error types
+            if (isJsonError) {
+                console.log(`WIT info: Skipping non-WASM component ${element.id} (${element.label || 'unnamed'})`);
+                // Don't set error properties for non-WASM components
+                return;
+            } else if (isFileNotFound) {
+                console.log(`WIT info: Component file not found for ${element.id} (${element.label || 'unnamed'}) - this is expected for placeholder components`);
+            } else {
+                console.error('Error fetching WIT info:', error);
+            }
+            
+            element.properties = {
+                ...element.properties,
+                interfaces: [],
+                status: isFileNotFound ? 'missing' : 'error',
+                witError: isFileNotFound ? 'Component file not found' : 'Error loading WIT information'
+            };
+        }
+        
+        // Trigger a re-render to show the updated interface circles
+        this.renderer.render();
+    }
+
+    // Method to pre-fetch WIT data for all WASM components in a diagram
+    public async preloadWitDataForDiagram(): Promise<void> {
+        const currentDiagram = this.renderer.getCurrentDiagram?.() || (this.renderer as any).currentDiagram;
+        if (!currentDiagram?.elements) return;
+
+        const wasmComponents = currentDiagram.elements.filter((el: any) => 
+            (el.type === 'wasm-component' || el.element_type === 'wasm-component') &&
+            (!el.properties?.interfaces || el.properties.interfaces.length === 0)
+        );
+
+        console.log(`Pre-loading WIT data for ${wasmComponents.length} WASM components`);
+        
+        // Fetch WIT data for all components in parallel
+        await Promise.allSettled(
+            wasmComponents.map(component => this.fetchAndStoreWitInfo(component))
+        );
     }
 
     private openComponentExecutionView(elementId: string): void {
@@ -522,6 +765,10 @@ function sleep(ms) {
                     event.preventDefault();
                     this.selectAll();
                     break;
+                case 'w':
+                    event.preventDefault();
+                    this.closeDiagram();
+                    break;
             }
         }
 
@@ -567,16 +814,77 @@ function sleep(ms) {
         }
     }
 
-    private deleteSelected(): void {
+    private async deleteSelected(): Promise<void> {
         try {
             const diagramId = this.diagramService.getCurrentDiagramId();
             if (!diagramId) return;
 
             console.log('Delete selected triggered via keyboard shortcut');
-            // TODO: Implement delete selected when selection manager is available
-            // For now, just log that the shortcut was triggered
+            
+            // Get selected elements from the renderer
+            const renderer = this.renderer as any;
+            if (!renderer.selectionManager || !renderer.selectionManager.getSelectedElements) {
+                console.log('No selection manager available');
+                return;
+            }
+            
+            // Get the current diagram from the renderer
+            const currentDiagram = renderer.getCurrentDiagram ? renderer.getCurrentDiagram() : renderer.currentDiagram;
+            if (!currentDiagram || !currentDiagram.elements) {
+                console.log('No diagram or elements available');
+                return;
+            }
+            
+            // Get selected elements
+            const selectedElements = renderer.selectionManager.getSelectedElements(currentDiagram.elements);
+            if (!selectedElements || selectedElements.length === 0) {
+                console.log('No elements selected to delete');
+                return;
+            }
+            
+            console.log(`Deleting ${selectedElements.length} selected element(s)`);
+            
+            // Set saving status before deletion
+            statusManager.setDiagramSyncStatus('saving');
+            
+            // Delete each selected element
+            let deleteCount = 0;
+            for (const element of selectedElements) {
+                if (element.id) {
+                    try {
+                        await this.mcpService.callTool('delete_element', {
+                            diagramId,
+                            elementId: element.id
+                        });
+                        console.log(`Deleted element: ${element.id}`);
+                        deleteCount++;
+                    } catch (error) {
+                        console.error(`Failed to delete element ${element.id}:`, error);
+                    }
+                }
+            }
+            
+            // Clear selection after deletion
+            if (renderer.selectionManager.clearSelection) {
+                renderer.selectionManager.clearSelection();
+            }
+            
+            // Reload the diagram to reflect changes
+            const updatedDiagram = await this.diagramService.loadDiagram(diagramId);
+            if (updatedDiagram) {
+                this.renderer.setDiagram(updatedDiagram);
+            }
+            
+            // Update status to show the diagram is saved (following the same pattern as createNode/createEdge)
+            if (deleteCount > 0) {
+                statusManager.setDiagramSaved();
+                console.log(`Successfully deleted ${deleteCount} element(s) and saved to server`);
+            } else {
+                statusManager.setDiagramSyncStatus('error', 'Failed to delete elements');
+            }
         } catch (error) {
             console.error('Failed to delete selected elements:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
         }
     }
 
@@ -588,6 +896,70 @@ function sleep(ms) {
         } catch (error) {
             console.error('Failed to clear selection:', error);
         }
+    }
+
+    private closeDiagram(): void {
+        try {
+            console.log('Close diagram triggered via keyboard shortcut (Ctrl+W)');
+            statusManager.clearCurrentDiagram();
+            window.dispatchEvent(new CustomEvent('diagram-close-requested'));
+            // Force header icon update
+            window.dispatchEvent(new CustomEvent('force-header-icon-update'));
+        } catch (error) {
+            console.error('Failed to close diagram:', error);
+        }
+    }
+
+    private async handleDragEnd(event: InteractionEvent): Promise<void> {
+        try {
+            const diagramId = this.diagramService.getCurrentDiagramId();
+            if (!diagramId) return;
+
+            // Get current diagram and its elements from the renderer
+            const renderer = this.renderer as any;
+            if (renderer.selectionManager && renderer.selectionManager.getSelectedElements) {
+                // Get the current diagram from the renderer
+                const currentDiagram = renderer.getCurrentDiagram ? renderer.getCurrentDiagram() : renderer.currentDiagram;
+                if (!currentDiagram || !currentDiagram.elements) {
+                    console.log('No diagram or elements available for auto-save');
+                    return;
+                }
+
+                // Get selected elements with full data including positions
+                const selectedElements = renderer.selectionManager.getSelectedElements(currentDiagram.elements);
+                
+                if (selectedElements && selectedElements.length > 0) {
+                    console.log(`Scheduling auto-save for ${selectedElements.length} moved element(s)`);
+                    
+                    // Debounce the auto-save to prevent excessive server requests
+                    this.scheduleAutoSave(diagramId, selectedElements);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to auto-save element positions after drag:', error);
+        }
+    }
+
+    private scheduleAutoSave(diagramId: string, selectedElements: any[]): void {
+        // Clear any existing timeout
+        if (this.autoSaveTimeout) {
+            clearTimeout(this.autoSaveTimeout);
+        }
+
+        // Mark that an auto-save is pending
+        this.pendingAutoSave = true;
+
+        // Schedule auto-save with 500ms debounce
+        this.autoSaveTimeout = window.setTimeout(async () => {
+            try {
+                console.log(`Auto-saving positions for ${selectedElements.length} moved element(s)`);
+                await this.diagramService.updateSelectedElementPositions(diagramId, selectedElements);
+                this.pendingAutoSave = false;
+            } catch (error) {
+                console.error('Debounced auto-save failed:', error);
+                this.pendingAutoSave = false;
+            }
+        }, 500); // 500ms debounce delay
     }
 
     private handleSpaceKeyDown(event: KeyboardEvent): void {
