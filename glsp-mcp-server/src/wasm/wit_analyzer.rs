@@ -171,10 +171,19 @@ impl WitAnalyzer {
         resolve: &Resolve,
         world_id: WorldId
     ) -> Result<ComponentWitAnalysis> {
+        // Debug: List all available worlds
+        println!("🌍 Available worlds in resolve:");
+        for (id, world) in &resolve.worlds {
+            println!("  - World ID {:?}: '{}' (imports: {}, exports: {})", 
+                id, world.name, world.imports.len(), world.exports.len());
+        }
+        
         let world = resolve.worlds.get(world_id)
             .ok_or_else(|| anyhow!("World not found in resolve"))?;
 
-        println!("🌍 Analyzing world: {}", world.name);
+        println!("🌍 Analyzing world: {} (ID: {:?})", world.name, world_id);
+        println!("📥 World imports count: {}", world.imports.len());
+        println!("📤 World exports count: {}", world.exports.len());
 
         let mut imports = Vec::new();
         let mut exports = Vec::new();
@@ -183,23 +192,27 @@ impl WitAnalyzer {
 
         // Extract imports
         for (key, import) in &world.imports {
+            println!("  🔍 Processing import: {:?} -> {:?}", key, import);
             let interface = Self::extract_world_item_interface(
                 resolve,
                 key,
                 import,
                 WitInterfaceType::Import
             ).await?;
+            println!("  ✅ Created import interface: {}", interface.name);
             imports.push(interface);
         }
 
         // Extract exports  
         for (key, export) in &world.exports {
+            println!("  🔍 Processing export: {:?} -> {:?}", key, export);
             let interface = Self::extract_world_item_interface(
                 resolve,
                 key,
                 export,
                 WitInterfaceType::Export
             ).await?;
+            println!("  ✅ Created export interface: {}", interface.name);
             exports.push(interface);
         }
 
