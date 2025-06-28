@@ -1,0 +1,44 @@
+{
+  "id": "d81a1adf-b5d3-4b59-af5a-927fc1d680ca",
+  "name": "New WASM 2025-06-28",
+  "diagram_type": "wasm-component",
+  "revision": 8,
+  "created_at": "2025-06-28T11:01:45.371682Z",
+  "updated_at": "2025-06-28T11:01:45.371686Z",
+  "nodes": [
+    {
+      "id": "b60d032a-dae5-4da3-8769-7cd1bae180f5",
+      "node_type": "wasm-component",
+      "label": "adas_lidar_ecu",
+      "properties": {
+        "label": "adas_lidar_ecu"
+      }
+    },
+    {
+      "id": "067d907c-352a-429f-83af-8fb552f2f475",
+      "node_type": "wasm-component",
+      "label": "sensors_camera_front",
+      "properties": {
+        "label": "sensors_camera_front"
+      }
+    },
+    {
+      "id": "462a9d77-99a5-41d9-b44a-2aff9b55606b",
+      "node_type": "wasm-component",
+      "label": "sensors_lidar",
+      "properties": {
+        "label": "sensors_lidar"
+      }
+    },
+    {
+      "id": "a771a7ba-13fc-46e5-b0ad-d99e0d28c812",
+      "node_type": "wasm-component",
+      "label": "system_feo_demo",
+      "properties": {
+        "label": "system_feo_demo"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

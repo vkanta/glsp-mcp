@@ -1,0 +1,71 @@
+{
+  "id": "61e9cf40-089e-484d-882c-3caf6cd97de7",
+  "name": "Sample Workflow",
+  "diagram_type": "workflow",
+  "revision": 14,
+  "created_at": "2025-06-27T18:19:42.662297Z",
+  "updated_at": "2025-06-27T18:19:42.662298Z",
+  "nodes": [
+    {
+      "id": "47bfb7c0-8b0e-4b7e-a992-3d6c42c42686",
+      "node_type": "start-event",
+      "label": "Start",
+      "properties": {
+        "label": "Start"
+      }
+    },
+    {
+      "id": "724b3c0f-eaf6-47b3-a1b3-d9cebace87df",
+      "node_type": "flow",
+      "label": null,
+      "properties": {
+        "sourceId": "3fd3d995-91fe-4621-8b77-73d88fe027a1",
+        "targetId": "fc02cde8-322e-45e9-827b-3eb779c7d257"
+      }
+    },
+    {
+      "id": "fc02cde8-322e-45e9-827b-3eb779c7d257",
+      "node_type": "gateway",
+      "label": "Valid?",
+      "properties": {
+        "label": "Valid?"
+      }
+    },
+    {
+      "id": "3fd3d995-91fe-4621-8b77-73d88fe027a1",
+      "node_type": "task",
+      "label": "Process Order",
+      "properties": {
+        "label": "Process Order"
+      }
+    },
+    {
+      "id": "ccf24e5e-6ecc-4fdd-aca7-0530d1600873",
+      "node_type": "flow",
+      "label": null,
+      "properties": {
+        "sourceId": "fc02cde8-322e-45e9-827b-3eb779c7d257",
+        "targetId": "8f2e334b-872a-4ae4-83a3-1e7b692c1e14"
+      }
+    },
+    {
+      "id": "8f2e334b-872a-4ae4-83a3-1e7b692c1e14",
+      "node_type": "end-event",
+      "label": "End",
+      "properties": {
+        "label": "End"
+      }
+    },
+    {
+      "id": "2db9fae1-9db0-4f33-a704-101be1faac04",
+      "node_type": "flow",
+      "label": null,
+      "properties": {
+        "sourceId": "47bfb7c0-8b0e-4b7e-a992-3d6c42c42686",
+        "targetId": "3fd3d995-91fe-4621-8b77-73d88fe027a1"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

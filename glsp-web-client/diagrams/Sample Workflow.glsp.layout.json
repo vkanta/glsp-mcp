@@ -1,0 +1,52 @@
+{
+  "diagram_id": "61e9cf40-089e-484d-882c-3caf6cd97de7",
+  "revision": 14,
+  "updated_at": "2025-06-27T18:19:42.662298Z",
+  "elements": {
+    "8f2e334b-872a-4ae4-83a3-1e7b692c1e14": {
+      "bounds": {
+        "x": 500.0,
+        "y": 100.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    },
+    "3fd3d995-91fe-4621-8b77-73d88fe027a1": {
+      "bounds": {
+        "x": 200.0,
+        "y": 100.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    },
+    "47bfb7c0-8b0e-4b7e-a992-3d6c42c42686": {
+      "bounds": {
+        "x": 50.0,
+        "y": 100.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    },
+    "fc02cde8-322e-45e9-827b-3eb779c7d257": {
+      "bounds": {
+        "x": 350.0,
+        "y": 100.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    }
+  },
+  "viewport": null
+}

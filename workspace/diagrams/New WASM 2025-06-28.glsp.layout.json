@@ -1,0 +1,19 @@
+{
+  "diagram_id": "63c02063-8b46-4cd6-a8eb-abbe28f0950c",
+  "revision": 55,
+  "updated_at": "2025-06-28T12:07:26.320307Z",
+  "elements": {
+    "b255a997-f664-4b12-9013-f42382f1c8c1": {
+      "bounds": {
+        "x": 306.8940734863281,
+        "y": 140.45138549804688,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    }
+  },
+  "viewport": null
+}

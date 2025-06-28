@@ -1,0 +1,1853 @@
+{
+  "id": "63c02063-8b46-4cd6-a8eb-abbe28f0950c",
+  "name": "New WASM 2025-06-28",
+  "diagram_type": "wasm-component",
+  "revision": 55,
+  "created_at": "2025-06-28T12:07:26.320304Z",
+  "updated_at": "2025-06-28T12:07:26.320307Z",
+  "nodes": [
+    {
+      "id": "b255a997-f664-4b12-9013-f42382f1c8c1",
+      "node_type": "wasm-component",
+      "label": "adas_video_decoder",
+      "properties": {
+        "importsCount": 11,
+        "dependenciesCount": 4,
+        "interfaces": [
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "get-environment",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "environment",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "exit",
+                "params": [
+                  {
+                    "name": "status",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": []
+              }
+            ],
+            "interface_type": "import",
+            "name": "exit",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [],
+            "interface_type": "import",
+            "name": "error",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "[method]output-stream.check-write",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]output-stream.write",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  },
+                  {
+                    "name": "contents",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]output-stream.blocking-write-and-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  },
+                  {
+                    "name": "contents",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]output-stream.blocking-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "streams",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "get-stdin",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdin",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "get-stdout",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdout",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "get-stderr",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stderr",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "now",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "monotonic-clock",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "now",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "wall-clock",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "[method]descriptor.write-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  },
+                  {
+                    "name": "offset",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]descriptor.append-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]descriptor.get-type",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]descriptor.stat",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "filesystem-error-code",
+                "params": [
+                  {
+                    "name": "err",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "types",
+            "type": "import"
+          },
+          {
+            "direction": "input",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "get-directories",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "preopens",
+            "type": "import"
+          },
+          {
+            "direction": "output",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "[method]camera-stream.get-frame",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]camera-stream.get-intrinsics",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "[method]camera-stream.is-available",
+                "params": [
+                  {
+                    "name": "self",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "create-stream",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "export",
+            "name": "camera-data",
+            "type": "export"
+          },
+          {
+            "direction": "output",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "load-embedded-video",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "play",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "pause",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "stop",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "seek-to-frame",
+                "params": [
+                  {
+                    "name": "frame",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "seek-to-time",
+                "params": [
+                  {
+                    "name": "time-ms",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "set-playback-speed",
+                "params": [
+                  {
+                    "name": "speed",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "set-loop",
+                "params": [
+                  {
+                    "name": "enabled",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "update-config",
+                "params": [
+                  {
+                    "name": "config",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-status",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-current-frame",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-elapsed-time",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-playback-metrics",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-video-info",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "run-diagnostic",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "export",
+            "name": "video-control",
+            "type": "export"
+          },
+          {
+            "direction": "output",
+            "functions": [
+              {
+                "isAsync": false,
+                "name": "execute-cycle",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "can-execute",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "has-output",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "reset-component",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "enable-component",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "disable-component",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "flush-component",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-execution-state",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-last-metrics",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-component-info",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-data-slot-status",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-diagnostics",
+                "params": [],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "has-input-data",
+                "params": [
+                  {
+                    "name": "slot-name",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "has-output-space",
+                "params": [
+                  {
+                    "name": "slot-name",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "get-slot-size",
+                "params": [
+                  {
+                    "name": "slot-name",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              },
+              {
+                "isAsync": false,
+                "name": "clear-slot",
+                "params": [
+                  {
+                    "name": "slot-name",
+                    "type": "anonymous"
+                  }
+                ],
+                "results": [
+                  {
+                    "name": "result",
+                    "type": "anonymous"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "export",
+            "name": "feo-control",
+            "type": "export"
+          }
+        ],
+        "witInfo": {
+          "componentName": "adas_video_decoder",
+          "dependencies": [
+            {
+              "interfaces": [
+                "error",
+                "streams"
+              ],
+              "package": "wasi:io",
+              "version": "0.2.3"
+            },
+            {
+              "interfaces": [
+                "environment",
+                "exit",
+                "stdin",
+                "stdout",
+                "stderr"
+              ],
+              "package": "wasi:cli",
+              "version": "0.2.3"
+            },
+            {
+              "interfaces": [
+                "monotonic-clock",
+                "wall-clock"
+              ],
+              "package": "wasi:clocks",
+              "version": "0.2.3"
+            },
+            {
+              "interfaces": [
+                "types",
+                "preopens"
+              ],
+              "package": "wasi:filesystem",
+              "version": "0.2.3"
+            }
+          ],
+          "exports": [
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "[method]camera-stream.get-frame",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]camera-stream.get-intrinsics",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]camera-stream.is-available",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "create-stream",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "camera-data",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }] }",
+                  "name": "position3d"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"w\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }] }",
+                  "name": "quaternion"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"orientation\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
+                  "name": "camera-pose"
+                },
+                {
+                  "definition": "Enum { cases: [\"rgb8\", \"rgba8\", \"bgr8\", \"bgra8\", \"yuv420\", \"gray8\", \"gray16\"] }",
+                  "name": "pixel-format"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"width\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"height\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"data\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"format\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"exposure-time\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"gain\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"sensor-pose\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
+                  "name": "camera-frame"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"focal-length-x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"focal-length-y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"principal-point-x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"principal-point-y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"distortion\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
+                  "name": "camera-intrinsics"
+                },
+                {
+                  "definition": "Resource { methods: [] }",
+                  "name": "camera-stream"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "load-embedded-video",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "play",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "pause",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "stop",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "seek-to-frame",
+                  "params": [
+                    {
+                      "name": "frame",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "seek-to-time",
+                  "params": [
+                    {
+                      "name": "time-ms",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "set-playback-speed",
+                  "params": [
+                    {
+                      "name": "speed",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "set-loop",
+                  "params": [
+                    {
+                      "name": "enabled",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "update-config",
+                  "params": [
+                    {
+                      "name": "config",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-status",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-current-frame",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-elapsed-time",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-playback-metrics",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-video-info",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "run-diagnostic",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "video-control",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Record { fields: [WitParam { name: \"auto-play\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"bool\") } }, WitParam { name: \"loop-enabled\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"bool\") } }, WitParam { name: \"playback-speed\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"start-frame\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
+                  "name": "video-config"
+                },
+                {
+                  "definition": "Enum { cases: [\"unloaded\", \"loading\", \"ready\", \"playing\", \"paused\", \"ended\", \"error\"] }",
+                  "name": "video-status"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"width\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"height\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"frame-count\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"frame-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"duration-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"file-size\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }] }",
+                  "name": "video-info"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"current-frame\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"elapsed-time-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"playback-speed\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"frames-decoded\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"cache-hit-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
+                  "name": "playback-metrics"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "execute-cycle",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "can-execute",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "has-output",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "reset-component",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "enable-component",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "disable-component",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "flush-component",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-execution-state",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-last-metrics",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-component-info",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-data-slot-status",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-diagnostics",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "has-input-data",
+                  "params": [
+                    {
+                      "name": "slot-name",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "has-output-space",
+                  "params": [
+                    {
+                      "name": "slot-name",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "get-slot-size",
+                  "params": [
+                    {
+                      "name": "slot-name",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "clear-slot",
+                  "params": [
+                    {
+                      "name": "slot-name",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "feo-control",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Enum { cases: [\"idle\", \"ready\", \"processing\", \"completed\", \"error\", \"disabled\"] }",
+                  "name": "execution-state"
+                },
+                {
+                  "definition": "Enum { cases: [\"success\", \"no-input-data\", \"no-output-space\", \"processing-error\", \"component-disabled\"] }",
+                  "name": "execution-result"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"execution-time-us\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"input-items-consumed\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"output-items-produced\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"errors-encountered\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"memory-used-bytes\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"cpu-cycles-estimated\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }] }",
+                  "name": "execution-metrics"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"component-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"component-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"version\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"input-interfaces\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"output-interfaces\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"execution-time-budget-us\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"memory-budget-bytes\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }] }",
+                  "name": "component-info"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"slot-name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"slot-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"buffer-size\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"buffer-capacity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"items-available\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"items-pending\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
+                  "name": "data-slot-info"
+                }
+              ],
+              "version": null
+            }
+          ],
+          "filePath": "../workspace/adas-wasm-components/components/input/video-decoder/target/wasm32-wasip2/debug/adas_video_decoder.wasm",
+          "imports": [
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "get-environment",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "environment",
+              "namespace": null,
+              "package": null,
+              "types": [],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "exit",
+                  "params": [
+                    {
+                      "name": "status",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": []
+                }
+              ],
+              "name": "exit",
+              "namespace": null,
+              "package": null,
+              "types": [],
+              "version": null
+            },
+            {
+              "functions": [],
+              "name": "error",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Resource { methods: [] }",
+                  "name": "error"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "[method]output-stream.check-write",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]output-stream.write",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    },
+                    {
+                      "name": "contents",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]output-stream.blocking-write-and-flush",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    },
+                    {
+                      "name": "contents",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]output-stream.blocking-flush",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "streams",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "error"
+                },
+                {
+                  "definition": "Resource { methods: [] }",
+                  "name": "output-stream"
+                },
+                {
+                  "definition": "Resource { methods: [] }",
+                  "name": "input-stream"
+                },
+                {
+                  "definition": "Variant { cases: [WitVariantCase { name: \"last-operation-failed\", payload: Some(WitType { name: \"anonymous\", type_def: Primitive(\"custom\") }) }, WitVariantCase { name: \"closed\", payload: None }] }",
+                  "name": "stream-error"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "get-stdin",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "stdin",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "input-stream"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "get-stdout",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "stdout",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "output-stream"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "get-stderr",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "stderr",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "output-stream"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "now",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "monotonic-clock",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "instant"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "now",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "wall-clock",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Record { fields: [WitParam { name: \"seconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"nanoseconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
+                  "name": "datetime"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "[method]descriptor.write-via-stream",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    },
+                    {
+                      "name": "offset",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]descriptor.append-via-stream",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]descriptor.get-type",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "[method]descriptor.stat",
+                  "params": [
+                    {
+                      "name": "self",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                },
+                {
+                  "isAsync": false,
+                  "name": "filesystem-error-code",
+                  "params": [
+                    {
+                      "name": "err",
+                      "type": "anonymous"
+                    }
+                  ],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "types",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Resource { methods: [] }",
+                  "name": "descriptor"
+                },
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "error"
+                },
+                {
+                  "definition": "Enum { cases: [\"access\", \"would-block\", \"already\", \"bad-descriptor\", \"busy\", \"deadlock\", \"quota\", \"exist\", \"file-too-large\", \"illegal-byte-sequence\", \"in-progress\", \"interrupted\", \"invalid\", \"io\", \"is-directory\", \"loop\", \"too-many-links\", \"message-size\", \"name-too-long\", \"no-device\", \"no-entry\", \"no-lock\", \"insufficient-memory\", \"insufficient-space\", \"not-directory\", \"not-empty\", \"not-recoverable\", \"unsupported\", \"no-tty\", \"no-such-device\", \"overflow\", \"not-permitted\", \"pipe\", \"read-only\", \"invalid-seek\", \"text-file-busy\", \"cross-device\"] }",
+                  "name": "error-code"
+                },
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "filesize"
+                },
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "output-stream"
+                },
+                {
+                  "definition": "Enum { cases: [\"unknown\", \"block-device\", \"character-device\", \"directory\", \"fifo\", \"symbolic-link\", \"regular-file\", \"socket\"] }",
+                  "name": "descriptor-type"
+                },
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "link-count"
+                },
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "datetime"
+                },
+                {
+                  "definition": "Record { fields: [WitParam { name: \"type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"link-count\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"size\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-access-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-modification-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"status-change-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
+                  "name": "descriptor-stat"
+                }
+              ],
+              "version": null
+            },
+            {
+              "functions": [
+                {
+                  "isAsync": false,
+                  "name": "get-directories",
+                  "params": [],
+                  "results": [
+                    {
+                      "name": "result",
+                      "type": "anonymous"
+                    }
+                  ]
+                }
+              ],
+              "name": "preopens",
+              "namespace": null,
+              "package": null,
+              "types": [
+                {
+                  "definition": "Primitive(\"unknown\")",
+                  "name": "descriptor"
+                }
+              ],
+              "version": null
+            }
+          ],
+          "summary": {
+            "dependenciesCount": 4,
+            "exportsCount": 3,
+            "importsCount": 11,
+            "totalFunctions": 52,
+            "typesCount": 20
+          },
+          "worldName": "root"
+        },
+        "label": "adas_video_decoder",
+        "exportsCount": 3,
+        "description": "ADAS component: adas_video_decoder",
+        "componentName": "adas_video_decoder",
+        "totalFunctions": 52,
+        "status": "available",
+        "componentPath": "../workspace/adas-wasm-components/components/input/video-decoder/target/wasm32-wasip2/debug/adas_video_decoder.wasm"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}
