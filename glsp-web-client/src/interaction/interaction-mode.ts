@@ -2,10 +2,19 @@
  * Interaction modes for the diagram editor
  */
 
+export interface InterfaceLinkInfo {
+    componentId: string;
+    interfaceName: string;
+    interfaceType: 'import' | 'export';
+    interfaceObject: any; // WIT interface details
+    position: { x: number; y: number }; // Visual position for UI feedback
+}
+
 export enum InteractionMode {
     Select = 'select',
     CreateNode = 'create-node',
     CreateEdge = 'create-edge',
+    CreateInterfaceLink = 'create-interface-link',
     Pan = 'pan'
 }
 
@@ -42,6 +51,7 @@ export class InteractionModeManager {
     private selectedNodeType: string = 'task';
     private selectedEdgeType: string = 'flow';
     private modeChangeHandlers: ((mode: InteractionMode) => void)[] = [];
+    private sourceInterface?: InterfaceLinkInfo;
     
     constructor() {}
     
@@ -72,6 +82,25 @@ export class InteractionModeManager {
     setSelectedEdgeType(type: string): void {
         this.selectedEdgeType = type;
         this.setMode(InteractionMode.CreateEdge);
+    }
+    
+    // Interface linking methods
+    startInterfaceLinking(): void {
+        this.sourceInterface = undefined;
+        this.setMode(InteractionMode.CreateInterfaceLink);
+    }
+    
+    setSourceInterface(interfaceInfo: InterfaceLinkInfo): void {
+        this.sourceInterface = interfaceInfo;
+    }
+    
+    getSourceInterface(): InterfaceLinkInfo | undefined {
+        return this.sourceInterface;
+    }
+    
+    clearInterfaceLinking(): void {
+        this.sourceInterface = undefined;
+        this.setMode(InteractionMode.Select);
     }
     
     onModeChange(handler: (mode: InteractionMode) => void): void {
