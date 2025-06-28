@@ -4,6 +4,9 @@ import { WasmComponentManager } from '../wasm/WasmComponentManager.js';
 import { UIManager } from './UIManager.js';
 import { statusManager } from '../services/StatusManager.js';
 import { McpService } from '../services/McpService.js';
+import { InterfaceConnectionDialog, InterfaceConnectionOption } from './dialogs/specialized/InterfaceConnectionDialog.js';
+import { InterfaceCompatibilityChecker, WitInterface } from '../diagrams/interface-compatibility.js';
+import { InteractionMode } from '../interaction/interaction-mode.js';
 
 export class InteractionManager {
     private renderer: CanvasRenderer;
@@ -64,6 +67,10 @@ export class InteractionManager {
                 this.renderer.setInteractionMode('create-node');
             } else if (this.currentMode === 'create-edge') {
                 this.renderer.setInteractionMode('create-edge');
+            } else if (this.currentMode === 'create-interface-link') {
+                this.renderer.setInteractionMode('create-interface-link');
+                // Ensure interface data is loaded when entering interface linking mode
+                this.preloadWitDataForDiagram().catch(console.error);
             } else {
                 this.renderer.setInteractionMode('select');
             }
@@ -139,6 +146,9 @@ export class InteractionManager {
                     const edgeType = this.currentEdgeType || 'flow';
                     await this.diagramService.createEdge(diagramId, edgeType, event.sourceElement.id, event.element.id);
                 }
+                break;
+            case 'interface-click':
+                await this.handleInterfaceClick(event);
                 break;
         }
     }
@@ -409,10 +419,11 @@ export class InteractionManager {
 
     // Method to pre-fetch WIT data for all WASM components in a diagram
     public async preloadWitDataForDiagram(): Promise<void> {
-        const currentDiagram = this.renderer.getCurrentDiagram?.() || (this.renderer as any).currentDiagram;
+        const currentDiagram = this.renderer.getCurrentDiagram ? this.renderer.getCurrentDiagram() : this.renderer.currentDiagram;
         if (!currentDiagram?.elements) return;
 
-        const wasmComponents = currentDiagram.elements.filter((el: any) => 
+        // Convert elements object to array and filter for WASM components without interface data
+        const wasmComponents = Object.values(currentDiagram.elements).filter((el: any) => 
             (el.type === 'wasm-component' || el.element_type === 'wasm-component') &&
             (!el.properties?.interfaces || el.properties.interfaces.length === 0)
         );
@@ -423,6 +434,12 @@ export class InteractionManager {
         await Promise.allSettled(
             wasmComponents.map(component => this.fetchAndStoreWitInfo(component))
         );
+        
+        // Force re-render after loading interface data
+        if (wasmComponents.length > 0) {
+            this.renderer.render();
+            console.log(`Completed pre-loading WIT data and re-rendered diagram`);
+        }
     }
 
     private openComponentExecutionView(elementId: string): void {
@@ -988,6 +1005,130 @@ function sleep(ms) {
             this.currentMode = this.originalMode;
             this.renderer.setInteractionMode(this.originalMode);
             console.log('Space released - returning to', this.originalMode, 'mode');
+        }
+    }
+
+    private async handleInterfaceClick(event: InteractionEvent): Promise<void> {
+        if (!event.interfaceInfo) return;
+
+        const { interfaceInfo } = event;
+
+        // Get current diagram for finding compatible interfaces
+        const diagramId = this.diagramService.getCurrentDiagramId();
+        if (!diagramId) return;
+
+        const currentDiagram = this.renderer.getCurrentDiagram ? this.renderer.getCurrentDiagram() : this.renderer.currentDiagram;
+        if (!currentDiagram) return;
+
+        // Convert interface info to WitInterface format
+        const sourceInterface: WitInterface = {
+            name: interfaceInfo.interface.name || 'unknown',
+            interface_type: interfaceInfo.interfaceType,
+            functions: interfaceInfo.interface.functions || [],
+            types: interfaceInfo.interface.types || []
+        };
+
+        // Find all available interfaces in the diagram
+        const availableInterfaces: Array<{ componentId: string; interface: WitInterface }> = [];
+        
+        Object.values(currentDiagram.elements).forEach(element => {
+            const elementType = element.type || element.element_type;
+            if (elementType === 'wasm-component' && element.id !== interfaceInfo.componentId) {
+                const interfaces = element.properties?.interfaces || [];
+                interfaces.forEach((iface: any) => {
+                    const witInterface: WitInterface = {
+                        name: iface.name || 'unknown',
+                        interface_type: iface.interface_type,
+                        functions: iface.functions || [],
+                        types: iface.types || []
+                    };
+                    availableInterfaces.push({
+                        componentId: element.id,
+                        interface: witInterface
+                    });
+                });
+            }
+        });
+
+        // Find compatible interfaces
+        const compatibleInterfaces = InterfaceCompatibilityChecker.findCompatibleInterfaces(
+            sourceInterface,
+            availableInterfaces
+        );
+
+        if (compatibleInterfaces.length === 0) {
+            console.log('No compatible interfaces found');
+            // TODO: Show a notification to the user
+            return;
+        }
+
+        // Prepare dialog options
+        const connectionOptions: InterfaceConnectionOption[] = compatibleInterfaces.map(result => ({
+            componentId: result.componentId,
+            componentName: currentDiagram.elements[result.componentId]?.label?.toString() || 
+                          currentDiagram.elements[result.componentId]?.properties?.componentName?.toString() || 
+                          result.componentId,
+            interface: result.interface,
+            compatibility: result.compatibility
+        }));
+
+        // Show interface connection dialog
+        const dialog = new InterfaceConnectionDialog({
+            sourceComponentId: interfaceInfo.componentId,
+            sourceComponentName: currentDiagram.elements[interfaceInfo.componentId]?.label?.toString() || 
+                                currentDiagram.elements[interfaceInfo.componentId]?.properties?.componentName?.toString() || 
+                                interfaceInfo.componentId,
+            sourceInterface: sourceInterface,
+            availableInterfaces: connectionOptions,
+            position: interfaceInfo.connectorPosition
+        });
+
+        // Handle connection creation
+        const selectedOption = await dialog.show();
+        if (selectedOption) {
+            await this.createInterfaceConnection(
+                interfaceInfo.componentId,
+                sourceInterface,
+                selectedOption.componentId,
+                selectedOption.interface
+            );
+        }
+    }
+
+    private async createInterfaceConnection(
+        sourceComponentId: string,
+        sourceInterface: WitInterface,
+        targetComponentId: string,
+        targetInterface: WitInterface
+    ): Promise<void> {
+        const diagramId = this.diagramService.getCurrentDiagramId();
+        if (!diagramId) return;
+
+        try {
+            statusManager.setDiagramSyncStatus('saving');
+
+            // Create edge with interface metadata
+            await this.mcpService.createEdge(
+                diagramId,
+                'interface-connection',
+                sourceComponentId,
+                targetComponentId,
+                `${sourceInterface.name} → ${targetInterface.name}`
+            );
+
+            // TODO: Add interface-specific metadata to the edge
+            console.log('Interface connection created:', {
+                source: { component: sourceComponentId, interface: sourceInterface.name },
+                target: { component: targetComponentId, interface: targetInterface.name }
+            });
+
+            // Reload diagram to show the new connection
+            await this.diagramService.loadDiagram(diagramId);
+            statusManager.setDiagramSaved();
+
+        } catch (error) {
+            console.error('Failed to create interface connection:', error);
+            statusManager.setDiagramSyncStatus('error', error instanceof Error ? error.message : 'Unknown error');
         }
     }
 }
