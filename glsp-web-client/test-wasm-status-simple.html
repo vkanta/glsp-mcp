@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Component Status Test - Simple</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #e5e9f0;
+        }
+        .test-canvas {
+            border: 1px solid #3d444d;
+            margin: 20px 0;
+            background: #0F1419;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4A9EFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #3A8EEF;
+        }
+        .status {
+            padding: 10px;
+            background: #1C2333;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .component-demo {
+            display: inline-block;
+            margin: 20px;
+            text-align: center;
+        }
+        .component-box {
+            width: 200px;
+            height: 120px;
+            border-radius: 12px;
+            position: relative;
+            margin: 10px auto;
+            transition: all 0.3s ease;
+        }
+        .component-loaded {
+            background: linear-gradient(180deg, #4F46E5, #4339C9);
+            border: 2px solid #6366F1;
+        }
+        .component-unloaded {
+            background: linear-gradient(180deg, #374151, #1F2937);
+            border: 2px solid #6B7280;
+        }
+        .component-missing {
+            background: linear-gradient(180deg, #EF4444, #DC2626);
+            border: 2px solid #F87171;
+            opacity: 0.8;
+        }
+        .component-header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 10px 10px 0 0;
+            font-weight: bold;
+        }
+        .status-indicator {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .status-loaded {
+            background: #10B981;
+        }
+        .status-unloaded {
+            background: #6B7280;
+        }
+        .status-error {
+            background: #EF4444;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .component-ports {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            transform: translateY(-50%);
+        }
+        .port {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #10B981;
+        }
+        .port-input {
+            margin-left: -8px;
+        }
+        .port-output {
+            margin-right: -8px;
+            border-color: #F59E0B;
+        }
+    </style>
+</head>
+<body>
+    <h1>WASM Component Visual Status Test</h1>
+    
+    <p>This demonstrates how WASM components appear in different states:</p>
+    
+    <div style="display: flex; gap: 40px; justify-content: center;">
+        <div class="component-demo">
+            <h3>Loaded Component</h3>
+            <div class="component-box component-loaded">
+                <div class="component-header">Object Detection AI</div>
+                <div class="status-indicator status-loaded"></div>
+                <div class="component-ports">
+                    <div class="port port-input"></div>
+                    <div class="port port-output"></div>
+                </div>
+            </div>
+            <p style="color: #10B981;">✅ Active</p>
+        </div>
+        
+        <div class="component-demo">
+            <h3>Unloaded Component</h3>
+            <div class="component-box component-unloaded">
+                <div class="component-header">Camera Input ECU</div>
+                <div class="status-indicator status-unloaded"></div>
+                <div class="component-ports">
+                    <div class="port port-input"></div>
+                    <div class="port port-output"></div>
+                </div>
+            </div>
+            <p style="color: #6B7280;">⭕ Inactive</p>
+        </div>
+        
+        <div class="component-demo">
+            <h3>Missing Component</h3>
+            <div class="component-box component-missing">
+                <div class="component-header">Vision Processor</div>
+                <div class="status-indicator status-error"></div>
+                <div class="component-ports">
+                    <div class="port port-input"></div>
+                    <div class="port port-output"></div>
+                </div>
+            </div>
+            <p style="color: #EF4444;">❌ Error</p>
+        </div>
+    </div>
+    
+    <div style="margin-top: 40px; padding: 20px; background: #1C2333; border-radius: 8px;">
+        <h3>Visual Indicators Explained:</h3>
+        <ul style="line-height: 1.8;">
+            <li><strong>Loaded (Active):</strong> Purple gradient background, green status indicator, component is ready to execute</li>
+            <li><strong>Unloaded (Inactive):</strong> Gray gradient background, gray status indicator, component needs to be loaded</li>
+            <li><strong>Missing (Error):</strong> Red gradient background with reduced opacity, red status indicator, component file not found</li>
+            <li><strong>Ports:</strong> Green = Input interfaces, Orange = Output interfaces</li>
+        </ul>
+    </div>
+    
+    <div style="margin-top: 40px;">
+        <h3>In the Application:</h3>
+        <p>1. Components appear as "Unloaded" when first added to the canvas</p>
+        <p>2. Click the Load button (📥) in the floating panel to load a component</p>
+        <p>3. The component will update to show "Loaded" status with visual changes</p>
+        <p>4. If a component file is missing, it will show the error state</p>
+        <p>5. Use the Unload button (📤) to unload a component</p>
+    </div>
+</body>
+</html>
