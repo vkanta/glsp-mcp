@@ -62,15 +62,38 @@ export class WasmComponentRendererV2 {
         console.log('WasmComponentRendererV2: Interfaces:', interfaces);
         console.log('WasmComponentRendererV2: Interface count:', interfaces.length);
 
-        // Use consistent sizing
+        // Separate input and output interfaces for height calculation
+        const inputs = interfaces.filter(i => 
+            i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
+        );
+        const outputs = interfaces.filter(i => 
+            i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
+        );
+        
+        // Calculate minimum height needed for interfaces
+        const maxPorts = Math.max(inputs.length, outputs.length);
+        const minHeightForPorts = this.HEADER_HEIGHT + 40 + (maxPorts * this.PORT_SPACING);
+        
+        // Use consistent sizing with dynamic height adjustment
         const width = Math.max(bounds.width, this.DEFAULT_WIDTH);
-        const height = Math.max(bounds.height, this.DEFAULT_HEIGHT);
+        const height = Math.max(bounds.height, this.DEFAULT_HEIGHT, minHeightForPorts);
+        
+        console.log(`WasmComponentRendererV2: Component ${componentName} - inputs: ${inputs.length}, outputs: ${outputs.length}, max: ${maxPorts}`);
+        console.log(`WasmComponentRendererV2: Height calculation - original: ${bounds.height}, default: ${this.DEFAULT_HEIGHT}, required: ${minHeightForPorts}, final: ${height}`);
         
         // Center the component if bounds are larger than needed
         const x = bounds.x + (bounds.width - width) / 2;
         const y = bounds.y + (bounds.height - height) / 2;
         
         const actualBounds = { x, y, width, height };
+        
+        // Update element bounds if component size changed due to interface count
+        if (height > bounds.height || width > bounds.width) {
+            // Update the element's bounds to reflect the actual rendered size
+            // This ensures selection and interaction work correctly
+            Object.assign(bounds, { width, height });
+            console.log(`WasmComponentRendererV2: Updated bounds for ${componentName} to ${width}x${height}`);
+        }
 
         // Draw main component body
         this.drawComponentBody(ctx, actualBounds, colors, isSelected, isHovered, status);
@@ -237,9 +260,6 @@ export class WasmComponentRendererV2 {
         colors: any,
         isSelected: boolean
     ): void {
-        console.log('WasmComponentRendererV2: drawPorts called with', interfaces.length, 'interfaces');
-        console.log('WasmComponentRendererV2: Interface details:', interfaces);
-        
         // Separate input and output interfaces
         const inputs = interfaces.filter(i => 
             i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
@@ -247,9 +267,6 @@ export class WasmComponentRendererV2 {
         const outputs = interfaces.filter(i => 
             i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
         );
-        
-        console.log('WasmComponentRendererV2: Filtered inputs:', inputs.length, inputs);
-        console.log('WasmComponentRendererV2: Filtered outputs:', outputs.length, outputs);
 
         // Draw input ports (left side)
         this.drawPortGroup(ctx, bounds, inputs, 'input', colors, isSelected);
@@ -271,14 +288,14 @@ export class WasmComponentRendererV2 {
         const isInput = type === 'input';
         const portColor = isInput ? colors.input : colors.output;
         
-        // Calculate port positions
+        // Calculate port positions with proper spacing
         const startY = bounds.y + this.HEADER_HEIGHT + 20;
-        const availableHeight = bounds.height - this.HEADER_HEIGHT - 40;
-        const spacing = Math.min(this.PORT_SPACING, availableHeight / Math.max(ports.length, 1));
+        const spacing = this.PORT_SPACING; // Use consistent spacing - component height is now dynamic
 
         ports.forEach((port, index) => {
             const x = isInput ? bounds.x : bounds.x + bounds.width;
             const y = startY + (index * spacing);
+
 
             // Draw port circle
             ctx.fillStyle = portColor;
@@ -543,6 +560,7 @@ export class WasmComponentRendererV2 {
         position: { x: number; y: number }
     ): { port: any; type: 'input' | 'output' } | null {
         const interfaces = element.properties?.interfaces as any[] || [];
+        
         const inputs = interfaces.filter(i => 
             i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
         );
@@ -561,7 +579,8 @@ export class WasmComponentRendererV2 {
             const portY = startY + (i * spacing);
             const distance = Math.sqrt(Math.pow(position.x - portX, 2) + Math.pow(position.y - portY, 2));
             
-            if (distance <= this.PORT_RADIUS + 4) { // Small tolerance
+            if (distance <= this.PORT_RADIUS + 20) { // Larger tolerance for easier clicking
+                console.log(`FOUND INPUT PORT: ${inputs[i].name} at (${portX}, ${portY}), click: (${position.x}, ${position.y}), distance: ${distance}`);
                 return { port: inputs[i], type: 'input' };
             }
         }
@@ -572,7 +591,8 @@ export class WasmComponentRendererV2 {
             const portY = startY + (i * spacing);
             const distance = Math.sqrt(Math.pow(position.x - portX, 2) + Math.pow(position.y - portY, 2));
             
-            if (distance <= this.PORT_RADIUS + 4) { // Small tolerance
+            if (distance <= this.PORT_RADIUS + 20) { // Larger tolerance for easier clicking
+                console.log(`FOUND OUTPUT PORT: ${outputs[i].name} at (${portX}, ${portY}), click: (${position.x}, ${position.y}), distance: ${distance}`);
                 return { port: outputs[i], type: 'output' };
             }
         }
