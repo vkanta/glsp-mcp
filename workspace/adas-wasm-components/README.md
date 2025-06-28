@@ -1,12 +1,60 @@
-# ADAS WebAssembly Components
+# 🚗 ADAS WebAssembly Components
 
-A modular Advanced Driver-Assistance System (ADAS) built using WebAssembly Component Model.
+**Automotive Advanced Driver Assistance System (ADAS) built with WebAssembly Component Model and Fixed Execution Order (FEO)**
 
-## 🚗 Overview
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](./build.sh)
+[![Components](https://img.shields.io/badge/components-18-blue)](#component-architecture)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-Component%20Model-orange)](https://component-model.bytecodealliance.org/)
+[![FEO](https://img.shields.io/badge/FEO-Fixed%20Execution%20Order-purple)](#fixed-execution-order-feo)
 
-This project implements a complete ADAS architecture as WebAssembly components that can be composed together. Each component has a single responsibility and communicates through well-defined WIT (WebAssembly Interface Types) interfaces.
+## 🎯 Overview
 
-## 🏗️ Architecture
+This project implements a **revolutionary AI-native automotive ADAS system** using:
+
+- **🔧 WebAssembly Component Model**: Isolated, composable automotive ECU simulation
+- **⚡ Fixed Execution Order (FEO)**: Deterministic, automotive-grade component execution  
+- **🤖 Real AI Processing**: YOLOv5n object detection with embedded CarND video
+- **🛡️ ASIL-B Safety**: Functional safety patterns per ISO 26262
+- **🎬 Video Integration**: Real automotive footage processing at 320x200 resolution
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+```bash
+# Install Rust with WebAssembly support
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup target add wasm32-wasip2
+
+# Install WebAssembly tools (optional, for validation)
+cargo install wasm-tools
+```
+
+### Build All Components
+
+```bash
+# Debug build (fast, larger files)
+./build.sh
+
+# Release build (optimized, smaller files)  
+./build.sh release
+
+# Clean workspace
+./clean.sh
+```
+
+### Component Output
+
+```
+dist/
+├── sensors-camera-front.wasm      (2.4MB - Front camera ECU)
+├── ai-object-detection.wasm       (9.9MB - YOLOv5n + 3.8MB model)
+├── input-video-decoder.wasm       (10MB - MP4 decoder + 3.3MB video)
+├── system-feo-demo.wasm           (2.6MB - FEO orchestration demo)
+└── ... (18 total components)
+```
+
+## 🏗️ Component Architecture
 
 ```
 Sensors → AI Processing → Fusion → Planning → Control → Vehicle

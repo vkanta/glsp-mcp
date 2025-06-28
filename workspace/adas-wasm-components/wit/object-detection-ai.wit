@@ -2,6 +2,40 @@
 package adas:object-detection-ai@0.1.0;
 
 world object-detection-component {
+    /// Import execution control interface for FEO compatibility
+    import execution-control: interface {
+        enum execution-state {
+            idle, ready, processing, completed, error, disabled
+        }
+        enum execution-result {
+            success, no-input-data, no-output-space, processing-error, component-disabled
+        }
+        record execution-metrics {
+            execution-time-us: u64,
+            input-items-consumed: u32,
+            output-items-produced: u32,
+            errors-encountered: u32,
+            memory-used-bytes: u64,
+            cpu-cycles-estimated: u64,
+        }
+        record component-info {
+            component-id: string,
+            component-type: string,
+            version: string,
+            input-interfaces: list<string>,
+            output-interfaces: list<string>,
+            execution-time-budget-us: u64,
+            memory-budget-bytes: u64,
+        }
+        record data-slot-info {
+            slot-name: string,
+            slot-type: string,
+            buffer-size: u32,
+            buffer-capacity: u32,
+            items-available: u32,
+            items-pending: u32,
+        }
+    }
     /// Import camera data from camera components
     import camera-data: interface {
         /// Shared spatial types
@@ -296,5 +330,64 @@ world object-detection-component {
         
         /// Run AI system diagnostics
         run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+    
+    /// Export FEO execution control interface
+    export feo-control: interface {
+        enum execution-state {
+            idle, ready, processing, completed, error, disabled
+        }
+        enum execution-result {
+            success, no-input-data, no-output-space, processing-error, component-disabled
+        }
+        record execution-metrics {
+            execution-time-us: u64,
+            input-items-consumed: u32,
+            output-items-produced: u32,
+            errors-encountered: u32,
+            memory-used-bytes: u64,
+            cpu-cycles-estimated: u64,
+        }
+        record component-info {
+            component-id: string,
+            component-type: string,
+            version: string,
+            input-interfaces: list<string>,
+            output-interfaces: list<string>,
+            execution-time-budget-us: u64,
+            memory-budget-bytes: u64,
+        }
+        record data-slot-info {
+            slot-name: string,
+            slot-type: string,
+            buffer-size: u32,
+            buffer-capacity: u32,
+            items-available: u32,
+            items-pending: u32,
+        }
+        
+        // Core FEO interface
+        execute-cycle: func() -> result<execution-metrics, string>;
+        can-execute: func() -> bool;
+        has-output: func() -> bool;
+        
+        // Component control
+        reset-component: func() -> result<_, string>;
+        enable-component: func() -> result<_, string>;
+        disable-component: func() -> result<_, string>;
+        flush-component: func() -> result<_, string>;
+        
+        // Status and introspection
+        get-execution-state: func() -> execution-state;
+        get-last-metrics: func() -> execution-metrics;
+        get-component-info: func() -> component-info;
+        get-data-slot-status: func() -> list<data-slot-info>;
+        get-diagnostics: func() -> result<string, string>;
+        
+        // Data slot management
+        has-input-data: func(slot-name: string) -> result<bool, string>;
+        has-output-space: func(slot-name: string) -> result<bool, string>;
+        get-slot-size: func(slot-name: string) -> result<u32, string>;
+        clear-slot: func(slot-name: string) -> result<_, string>;
     }
 }
