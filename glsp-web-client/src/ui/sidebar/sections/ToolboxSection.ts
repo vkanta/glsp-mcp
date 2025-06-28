@@ -310,5 +310,18 @@ export const createDefaultTools = (): Tool[] => [
         category: 'Connections',
         description: 'Create a bidirectional connection',
         action: () => console.log('Bidirectional edge tool activated')
+    },
+    {
+        id: 'interface-linker',
+        name: 'Interface Linker',
+        icon: '🔗',
+        category: 'Connections',
+        description: 'Link WASM interface ports with compatibility checking',
+        action: () => {
+            console.log('Interface Linker tool activated');
+            window.dispatchEvent(new CustomEvent('toolbar-mode-change', {
+                detail: { mode: 'create-interface-link' }
+            }));
+        }
     }
 ];

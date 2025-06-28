@@ -108,6 +108,9 @@ export class UIManager {
             } else if (tool.id.startsWith('edge-')) {
                 this.setMode('create-edge');
                 this.currentEdgeType = tool.id.replace('edge-', '');
+            } else if (tool.id === 'interface-linker') {
+                // Interface linker handles its own mode change through its action
+                // Don't override the mode here
             } else {
                 this.setMode(tool.id);
             }
