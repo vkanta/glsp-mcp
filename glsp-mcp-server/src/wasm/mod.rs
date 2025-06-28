@@ -1,3 +1,12 @@
+mod filesystem_watcher;
+mod wit_analyzer;
+
+pub use filesystem_watcher::{FileSystemWatcher, WasmComponentChange, WasmChangeType};
+pub use wit_analyzer::{
+    WitAnalyzer, ComponentWitAnalysis, WitInterface, WitFunction, WitType, 
+    WitInterfaceType, WitParam, WitTypeDefinition, WitDependency
+};
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -67,14 +76,49 @@ impl WasmFileWatcher {
     pub fn get_component(&self, name: &str) -> Option<&WasmComponent> {
         self.components.get(name)
     }
+    
+    pub fn get_component_by_path(&self, path: &str) -> Option<&WasmComponent> {
+        self.components.values()
+            .find(|comp| comp.path == path)
+    }
+    
+    /// Find a component by name, trying various naming conventions
+    pub fn find_component_flexible(&self, component_name: &str) -> Option<&WasmComponent> {
+        // Try exact match first
+        if let Some(comp) = self.get_component(component_name) {
+            return Some(comp);
+        }
+        
+        // Try with underscores converted to hyphens
+        let hyphen_name = component_name.replace('_', "-");
+        if let Some(comp) = self.get_component(&hyphen_name) {
+            return Some(comp);
+        }
+        
+        // Try with hyphens converted to underscores
+        let underscore_name = component_name.replace('-', "_");
+        if let Some(comp) = self.get_component(&underscore_name) {
+            return Some(comp);
+        }
+        
+        // Try to find by matching any component where the name matches after normalization
+        self.components.values()
+            .find(|comp| {
+                let normalized_comp_name = comp.name.replace(['-', '_'], "");
+                let normalized_search_name = component_name.replace(['-', '_'], "");
+                normalized_comp_name.eq_ignore_ascii_case(&normalized_search_name)
+            })
+    }
 
     pub async fn scan_components(&mut self) -> anyhow::Result<()> {
         use std::ffi::OsStr;
 
-        println!("Scanning WASM components in: {:?}", self.watch_path);
+        let watch_path = &self.watch_path;
+        println!("Scanning WASM components in: {watch_path:?}");
         
         if !self.watch_path.exists() {
-            println!("WASM watch path does not exist: {:?}", self.watch_path);
+            let watch_path = &self.watch_path;
+            println!("WASM watch path does not exist: {watch_path:?}");
             return Ok(());
         }
 
@@ -110,11 +154,15 @@ impl WasmFileWatcher {
             if !found_components.contains(name) && component.file_exists {
                 component.file_exists = false;
                 component.removed_at = Some(Utc::now());
-                println!("Component {} file is now missing", name);
+                println!("Component {name} file is now missing");
             }
         }
 
         self.last_scan = Utc::now();
+        
+        // Generate and display comprehensive statistics
+        self.display_scan_statistics().await;
+        
         Ok(())
     }
 
@@ -141,14 +189,14 @@ impl WasmFileWatcher {
             .unwrap_or("unknown")
             .to_string();
 
-        println!("Extracting component info from: {:?}", wasm_path);
+        println!("Extracting component info from: {wasm_path:?}");
 
         // Try to extract actual metadata using wasm-tools
         match self.extract_wasm_metadata(wasm_path).await {
             Ok((interfaces, metadata, wit_content, dependencies)) => {
                 let description = metadata.get("description")
                     .and_then(|v| v.as_str())
-                    .unwrap_or(&format!("ADAS component: {}", component_name))
+                    .unwrap_or(&format!("ADAS component: {component_name}"))
                     .to_string();
 
                 Ok(WasmComponent {
@@ -165,20 +213,23 @@ impl WasmFileWatcher {
                 })
             }
             Err(e) => {
-                println!("Failed to extract WASM metadata for {}: {}. Using fallback.", component_name, e);
+                println!("Failed to extract WASM metadata for {component_name}: {e}. Using fallback.");
                 
                 // Fallback to basic component info if extraction fails
                 Ok(WasmComponent {
                     name: component_name.clone(),
                     path: wasm_path.to_string_lossy().to_string(),
-                    description: format!("ADAS component: {} (metadata extraction failed)", component_name),
+                    description: format!("ADAS component: {component_name} (metadata extraction failed)"),
                     file_exists: true,
                     last_seen: Some(Utc::now()),
                     removed_at: None,
                     interfaces: vec![
                         // Export interface
                         WasmInterface {
-                            name: format!("adas:{}/component", component_name.replace('-', "_")),
+                            name: {
+                                let normalized_name = component_name.replace('-', "_");
+                                format!("adas:{normalized_name}/component")
+                            },
                             interface_type: "export".to_string(),
                             functions: vec![
                                 WasmFunction {
@@ -247,7 +298,105 @@ impl WasmFileWatcher {
     }
 
     async fn extract_wasm_metadata(&self, wasm_path: &PathBuf) -> anyhow::Result<(Vec<WasmInterface>, HashMap<String, serde_json::Value>, Option<String>, Vec<String>)> {
+        // First try to use the advanced WIT analyzer
+        match WitAnalyzer::analyze_component(wasm_path).await {
+            Ok(wit_analysis) => {
+                println!("✅ Successfully analyzed component with WIT analyzer");
+                self.convert_wit_analysis_to_legacy_format(wit_analysis).await
+            }
+            Err(wit_error) => {
+                println!("⚠️  WIT analysis failed: {wit_error}, falling back to wasmparser");
+                self.extract_wasm_metadata_fallback(wasm_path).await
+            }
+        }
+    }
+
+    /// Convert WIT analysis to legacy format for backward compatibility
+    async fn convert_wit_analysis_to_legacy_format(&self, analysis: ComponentWitAnalysis) -> anyhow::Result<(Vec<WasmInterface>, HashMap<String, serde_json::Value>, Option<String>, Vec<String>)> {
+        let mut interfaces = Vec::new();
+        let mut metadata = HashMap::new();
+        let mut dependencies = Vec::new();
+
+        // Convert imports
+        for wit_interface in analysis.imports {
+            let interface = WasmInterface {
+                name: wit_interface.name,
+                interface_type: "import".to_string(),
+                functions: wit_interface.functions.into_iter().map(|f| WasmFunction {
+                    name: f.name,
+                    params: f.params.into_iter().map(|p| WasmParam {
+                        name: p.name,
+                        param_type: Self::wit_type_to_string(&p.param_type),
+                    }).collect(),
+                    returns: f.results.into_iter().map(|r| WasmParam {
+                        name: r.name,
+                        param_type: Self::wit_type_to_string(&r.param_type),
+                    }).collect(),
+                }).collect(),
+            };
+            interfaces.push(interface);
+        }
+
+        // Convert exports
+        for wit_interface in analysis.exports {
+            let interface = WasmInterface {
+                name: wit_interface.name,
+                interface_type: "export".to_string(),
+                functions: wit_interface.functions.into_iter().map(|f| WasmFunction {
+                    name: f.name,
+                    params: f.params.into_iter().map(|p| WasmParam {
+                        name: p.name,
+                        param_type: Self::wit_type_to_string(&p.param_type),
+                    }).collect(),
+                    returns: f.results.into_iter().map(|r| WasmParam {
+                        name: r.name,
+                        param_type: Self::wit_type_to_string(&r.param_type),
+                    }).collect(),
+                }).collect(),
+            };
+            interfaces.push(interface);
+        }
+
+        // Extract dependencies
+        for dep in analysis.dependencies {
+            dependencies.push(dep.package);
+        }
+
+        // Add metadata
+        metadata.insert("wit_world".to_string(), 
+            serde_json::Value::String(analysis.world_name.unwrap_or("unknown".to_string())));
+        metadata.insert("wit_analysis_version".to_string(), 
+            serde_json::Value::String("2.0".to_string()));
+        metadata.insert("extracted_at".to_string(), 
+            serde_json::Value::String(Utc::now().to_rfc3339()));
+        metadata.insert("interface_count".to_string(), 
+            serde_json::Value::Number(serde_json::Number::from(interfaces.len())));
+
+        Ok((interfaces, metadata, analysis.raw_wit, dependencies))
+    }
+
+    /// Convert WIT type to string representation for legacy compatibility
+    fn wit_type_to_string(wit_type: &WitType) -> String {
+        match &wit_type.type_def {
+            WitTypeDefinition::Primitive(name) => name.clone(),
+            WitTypeDefinition::Record { .. } => format!("record({})", wit_type.name),
+            WitTypeDefinition::Variant { .. } => format!("variant({})", wit_type.name),
+            WitTypeDefinition::Enum { .. } => format!("enum({})", wit_type.name),
+            WitTypeDefinition::Union { .. } => format!("union({})", wit_type.name),
+            WitTypeDefinition::Option { inner } => format!("option<{}>", Self::wit_type_to_string(inner)),
+            WitTypeDefinition::Result { .. } => format!("result({})", wit_type.name),
+            WitTypeDefinition::List { element } => format!("list<{}>", Self::wit_type_to_string(element)),
+            WitTypeDefinition::Tuple { .. } => format!("tuple({})", wit_type.name),
+            WitTypeDefinition::Flags { .. } => format!("flags({})", wit_type.name),
+            WitTypeDefinition::Resource { .. } => format!("resource({})", wit_type.name),
+        }
+    }
+
+    /// Fallback method using the original wasmparser approach
+    async fn extract_wasm_metadata_fallback(&self, wasm_path: &PathBuf) -> anyhow::Result<(Vec<WasmInterface>, HashMap<String, serde_json::Value>, Option<String>, Vec<String>)> {
         use wasmparser::{Parser, Payload};
+        
+        println!("🔧 Using fallback WASM parser for basic metadata extraction");
         
         // Read the WASM file
         let wasm_bytes = tokio::fs::read(wasm_path).await?;
@@ -257,60 +406,49 @@ impl WasmFileWatcher {
         let mut wit_content = None;
         let mut dependencies = Vec::new();
 
-        // Parse the WASM module
+        // Parse the WASM module using wasmparser
         let parser = Parser::new(0);
         for payload in parser.parse_all(&wasm_bytes) {
             match payload? {
                 Payload::CustomSection(reader) => {
                     match reader.name() {
                         "component-type" => {
-                            // Extract component type information
                             println!("Found component-type section");
-                            // TODO: Parse component type data
                         }
                         "wit-component" => {
-                            // Extract WIT interface definitions
                             println!("Found wit-component section");
                             if let Ok(wit_str) = std::str::from_utf8(reader.data()) {
                                 wit_content = Some(wit_str.to_string());
                             }
                         }
                         "producers" => {
-                            // Extract producer information (toolchain, etc.)
                             println!("Found producers section");
                         }
                         name if name.starts_with("adas:") => {
-                            // Custom ADAS-specific metadata
-                            println!("Found ADAS metadata section: {}", name);
+                            println!("Found ADAS metadata section: {name}");
                             if let Ok(metadata_str) = std::str::from_utf8(reader.data()) {
                                 if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(metadata_str) {
                                     metadata.insert(name.to_string(), json_val);
                                 }
                             }
                         }
-                        _ => {
-                            // Other custom sections
-                            println!("Found custom section: {}", reader.name());
-                        }
+                        _ => {}
                     }
                 }
                 Payload::ImportSection(reader) => {
-                    // Extract imports (dependencies)
                     for import in reader {
                         let import = import?;
                         dependencies.push(format!("{}::{}", import.module, import.name));
                         
-                        // Create interface for imported functions
                         if let wasmparser::TypeRef::Func(_) = import.ty {
-                            let interface_name = format!("{}::{}", import.module, import.name);
                             let interface = WasmInterface {
-                                name: interface_name,
+                                name: format!("{}::{}", import.module, import.name),
                                 interface_type: "import".to_string(),
                                 functions: vec![
                                     WasmFunction {
                                         name: import.name.to_string(),
-                                        params: vec![], // TODO: Extract actual parameters
-                                        returns: vec![], // TODO: Extract actual returns
+                                        params: vec![],
+                                        returns: vec![],
                                     }
                                 ],
                             };
@@ -319,7 +457,6 @@ impl WasmFileWatcher {
                     }
                 }
                 Payload::ExportSection(reader) => {
-                    // Extract exports
                     let mut export_functions = Vec::new();
                     
                     for export in reader {
@@ -328,34 +465,35 @@ impl WasmFileWatcher {
                         if let wasmparser::ExternalKind::Func = export.kind {
                             export_functions.push(WasmFunction {
                                 name: export.name.to_string(),
-                                params: vec![], // TODO: Extract actual parameters  
-                                returns: vec![], // TODO: Extract actual returns
+                                params: vec![],
+                                returns: vec![],
                             });
                         }
                     }
                     
                     if !export_functions.is_empty() {
-                        let interface = WasmInterface {
+                        interfaces.push(WasmInterface {
                             name: "exports".to_string(),
                             interface_type: "export".to_string(),
                             functions: export_functions,
-                        };
-                        interfaces.push(interface);
+                        });
                     }
                 }
-                _ => {
-                    // Other sections we don't need for metadata extraction
-                }
+                _ => {}
             }
         }
 
-        // Add some basic metadata
-        metadata.insert("file_size".to_string(), serde_json::Value::Number(serde_json::Number::from(wasm_bytes.len())));
-        metadata.insert("extracted_at".to_string(), serde_json::Value::String(Utc::now().to_rfc3339()));
+        // Add basic metadata
+        metadata.insert("file_size".to_string(), 
+            serde_json::Value::Number(serde_json::Number::from(wasm_bytes.len())));
+        metadata.insert("extracted_at".to_string(), 
+            serde_json::Value::String(Utc::now().to_rfc3339()));
+        metadata.insert("analysis_method".to_string(), 
+            serde_json::Value::String("wasmparser_fallback".to_string()));
 
-        // If no interfaces were found, add default ones for visualization
+        // Add default interfaces if none found
         if interfaces.is_empty() {
-            println!("No interfaces found in WASM metadata, adding default interfaces for component");
+            println!("No interfaces found, adding default ones for visualization");
             interfaces.push(WasmInterface {
                 name: "component-export".to_string(),
                 interface_type: "export".to_string(),
@@ -391,5 +529,171 @@ impl WasmFileWatcher {
             }
         }
         false
+    }
+
+    /// Display comprehensive statistics after component scan
+    async fn display_scan_statistics(&self) {
+        let total_components = self.components.len();
+        let available_components = self.components.values().filter(|c| c.file_exists).count();
+        let missing_components = total_components - available_components;
+        
+        // Interface statistics
+        let mut total_interfaces = 0;
+        let mut total_imports = 0;
+        let mut total_exports = 0;
+        let mut total_functions = 0;
+        let mut components_with_wit = 0;
+        let mut interface_types = std::collections::HashMap::new();
+        let mut dependency_count = 0;
+        
+        for component in self.components.values() {
+            if !component.file_exists {
+                continue;
+            }
+            
+            total_interfaces += component.interfaces.len();
+            dependency_count += component.dependencies.len();
+            
+            if component.wit_interfaces.is_some() {
+                components_with_wit += 1;
+            }
+            
+            for interface in &component.interfaces {
+                total_functions += interface.functions.len();
+                
+                match interface.interface_type.as_str() {
+                    "import" => total_imports += 1,
+                    "export" => total_exports += 1,
+                    _ => {}
+                }
+                
+                // Count interface name patterns
+                let interface_category = if interface.name.starts_with("wasi:") {
+                    "WASI Standard"
+                } else if interface.name.starts_with("adas:") {
+                    "ADAS Custom"
+                } else if interface.name.contains("/") {
+                    "Namespaced"
+                } else {
+                    "Component Local"
+                };
+                
+                *interface_types.entry(interface_category.to_string()).or_insert(0) += 1;
+            }
+        }
+        
+        // Calculate percentages
+        let wit_coverage = if available_components > 0 {
+            (components_with_wit as f64 / available_components as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let avg_interfaces_per_component = if available_components > 0 {
+            total_interfaces as f64 / available_components as f64
+        } else {
+            0.0
+        };
+        
+        let avg_functions_per_interface = if total_interfaces > 0 {
+            total_functions as f64 / total_interfaces as f64
+        } else {
+            0.0
+        };
+
+        // Display formatted statistics
+        println!("\n🔍 WASM Component Scan Statistics");
+        println!("=====================================");
+        println!("📁 Scan Path: {:?}", self.watch_path);
+        println!("⏰ Scan Time: {}", self.last_scan.format("%Y-%m-%d %H:%M:%S UTC"));
+        println!();
+        
+        // Component Overview
+        println!("📦 Component Overview:");
+        println!("   Total Components: {total_components}");
+        let available_pct = if total_components > 0 { (available_components as f64 / total_components as f64) * 100.0 } else { 0.0 };
+        println!("   Available: {available_components} ({available_pct:.1}%)");
+        let missing_pct = if total_components > 0 { (missing_components as f64 / total_components as f64) * 100.0 } else { 0.0 };
+        println!("   Missing: {missing_components} ({missing_pct:.1}%)");
+        println!("   WIT Analysis Coverage: {components_with_wit} ({wit_coverage:.1}%)");
+        println!();
+        
+        // Interface Statistics
+        println!("🔗 Interface Analysis:");
+        println!("   Total Interfaces: {total_interfaces}");
+        let imports_pct = if total_interfaces > 0 { (total_imports as f64 / total_interfaces as f64) * 100.0 } else { 0.0 };
+        println!("   Imports: {total_imports} ({imports_pct:.1}%)");
+        let exports_pct = if total_interfaces > 0 { (total_exports as f64 / total_interfaces as f64) * 100.0 } else { 0.0 };
+        println!("   Exports: {total_exports} ({exports_pct:.1}%)");
+        println!("   Total Functions: {total_functions}");
+        println!("   Dependencies: {dependency_count}");
+        println!();
+        
+        // Averages
+        println!("📊 Averages:");
+        println!("   Interfaces per Component: {avg_interfaces_per_component:.1}");
+        println!("   Functions per Interface: {avg_functions_per_interface:.1}");
+        let deps_per_component = if available_components > 0 { dependency_count as f64 / available_components as f64 } else { 0.0 };
+        println!("   Dependencies per Component: {deps_per_component:.1}");
+        println!();
+        
+        // Interface Type Breakdown
+        if !interface_types.is_empty() {
+            println!("🏷️  Interface Categories:");
+            let mut sorted_types: Vec<_> = interface_types.iter().collect();
+            sorted_types.sort_by(|a, b| b.1.cmp(a.1));
+            
+            for (category, count) in sorted_types {
+                let percentage = if total_interfaces > 0 {
+                    (*count as f64 / total_interfaces as f64) * 100.0
+                } else {
+                    0.0
+                };
+                println!("   {category}: {count} ({percentage:.1}%)");
+            }
+            println!();
+        }
+        
+        // Component Details (top 5 by interface count)
+        if available_components > 0 {
+            println!("🏆 Top Components by Interface Count:");
+            let mut components_by_interfaces: Vec<_> = self.components.values()
+                .filter(|c| c.file_exists)
+                .collect();
+            components_by_interfaces.sort_by(|a, b| b.interfaces.len().cmp(&a.interfaces.len()));
+            
+            for (i, component) in components_by_interfaces.iter().take(5).enumerate() {
+                let wit_status = if component.wit_interfaces.is_some() { "✅" } else { "❌" };
+                let rank = i + 1;
+                let name = &component.name;
+                let interface_count = component.interfaces.len();
+                let dep_count = component.dependencies.len();
+                println!("   {rank}. {name} - {interface_count} interfaces, {dep_count} deps {wit_status}");
+            }
+            println!();
+        }
+        
+        // Health Assessment
+        let health_status = if missing_components == 0 && wit_coverage > 80.0 {
+            "🟢 EXCELLENT"
+        } else if missing_components == 0 && wit_coverage > 50.0 {
+            "🟡 GOOD"
+        } else if missing_components < total_components / 2 {
+            "🟠 DEGRADED"
+        } else {
+            "🔴 CRITICAL"
+        };
+        
+        println!("🎯 Component Ecosystem Health: {health_status}");
+        
+        if missing_components > 0 {
+            println!("⚠️  Warning: {missing_components} components have missing files");
+        }
+        
+        if wit_coverage < 50.0 && available_components > 0 {
+            println!("💡 Suggestion: Consider running WIT analysis on more components");
+        }
+        
+        println!("=====================================\n");
     }
 }

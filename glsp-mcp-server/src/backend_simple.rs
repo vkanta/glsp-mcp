@@ -8,8 +8,8 @@ use mcp_protocol::*;
 use tracing::{info, error};
 use std::collections::HashMap;
 use serde_json::json;
-use crate::model::{DiagramModel, Node, Edge, Position};
-use crate::wasm::WasmFileWatcher;
+use crate::model::{DiagramModel, Node, Edge, Position, ElementType};
+use crate::wasm::{WasmFileWatcher, FileSystemWatcher};
 use crate::persistence::PersistenceManager;
 use std::path::PathBuf;
 
@@ -29,7 +29,7 @@ impl Default for GlspConfig {
     fn default() -> Self {
         Self {
             wasm_path: "../workspace/adas-wasm-components".to_string(),
-            diagrams_path: "./diagrams".to_string(),
+            diagrams_path: "../workspace/diagrams".to_string(),
             server_name: "GLSP MCP Server".to_string(),
             server_version: "0.1.0".to_string(),
         }
@@ -53,8 +53,8 @@ impl From<GlspError> for Error {
     fn from(err: GlspError) -> Self {
         match err {
             GlspError::Backend(be) => be.into(),
-            GlspError::ToolExecution(msg) => Error::internal_error(format!("Tool execution failed: {}", msg)),
-            GlspError::NotImplemented(msg) => Error::method_not_found(format!("Not implemented: {}", msg)),
+            GlspError::ToolExecution(msg) => Error::internal_error(format!("Tool execution failed: {msg}")),
+            GlspError::NotImplemented(msg) => Error::method_not_found(format!("Not implemented: {msg}")),
         }
     }
 }
@@ -71,6 +71,7 @@ pub struct GlspBackend {
     config: GlspConfig,
     models: std::sync::Arc<tokio::sync::Mutex<HashMap<String, DiagramModel>>>,
     wasm_watcher: std::sync::Arc<tokio::sync::Mutex<WasmFileWatcher>>,
+    filesystem_watcher: std::sync::Arc<tokio::sync::RwLock<FileSystemWatcher>>,
     persistence: std::sync::Arc<PersistenceManager>,
 }
 
@@ -83,25 +84,40 @@ impl McpBackend for GlspBackend {
         info!("Initializing GLSP backend with config: {:?}", config);
         
         let wasm_path = PathBuf::from(&config.wasm_path);
-        let wasm_watcher = WasmFileWatcher::new(wasm_path);
+        let wasm_watcher = WasmFileWatcher::new(wasm_path.clone());
+        let mut filesystem_watcher = FileSystemWatcher::new(wasm_path);
+        
+        // Start filesystem watching
+        filesystem_watcher.start_watching().await
+            .map_err(|e| GlspError::NotImplemented(format!("Failed to start filesystem watcher: {e}")))?;
         
         let diagrams_path = PathBuf::from(&config.diagrams_path);
         let persistence = PersistenceManager::new(diagrams_path);
         
         // Ensure storage directory exists
         persistence.ensure_storage_dir().await
-            .map_err(|e| GlspError::NotImplemented(format!("Failed to create storage directory: {}", e)))?;
+            .map_err(|e| GlspError::NotImplemented(format!("Failed to create storage directory: {e}")))?;
         
         // Create backend instance
         let backend = Self {
             config,
             models: std::sync::Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             wasm_watcher: std::sync::Arc::new(tokio::sync::Mutex::new(wasm_watcher)),
+            filesystem_watcher: std::sync::Arc::new(tokio::sync::RwLock::new(filesystem_watcher)),
             persistence: std::sync::Arc::new(persistence),
         };
         
         // Load existing diagrams from disk
         backend.load_all_diagrams().await?;
+        
+        // Perform initial WASM component scan with statistics
+        info!("Performing initial WASM component scan...");
+        {
+            let mut wasm_watcher = backend.wasm_watcher.lock().await;
+            if let Err(e) = wasm_watcher.scan_components().await {
+                error!("Failed to perform initial WASM component scan: {}", e);
+            }
+        }
         
         Ok(backend)
     }
@@ -378,6 +394,49 @@ impl McpBackend for GlspBackend {
                     "required": ["diagramId", "componentName", "position"]
                 }),
             },
+            Tool {
+                name: "refresh_wasm_interfaces".to_string(),
+                description: "Refresh interface data for all WASM components in a diagram".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {"type": "string"}
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "get_component_path".to_string(),
+                description: "Get the file path for a WASM component".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the WASM component"
+                        }
+                    },
+                    "required": ["componentName"]
+                }),
+            },
+            Tool {
+                name: "get_component_wit_info".to_string(),
+                description: "Get WIT interface information for a selected component in a diagram".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component"
+                        },
+                        "elementId": {
+                            "type": "string",
+                            "description": "ID of the component element to analyze"
+                        }
+                    },
+                    "required": ["diagramId", "elementId"]
+                }),
+            },
         ];
         
         Ok(ListToolsResult {
@@ -404,6 +463,9 @@ impl McpBackend for GlspBackend {
             "scan_wasm_components" => self.scan_wasm_components().await,
             "check_wasm_component_status" => self.check_wasm_component_status(request.arguments).await,
             "load_wasm_component" => self.load_wasm_component(request.arguments).await,
+            "refresh_wasm_interfaces" => self.refresh_wasm_interfaces(request.arguments).await,
+            "get_component_path" => self.get_component_path(request.arguments).await,
+            "get_component_wit_info" => self.get_component_wit_info(request.arguments).await,
             _ => Err(GlspError::NotImplemented(format!("Tool not implemented: {}", request.name)))
         }
     }
@@ -432,7 +494,7 @@ impl McpBackend for GlspBackend {
         // Add resources for each loaded diagram
         for (id, diagram) in models.iter() {
             resources.push(Resource {
-                uri: format!("diagram://model/{}", id),
+                uri: format!("diagram://model/{id}"),
                 name: diagram.name.clone(),
                 description: Some(format!("{} diagram", diagram.diagram_type)),
                 mime_type: Some("application/json".to_string()),
@@ -441,7 +503,7 @@ impl McpBackend for GlspBackend {
             });
             
             resources.push(Resource {
-                uri: format!("diagram://validation/{}", id),
+                uri: format!("diagram://validation/{id}"),
                 name: format!("{} Validation", diagram.name),
                 description: Some("Validation results for the diagram".to_string()),
                 mime_type: Some("application/json".to_string()),
@@ -465,7 +527,7 @@ impl McpBackend for GlspBackend {
             if let Some(model) = models.get(diagram_id) {
                 // Return the diagram model as JSON
                 let content = serde_json::to_string(model)
-                    .map_err(|e| GlspError::NotImplemented(format!("Serialization error: {}", e)))?;
+                    .map_err(|e| GlspError::NotImplemented(format!("Serialization error: {e}")))?;
                 
                 Ok(ReadResourceResult {
                     contents: vec![ResourceContents {
@@ -476,7 +538,7 @@ impl McpBackend for GlspBackend {
                     }],
                 })
             } else {
-                Err(GlspError::NotImplemented(format!("Diagram not found: {}", diagram_id)))
+                Err(GlspError::NotImplemented(format!("Diagram not found: {diagram_id}")))
             }
         } else if request.uri.starts_with("diagram://validation/") {
             // Return a simple validation result
@@ -523,26 +585,32 @@ impl McpBackend for GlspBackend {
                 }],
             })
         } else if request.uri == "wasm://components/list" {
-            // Get WASM components from the file watcher
-            let wasm_watcher = self.wasm_watcher.lock().await;
-            let components = wasm_watcher.get_components();
+            // Get WASM files from the filesystem watcher
+            let filesystem_watcher = self.filesystem_watcher.read().await;
+            let known_files = filesystem_watcher.get_known_files().await;
             
-            let component_list: Vec<serde_json::Value> = components.iter()
-                .map(|component| json!({
-                    "name": component.name,
-                    "path": component.path,
-                    "description": component.description,
-                    "status": if component.file_exists { "available" } else { "missing" },
-                    "interfaces": component.interfaces.len(),
-                    "uri": format!("wasm://component/{}", component.name)
-                }))
+            let component_list: Vec<serde_json::Value> = known_files.iter()
+                .filter_map(|path| {
+                    // Extract component name from file path
+                    let file_name = path.file_stem()?.to_str()?;
+                    let component_name = file_name.replace('-', "_");
+                    
+                    Some(json!({
+                        "name": component_name,
+                        "path": path.to_string_lossy(),
+                        "description": format!("WASM component: {}", component_name),
+                        "status": "available",
+                        "interfaces": 2, // Default interface count
+                        "uri": format!("wasm://component/{}", component_name)
+                    }))
+                })
                 .collect();
 
             let wasm_list = json!({
                 "components": component_list,
                 "total": component_list.len(),
-                "available": components.iter().filter(|c| c.file_exists).count(),
-                "missing": components.iter().filter(|c| !c.file_exists).count()
+                "available": component_list.len(),
+                "missing": 0
             });
             
             Ok(ReadResourceResult {
@@ -611,11 +679,11 @@ impl GlspBackend {
         
         // Save to disk
         if let Err(e) = self.save_diagram(&diagram_id).await {
-            error!("Failed to save new diagram to disk: {}", e);
+            error!("Failed to save new diagram to disk: {e}");
         }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Created diagram '{}' with ID: {}", name, diagram_id))],
+            content: vec![Content::text(format!("Created diagram '{name}' with ID: {diagram_id}"))],
             is_error: Some(false),
         })
     }
@@ -637,21 +705,20 @@ impl GlspBackend {
         drop(models); // Release the lock before filesystem operations
         
         if removed.is_none() {
-            return Err(GlspError::ToolExecution(format!("Diagram not found: {}", diagram_id)));
+            return Err(GlspError::ToolExecution(format!("Diagram not found: {diagram_id}")));
         }
         
         // Delete from disk using persistence manager
         let name_for_deletion = diagram_name.as_deref().unwrap_or("Unknown");
         if let Err(e) = self.delete_diagram_files(name_for_deletion).await {
-            error!("Failed to delete diagram files from disk: {}", e);
-            return Err(GlspError::ToolExecution(format!("Failed to delete diagram files: {}", e)));
+            error!("Failed to delete diagram files from disk: {e}");
+            return Err(GlspError::ToolExecution(format!("Failed to delete diagram files: {e}")));
         }
         
-        info!("Deleted diagram '{}' (ID: {})", name_for_deletion, diagram_id);
+        info!("Deleted diagram '{name_for_deletion}' (ID: {diagram_id})");
         
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Successfully deleted diagram '{}' (ID: {})", 
-                name_for_deletion, diagram_id))],
+            content: vec![Content::text(format!("Successfully deleted diagram '{name_for_deletion}' (ID: {diagram_id})"))],
             is_error: Some(false),
         })
     }
@@ -689,7 +756,7 @@ impl GlspBackend {
         }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Created {} node with ID: {}", node_type, node_id))],
+            content: vec![Content::text(format!("Created {node_type} node with ID: {node_id}"))],
             is_error: Some(false),
         })
     }
@@ -714,14 +781,14 @@ impl GlspBackend {
         // Verify source and target exist
         if !diagram.elements.contains_key(source_id) {
             return Ok(CallToolResult {
-                content: vec![Content::text(format!("Source element {} not found", source_id))],
+                content: vec![Content::text(format!("Source element {source_id} not found"))],
                 is_error: Some(true),
             });
         }
 
         if !diagram.elements.contains_key(target_id) {
             return Ok(CallToolResult {
-                content: vec![Content::text(format!("Target element {} not found", target_id))],
+                content: vec![Content::text(format!("Target element {target_id} not found"))],
                 is_error: Some(true),
             });
         }
@@ -744,7 +811,7 @@ impl GlspBackend {
         }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Created {} edge with ID: {}", edge_type, edge_id))],
+            content: vec![Content::text(format!("Created {edge_type} edge with ID: {edge_id}"))],
             is_error: Some(false),
         })
     }
@@ -770,12 +837,12 @@ impl GlspBackend {
                 }
                 
                 Ok(CallToolResult {
-                    content: vec![Content::text(format!("Deleted element with ID: {}", element_id))],
+                    content: vec![Content::text(format!("Deleted element with ID: {element_id}"))],
                     is_error: Some(false),
                 })
             },
             None => Ok(CallToolResult {
-                content: vec![Content::text(format!("Element {} not found", element_id))],
+                content: vec![Content::text(format!("Element {element_id} not found"))],
                 is_error: Some(true),
             }),
         }
@@ -818,7 +885,7 @@ impl GlspBackend {
         }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Updated element with ID: {}", element_id))],
+            content: vec![Content::text(format!("Updated element with ID: {element_id}"))],
             is_error: Some(false),
         })
     }
@@ -840,7 +907,7 @@ impl GlspBackend {
             "hierarchical" => Self::apply_hierarchical_layout(diagram),
             _ => {
                 return Ok(CallToolResult {
-                    content: vec![Content::text(format!("Layout algorithm '{}' not implemented yet", algorithm))],
+                    content: vec![Content::text(format!("Layout algorithm '{algorithm}' not implemented yet"))],
                     is_error: Some(true),
                 });
             }
@@ -854,7 +921,7 @@ impl GlspBackend {
         }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Applied {} layout to diagram {}", algorithm, diagram_id))],
+            content: vec![Content::text(format!("Applied {algorithm} layout to diagram {diagram_id}"))],
             is_error: Some(false),
         })
     }
@@ -873,21 +940,21 @@ impl GlspBackend {
         match format {
             "json" => {
                 let json_str = serde_json::to_string_pretty(diagram)
-                    .map_err(|e| GlspError::ToolExecution(format!("JSON serialization failed: {}", e)))?;
+                    .map_err(|e| GlspError::ToolExecution(format!("JSON serialization failed: {e}")))?;
                 Ok(CallToolResult {
-                    content: vec![Content::text(format!("Exported diagram as JSON:\\n{}", json_str))],
+                    content: vec![Content::text(format!("Exported diagram as JSON:\\n{json_str}"))],
                     is_error: Some(false),
                 })
             }
             "svg" => {
                 let svg = Self::generate_svg(diagram);
                 Ok(CallToolResult {
-                    content: vec![Content::text(format!("Exported diagram as SVG:\\n{}", svg))],
+                    content: vec![Content::text(format!("Exported diagram as SVG:\\n{svg}"))],
                     is_error: Some(false),
                 })
             }
             _ => Ok(CallToolResult {
-                content: vec![Content::text(format!("Export format '{}' not supported yet", format))],
+                content: vec![Content::text(format!("Export format '{format}' not supported yet"))],
                 is_error: Some(true),
             }),
         }
@@ -924,27 +991,22 @@ impl GlspBackend {
 
     // WASM component implementations
     async fn scan_wasm_components(&self) -> std::result::Result<CallToolResult, GlspError> {
-        let mut wasm_watcher = self.wasm_watcher.lock().await;
+        // Get current known files from the filesystem watcher
+        let filesystem_watcher = self.filesystem_watcher.read().await;
+        let known_files = filesystem_watcher.get_known_files().await;
         
-        match wasm_watcher.scan_components().await {
-            Ok(()) => {
-                let components = wasm_watcher.get_components();
-                let available = components.iter().filter(|c| c.file_exists).count();
-                let missing = components.len() - available;
-
-                Ok(CallToolResult {
-                    content: vec![Content::text(format!(
-                        "WASM component scan completed.\\nFound {} components: {} available, {} missing",
-                        components.len(), available, missing
-                    ))],
-                    is_error: Some(false),
-                })
-            }
-            Err(err) => Ok(CallToolResult {
-                content: vec![Content::text(format!("Failed to scan WASM components: {}", err))],
-                is_error: Some(true),
-            }),
-        }
+        let wasm_files: Vec<_> = known_files.iter()
+            .filter(|path| path.extension().and_then(|s| s.to_str()) == Some("wasm"))
+            .collect();
+        
+        let component_count = wasm_files.len();
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(format!(
+                "WASM component scan completed.\\nFound {component_count} WASM files: {component_count} available, 0 missing"
+            ))],
+            is_error: Some(false),
+        })
     }
 
     async fn check_wasm_component_status(&self, args: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
@@ -969,12 +1031,12 @@ impl GlspBackend {
 
                 Ok(CallToolResult {
                     content: vec![Content::text(serde_json::to_string_pretty(&status)
-                        .map_err(|e| GlspError::ToolExecution(format!("JSON serialization failed: {}", e)))?)],
+                        .map_err(|e| GlspError::ToolExecution(format!("JSON serialization failed: {e}")))?)],
                     is_error: Some(false),
                 })
             }
             None => Ok(CallToolResult {
-                content: vec![Content::text(format!("WASM component '{}' not found", component_name))],
+                content: vec![Content::text(format!("WASM component '{component_name}' not found"))],
                 is_error: Some(true),
             }),
         }
@@ -987,11 +1049,11 @@ impl GlspBackend {
         
         match self.save_diagram(diagram_id).await {
             Ok(_) => Ok(CallToolResult {
-                content: vec![Content::text(format!("Successfully saved diagram {} to disk", diagram_id))],
+                content: vec![Content::text(format!("Successfully saved diagram {diagram_id} to disk"))],
                 is_error: Some(false),
             }),
             Err(e) => Ok(CallToolResult {
-                content: vec![Content::text(format!("Failed to save diagram: {}", e))],
+                content: vec![Content::text(format!("Failed to save diagram: {e}"))],
                 is_error: Some(true),
             }),
         }
@@ -1010,16 +1072,20 @@ impl GlspBackend {
         };
 
         // Check if component exists and is available
+        // Use the flexible component finding method from WasmFileWatcher
         let component = {
             let wasm_watcher = self.wasm_watcher.lock().await;
-            wasm_watcher.get_component(component_name)
-                .ok_or_else(|| GlspError::ToolExecution(format!("WASM component '{}' not found", component_name)))?
-                .clone()
+            
+            wasm_watcher.find_component_flexible(component_name)
+                .cloned()
+                .ok_or_else(|| GlspError::ToolExecution(
+                    format!("WASM component '{component_name}' not found")
+                ))?
         };
 
         if !component.file_exists {
             return Ok(CallToolResult {
-                content: vec![Content::text(format!("Cannot load component '{}': file is missing at {}", component_name, component.path))],
+                content: vec![Content::text(format!("Cannot load component '{component_name}': file is missing at {}", component.path))],
                 is_error: Some(true),
             });
         }
@@ -1027,7 +1093,7 @@ impl GlspBackend {
         // Get the diagram
         let mut models = self.models.lock().await;
         let diagram = models.get_mut(diagram_id)
-            .ok_or_else(|| GlspError::ToolExecution(format!("Diagram '{}' not found", diagram_id)))?;
+            .ok_or_else(|| GlspError::ToolExecution(format!("Diagram '{diagram_id}' not found")))?;
 
         // Create a WASM component node
         let mut node = Node::new("wasm-component", position, Some(component.name.clone()));
@@ -1036,13 +1102,104 @@ impl GlspBackend {
         node.base.properties.insert("componentName".to_string(), json!(component.name));
         node.base.properties.insert("componentPath".to_string(), json!(component.path));
         node.base.properties.insert("description".to_string(), json!(component.description));
+        
+        // Add interface data for rendering
+        node.base.properties.insert("interfaces".to_string(), json!(component.interfaces));
+        node.base.properties.insert("status".to_string(), json!("available"));
+        node.base.properties.insert("importsCount".to_string(), json!(
+            component.interfaces.iter().filter(|i| i.interface_type == "import").count()
+        ));
+        node.base.properties.insert("exportsCount".to_string(), json!(
+            component.interfaces.iter().filter(|i| i.interface_type == "export").count()
+        ));
+        node.base.properties.insert("totalFunctions".to_string(), json!(
+            component.interfaces.iter().map(|i| i.functions.len()).sum::<usize>()
+        ));
 
         let node_id = node.base.id.clone();
         diagram.add_element(node.base);
         diagram.add_child_to_root(&node_id);
+        drop(models); // Release the lock before saving
+        
+        // Save to disk
+        if let Err(e) = self.save_diagram(diagram_id).await {
+            error!("Failed to save diagram after loading WASM component: {}", e);
+        }
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Loaded WASM component '{}' into diagram with ID: {}", component_name, node_id))],
+            content: vec![Content::text(format!("Loaded WASM component '{component_name}' into diagram with ID: {node_id}"))],
+            is_error: Some(false),
+        })
+    }
+
+    async fn refresh_wasm_interfaces(&self, args: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = args.ok_or_else(|| GlspError::ToolExecution("Missing arguments".to_string()))?;
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| GlspError::ToolExecution("Missing diagramId".to_string()))?;
+
+        let mut models = self.models.lock().await;
+        let diagram = models.get_mut(diagram_id)
+            .ok_or_else(|| GlspError::ToolExecution(format!("Diagram '{diagram_id}' not found")))?;
+
+        let mut updated_count = 0;
+        let wasm_watcher = self.wasm_watcher.lock().await;
+
+        // Find all WASM components in the diagram
+        let mut elements_to_update = Vec::new();
+        for (element_id, element) in diagram.elements.iter() {
+            // Check if this is a WASM component
+            let is_wasm_component = match &element.element_type {
+                ElementType::Component => true,
+                ElementType::Custom(type_name) => type_name == "wasm-component",
+                _ => false,
+            };
+
+            if is_wasm_component {
+                // Try to get component name from properties or label
+                if let Some(component_name) = element.properties.get("componentName")
+                    .and_then(|v| v.as_str())
+                    .or(element.label.as_deref()) {
+                    
+                    // Find the component using flexible name matching
+                    if let Some(component) = wasm_watcher.find_component_flexible(component_name) {
+                        elements_to_update.push((element_id.clone(), component.clone()));
+                    }
+                }
+            }
+        }
+        drop(wasm_watcher); // Release the wasm_watcher lock
+
+        // Update each WASM component with interface data
+        for (element_id, component) in elements_to_update {
+            if let Some(element) = diagram.elements.get_mut(&element_id) {
+                // Add interface data for rendering
+                element.properties.insert("interfaces".to_string(), json!(component.interfaces));
+                element.properties.insert("status".to_string(), json!(if component.file_exists { "available" } else { "missing" }));
+                element.properties.insert("importsCount".to_string(), json!(
+                    component.interfaces.iter().filter(|i| i.interface_type == "import").count()
+                ));
+                element.properties.insert("exportsCount".to_string(), json!(
+                    component.interfaces.iter().filter(|i| i.interface_type == "export").count()
+                ));
+                element.properties.insert("totalFunctions".to_string(), json!(
+                    component.interfaces.iter().map(|i| i.functions.len()).sum::<usize>()
+                ));
+                
+                updated_count += 1;
+            }
+        }
+
+        drop(models); // Release the lock before saving
+        
+        // Save to disk if we updated any components
+        if updated_count > 0 {
+            if let Err(e) = self.save_diagram(diagram_id).await {
+                error!("Failed to save diagram after refreshing interfaces: {}", e);
+            }
+        }
+
+        Ok(CallToolResult {
+            content: vec![Content::text(format!("Refreshed interface data for {updated_count} WASM components in diagram {diagram_id}"))],
             is_error: Some(false),
         })
     }
@@ -1057,7 +1214,7 @@ impl GlspBackend {
         let mut col = 0;
 
         for (_, element) in diagram.elements.iter_mut() {
-            if element.element_type != "graph" && element.bounds.is_some() {
+            if element.element_type != ElementType::Graph && element.bounds.is_some() {
                 if let Some(bounds) = &mut element.bounds {
                     bounds.x = x;
                     bounds.y = y;
@@ -1082,7 +1239,7 @@ impl GlspBackend {
         let spacing_x = 150.0;
 
         for (_, element) in diagram.elements.iter_mut() {
-            if element.element_type != "graph" && element.bounds.is_some() {
+            if element.element_type != ElementType::Graph && element.bounds.is_some() {
                 if let Some(bounds) = &mut element.bounds {
                     bounds.x = x;
                     bounds.y = y;
@@ -1097,10 +1254,10 @@ impl GlspBackend {
         let mut svg = String::from(r#"<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">"#);
         
         // Add elements
-        for (_, element) in &diagram.elements {
-            if element.element_type != "graph" {
+        for element in diagram.elements.values() {
+            if element.element_type != ElementType::Graph {
                 if let Some(bounds) = &element.bounds {
-                    if element.element_type.contains("node") || element.element_type == "task" {
+                    if element.element_type.is_node_like() {
                         svg.push_str(&format!(
                             r#"<rect x="{}" y="{}" width="{}" height="{}" fill="lightblue" stroke="black" stroke-width="1"/>"#,
                             bounds.x, bounds.y, bounds.width, bounds.height
@@ -1128,7 +1285,7 @@ impl GlspBackend {
     // Persistence helper methods
     async fn load_all_diagrams(&self) -> std::result::Result<(), GlspError> {
         let diagram_infos = self.persistence.list_diagrams().await
-            .map_err(|e| GlspError::NotImplemented(format!("Failed to list diagrams: {}", e)))?;
+            .map_err(|e| GlspError::NotImplemented(format!("Failed to list diagrams: {e}")))?;
         
         let mut models = self.models.lock().await;
         
@@ -1139,7 +1296,7 @@ impl GlspBackend {
                     models.insert(diagram.id.clone(), diagram);
                 }
                 Err(e) => {
-                    error!("Failed to load diagram '{}': {}", info.file_name, e);
+                    error!("Failed to load diagram '{}': {e}", info.file_name);
                 }
             }
         }
@@ -1153,18 +1310,197 @@ impl GlspBackend {
         
         if let Some(diagram) = models.get(diagram_id) {
             self.persistence.save_diagram(diagram).await
-                .map_err(|e| GlspError::NotImplemented(format!("Failed to save diagram: {}", e)))?;
+                .map_err(|e| GlspError::NotImplemented(format!("Failed to save diagram: {e}")))?;
             info!("Saved diagram '{}' to disk", diagram.name);
             Ok(())
         } else {
-            Err(GlspError::NotImplemented(format!("Diagram not found: {}", diagram_id)))
+            Err(GlspError::NotImplemented(format!("Diagram not found: {diagram_id}")))
         }
     }
 
     async fn delete_diagram_files(&self, diagram_name: &str) -> std::result::Result<(), GlspError> {
         self.persistence.delete_diagram(diagram_name).await
-            .map_err(|e| GlspError::NotImplemented(format!("Failed to delete diagram files: {}", e)))?;
+            .map_err(|e| GlspError::NotImplemented(format!("Failed to delete diagram files: {e}")))?;
         info!("Deleted diagram files for '{}'", diagram_name);
         Ok(())
     }
+    
+    pub fn get_filesystem_watcher(&self) -> std::sync::Arc<tokio::sync::RwLock<FileSystemWatcher>> {
+        self.filesystem_watcher.clone()
+    }
+
+    pub fn get_wasm_watcher(&self) -> std::sync::Arc<tokio::sync::Mutex<WasmFileWatcher>> {
+        self.wasm_watcher.clone()
+    }
+
+    async fn get_component_path(&self, args: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = args.ok_or_else(|| GlspError::ToolExecution("Missing arguments".to_string()))?;
+        
+        let component_name = args["componentName"].as_str()
+            .ok_or_else(|| GlspError::ToolExecution("Missing componentName parameter".to_string()))?;
+        
+        // Look up the component using flexible name matching
+        let wasm_watcher = self.wasm_watcher.lock().await;
+        let component = wasm_watcher.find_component_flexible(component_name)
+            .ok_or_else(|| GlspError::ToolExecution(format!("WASM component not found: {component_name}")))?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(component.path.clone())],
+            is_error: Some(false),
+        })
+    }
+
+    async fn get_component_wit_info(&self, args: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        use crate::wasm::WitAnalyzer;
+        use std::path::PathBuf;
+        
+        let args = args.ok_or_else(|| GlspError::ToolExecution("Missing arguments".to_string()))?;
+        
+        let diagram_id = args["diagramId"].as_str()
+            .ok_or_else(|| GlspError::ToolExecution("Missing diagramId parameter".to_string()))?;
+        
+        let element_id = args["elementId"].as_str()
+            .ok_or_else(|| GlspError::ToolExecution("Missing elementId parameter".to_string()))?;
+        
+        // Get the diagram
+        let models = self.models.lock().await;
+        let diagram = models.get(diagram_id)
+            .ok_or_else(|| GlspError::ToolExecution(format!("Diagram not found: {diagram_id}")))?;
+        
+        // Get the element
+        let element = diagram.elements.get(element_id)
+            .ok_or_else(|| GlspError::ToolExecution(format!("Element not found: {element_id}")))?;
+        
+        // Check if it's a WASM component
+        let is_wasm_component = match &element.element_type {
+            ElementType::Component => true,
+            ElementType::Custom(type_name) => type_name == "wasm-component",
+            _ => false,
+        };
+        
+        if !is_wasm_component {
+            return Ok(CallToolResult {
+                content: vec![Content::text(format!("Element '{}' is not a WASM component (type: {})", element_id, element.element_type))],
+                is_error: Some(true),
+            });
+        }
+        
+        // First, try to get the component file path from element properties
+        let component_path = if let Some(path_value) = element.properties.get("componentPath") {
+            path_value.as_str().map(|s| s.to_string())
+        } else {
+            None
+        };
+        
+        // If we have a path, use it directly
+        let component_file_path = if let Some(path) = component_path {
+            PathBuf::from(path)
+        } else {
+            // Fallback: Try to find by component name
+            let component_name = element.properties.get("componentName")
+                .and_then(|v| v.as_str())
+                .or(element.properties.get("name").and_then(|v| v.as_str()))
+                .or(element.label.as_deref())
+                .ok_or_else(|| GlspError::ToolExecution("Component name not found in element properties".to_string()))?;
+            
+            // Look up the component in the watcher using flexible name matching
+            let wasm_watcher = self.wasm_watcher.lock().await;
+            let component = wasm_watcher.find_component_flexible(component_name)
+                .ok_or_else(|| GlspError::ToolExecution(format!("WASM component file not found: {component_name}")))?;
+            
+            PathBuf::from(&component.path)
+        };
+        
+        // Verify the file exists
+        if !component_file_path.exists() {
+            return Ok(CallToolResult {
+                content: vec![Content::text(format!("WASM component file not found at path: {}", component_file_path.display()))],
+                is_error: Some(true),
+            });
+        }
+        
+        // Analyze the component
+        match WitAnalyzer::analyze_component(&component_file_path).await {
+            Ok(analysis) => {
+                // Return structured WIT information suitable for properties panel
+                let wit_info = json!({
+                    "componentName": analysis.component_name,
+                    "worldName": analysis.world_name,
+                    "filePath": component_file_path.to_string_lossy(),
+                    "imports": analysis.imports.iter().map(|interface| json!({
+                        "name": interface.name,
+                        "namespace": interface.namespace,
+                        "package": interface.package,
+                        "version": interface.version,
+                        "functions": interface.functions.iter().map(|func| json!({
+                            "name": func.name,
+                            "params": func.params.iter().map(|p| json!({
+                                "name": p.name,
+                                "type": p.param_type.name
+                            })).collect::<Vec<_>>(),
+                            "results": func.results.iter().map(|r| json!({
+                                "name": r.name,
+                                "type": r.param_type.name
+                            })).collect::<Vec<_>>(),
+                            "isAsync": func.is_async
+                        })).collect::<Vec<_>>(),
+                        "types": interface.types.iter().map(|t| json!({
+                            "name": t.name,
+                            "definition": format!("{:?}", t.type_def)
+                        })).collect::<Vec<_>>()
+                    })).collect::<Vec<_>>(),
+                    "exports": analysis.exports.iter().map(|interface| json!({
+                        "name": interface.name,
+                        "namespace": interface.namespace,
+                        "package": interface.package,
+                        "version": interface.version,
+                        "functions": interface.functions.iter().map(|func| json!({
+                            "name": func.name,
+                            "params": func.params.iter().map(|p| json!({
+                                "name": p.name,
+                                "type": p.param_type.name
+                            })).collect::<Vec<_>>(),
+                            "results": func.results.iter().map(|r| json!({
+                                "name": r.name,
+                                "type": r.param_type.name
+                            })).collect::<Vec<_>>(),
+                            "isAsync": func.is_async
+                        })).collect::<Vec<_>>(),
+                        "types": interface.types.iter().map(|t| json!({
+                            "name": t.name,
+                            "definition": format!("{:?}", t.type_def)
+                        })).collect::<Vec<_>>()
+                    })).collect::<Vec<_>>(),
+                    "dependencies": analysis.dependencies.iter().map(|dep| json!({
+                        "package": dep.package,
+                        "version": dep.version,
+                        "interfaces": dep.interfaces
+                    })).collect::<Vec<_>>(),
+                    "summary": {
+                        "importsCount": analysis.imports.len(),
+                        "exportsCount": analysis.exports.len(),
+                        "totalFunctions": analysis.imports.iter()
+                            .chain(analysis.exports.iter())
+                            .map(|i| i.functions.len())
+                            .sum::<usize>(),
+                        "typesCount": analysis.types.len(),
+                        "dependenciesCount": analysis.dependencies.len()
+                    }
+                });
+                
+                Ok(CallToolResult {
+                    content: vec![Content::text(serde_json::to_string_pretty(&wit_info)
+                        .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize WIT info: {e}")))?)],
+                    is_error: Some(false),
+                })
+            }
+            Err(error) => {
+                Ok(CallToolResult {
+                    content: vec![Content::text(format!("Failed to analyze component WIT interfaces: {error}"))],
+                    is_error: Some(true),
+                })
+            }
+        }
+    }
+    
 }
