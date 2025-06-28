@@ -6,6 +6,8 @@ pub mod selection;
 pub mod wasm;
 pub mod backend_simple;
 pub mod persistence;
+pub mod sse;
+pub mod http_server;
 
 pub use mcp::*;
 pub use model::*;

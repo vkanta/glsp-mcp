@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use crate::selection::SelectionState;
+use std::fmt;
+use std::str::FromStr;
 
 /// Core diagram model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,8 +34,8 @@ fn default_name() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelElement {
     pub id: String,
-    #[serde(rename = "type")]
-    pub element_type: String,
+    #[serde(rename = "type", with = "element_type_serde")]
+    pub element_type: ElementType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -134,14 +136,108 @@ pub enum MarkerSeverity {
     Hint,
 }
 
+/// Element types in the diagram
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ElementType {
+    Graph,
+    Node,
+    Task,
+    Edge,
+    Workflow,
+    Component,
+    Port,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl ElementType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ElementType::Graph => "graph",
+            ElementType::Node => "node",
+            ElementType::Task => "task",
+            ElementType::Edge => "edge",
+            ElementType::Workflow => "workflow",
+            ElementType::Component => "component",
+            ElementType::Port => "port",
+            ElementType::Custom(s) => s,
+        }
+    }
+
+    pub fn is_node_like(&self) -> bool {
+        matches!(self, ElementType::Node | ElementType::Task | ElementType::Component)
+    }
+
+    pub fn is_edge_like(&self) -> bool {
+        matches!(self, ElementType::Edge)
+    }
+}
+
+impl fmt::Display for ElementType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for ElementType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "graph" => ElementType::Graph,
+            "node" => ElementType::Node,
+            "task" => ElementType::Task,
+            "edge" => ElementType::Edge,
+            "workflow" => ElementType::Workflow,
+            "component" => ElementType::Component,
+            "port" => ElementType::Port,
+            other => ElementType::Custom(other.to_string()),
+        })
+    }
+}
+
+impl From<String> for ElementType {
+    fn from(s: String) -> Self {
+        s.parse().unwrap_or(ElementType::Custom(s))
+    }
+}
+
+impl From<&str> for ElementType {
+    fn from(s: &str) -> Self {
+        s.parse().unwrap_or(ElementType::Custom(s.to_string()))
+    }
+}
+
+/// Serde helper for element_type field
+mod element_type_serde {
+    use super::ElementType;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(element_type: &ElementType, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        element_type.as_str().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ElementType, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(ElementType::from(s))
+    }
+}
+
 impl DiagramModel {
     pub fn new(diagram_type: &str) -> Self {
         let id = Uuid::new_v4().to_string();
-        let root_id = format!("{}_root", id);
+        let root_id = format!("{id}_root");
         
         let root = ModelElement {
             id: root_id.clone(),
-            element_type: "graph".to_string(),
+            element_type: ElementType::Graph,
             children: Some(Vec::new()),
             bounds: None,
             layout_options: None,
@@ -238,7 +334,7 @@ impl Node {
         Self {
             base: ModelElement {
                 id: id.clone(),
-                element_type: node_type.to_string(),
+                element_type: ElementType::from(node_type),
                 children: None,
                 bounds: Some(Bounds {
                     x: position.x,
@@ -278,7 +374,7 @@ impl Edge {
         Self {
             base: ModelElement {
                 id: id.clone(),
-                element_type: edge_type.to_string(),
+                element_type: ElementType::from(edge_type),
                 children: None,
                 bounds: None,
                 layout_options: None,
