@@ -46,13 +46,21 @@ export class WasmComponentRendererV2 {
         const { ctx, isSelected, isHovered, isMissing, colors } = context;
 
         // Get component properties
-        const componentName = element.properties?.label?.toString() || 
+        // First check the label field (set by MCP create_node), then fall back to other properties
+        const componentName = element.label?.toString() || 
+                            element.properties?.label?.toString() || 
                             element.properties?.componentName?.toString() || 
                             'Component';
         const componentType = element.properties?.componentType?.toString() || 'WASM';
         const isLoaded = element.properties?.isLoaded === true;
         const interfaces = element.properties?.interfaces as any[] || [];
         const status = isMissing ? 'error' : (isLoaded ? 'loaded' : 'unloaded');
+        
+        // Debug interface data
+        console.log('WasmComponentRendererV2: Rendering component', componentName);
+        console.log('WasmComponentRendererV2: Element properties:', element.properties);
+        console.log('WasmComponentRendererV2: Interfaces:', interfaces);
+        console.log('WasmComponentRendererV2: Interface count:', interfaces.length);
 
         // Use consistent sizing
         const width = Math.max(bounds.width, this.DEFAULT_WIDTH);
@@ -229,6 +237,9 @@ export class WasmComponentRendererV2 {
         colors: any,
         isSelected: boolean
     ): void {
+        console.log('WasmComponentRendererV2: drawPorts called with', interfaces.length, 'interfaces');
+        console.log('WasmComponentRendererV2: Interface details:', interfaces);
+        
         // Separate input and output interfaces
         const inputs = interfaces.filter(i => 
             i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
@@ -236,6 +247,9 @@ export class WasmComponentRendererV2 {
         const outputs = interfaces.filter(i => 
             i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
         );
+        
+        console.log('WasmComponentRendererV2: Filtered inputs:', inputs.length, inputs);
+        console.log('WasmComponentRendererV2: Filtered outputs:', outputs.length, outputs);
 
         // Draw input ports (left side)
         this.drawPortGroup(ctx, bounds, inputs, 'input', colors, isSelected);
