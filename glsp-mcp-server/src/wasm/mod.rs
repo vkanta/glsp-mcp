@@ -567,15 +567,23 @@ impl WasmFileWatcher {
                     _ => {}
                 }
                 
-                // Count interface name patterns
-                let interface_category = if interface.name.starts_with("wasi:") {
-                    "WASI Standard"
-                } else if interface.name.starts_with("adas:") {
-                    "ADAS Custom"
-                } else if interface.name.contains("/") {
-                    "Namespaced"
-                } else {
-                    "Component Local"
+                // Count interface types properly
+                let interface_category = match interface.interface_type.as_str() {
+                    "import" => if interface.name.starts_with("wasi:") {
+                        "WASI Imports"
+                    } else if interface.name.starts_with("adas:") {
+                        "ADAS Imports"  
+                    } else {
+                        "Component Imports"
+                    },
+                    "export" => if interface.name.starts_with("wasi:") {
+                        "WASI Exports"
+                    } else if interface.name.starts_with("adas:") {
+                        "ADAS Exports"
+                    } else {
+                        "Component Exports"
+                    },
+                    _ => "Unknown Type"
                 };
                 
                 *interface_types.entry(interface_category.to_string()).or_insert(0) += 1;
