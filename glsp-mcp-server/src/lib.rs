@@ -1,26 +1,22 @@
+pub mod backend;
 pub mod mcp;
 pub mod model;
 pub mod operations;
-pub mod validation;
-pub mod selection;
-pub mod wasm;
-pub mod backend_simple;
 pub mod persistence;
+pub mod selection;
+pub mod validation;
+pub mod wasm;
 
 // Re-export local MCP modules
-pub use mcp::{protocol, tools, resources, prompts};
+pub use mcp::{prompts, protocol, resources, tools};
 
 // Re-export MCP framework types
-pub use mcp_protocol::{
-    Request, Response, Error, Content, 
-    Tool, Resource, Prompt,
-    CallToolRequestParam, CallToolResult,
-    ListToolsResult, ListResourcesResult, ListPromptsResult,
-    PaginatedRequestParam, ReadResourceRequestParam,
-    Implementation, ServerCapabilities,
-    ProtocolVersion
-};
+pub use backend::*;
 pub use model::*;
-pub use backend_simple::*;
+pub use pulseengine_mcp_protocol::{
+    CallToolRequestParam, CallToolResult, Content, Error, Implementation, ListPromptsResult,
+    ListResourcesResult, ListToolsResult, PaginatedRequestParam, Prompt, ProtocolVersion,
+    ReadResourceRequestParam, Request, Resource, Response, ServerCapabilities, Tool,
+};
 // pub use operations::*;
 // pub use validation::*;
