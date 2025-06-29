@@ -1,7 +1,7 @@
 /*!
  * WIT (WebAssembly Interface Types) Analyzer
- * 
- * This module provides functionality to extract and analyze WIT interfaces 
+ *
+ * This module provides functionality to extract and analyze WIT interfaces
  * from WebAssembly Component Model binaries using the Bytecode Alliance toolchain.
  */
 
@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use wit_component::DecodedWasm;
-use wit_parser::{Resolve, WorldId, Interface, Package, PackageId};
+use wit_parser::{Interface, Package, PackageId, Resolve, WorldId};
 
 /// Represents a complete WIT interface definition extracted from a WASM component
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,16 +57,37 @@ pub struct WitType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WitTypeDefinition {
     Primitive(String),
-    Record { fields: Vec<WitParam> },
-    Variant { cases: Vec<WitVariantCase> },
-    Enum { cases: Vec<String> },
-    Union { types: Vec<WitType> },
-    Option { inner: Box<WitType> },
-    Result { ok: Option<Box<WitType>>, error: Option<Box<WitType>> },
-    List { element: Box<WitType> },
-    Tuple { elements: Vec<WitType> },
-    Flags { flags: Vec<String> },
-    Resource { methods: Vec<WitFunction> },
+    Record {
+        fields: Vec<WitParam>,
+    },
+    Variant {
+        cases: Vec<WitVariantCase>,
+    },
+    Enum {
+        cases: Vec<String>,
+    },
+    Union {
+        types: Vec<WitType>,
+    },
+    Option {
+        inner: Box<WitType>,
+    },
+    Result {
+        ok: Option<Box<WitType>>,
+        error: Option<Box<WitType>>,
+    },
+    List {
+        element: Box<WitType>,
+    },
+    Tuple {
+        elements: Vec<WitType>,
+    },
+    Flags {
+        flags: Vec<String>,
+    },
+    Resource {
+        methods: Vec<WitFunction>,
+    },
 }
 
 /// Variant case for sum types
@@ -112,7 +133,8 @@ impl WitAnalyzer {
         println!("🔍 Analyzing WASM component: {path:?}");
 
         // Read the WASM bytes
-        let wasm_bytes = tokio::fs::read(path).await
+        let wasm_bytes = tokio::fs::read(path)
+            .await
             .with_context(|| format!("Failed to read WASM file: {path:?}"))?;
 
         // Try to decode as a component first
@@ -131,7 +153,7 @@ impl WitAnalyzer {
     /// Analyze a decoded WebAssembly component
     async fn analyze_decoded_component(
         component_name: String,
-        decoded: DecodedWasm
+        decoded: DecodedWasm,
     ) -> Result<ComponentWitAnalysis> {
         match decoded {
             DecodedWasm::Component(resolve, world_id) => {
@@ -148,10 +170,10 @@ impl WitAnalyzer {
     /// Analyze a core WebAssembly module (non-component)
     async fn analyze_core_module(
         component_name: String,
-        _wasm_bytes: Vec<u8>
+        _wasm_bytes: Vec<u8>,
     ) -> Result<ComponentWitAnalysis> {
         println!("🔧 Core module detected - limited interface extraction available");
-        
+
         // For core modules, we can only provide basic analysis
         // In a real implementation, you might want to try converting to component
         Ok(ComponentWitAnalysis {
@@ -169,16 +191,23 @@ impl WitAnalyzer {
     async fn extract_wit_from_resolve(
         component_name: String,
         resolve: &Resolve,
-        world_id: WorldId
+        world_id: WorldId,
     ) -> Result<ComponentWitAnalysis> {
         // Debug: List all available worlds
         println!("🌍 Available worlds in resolve:");
         for (id, world) in &resolve.worlds {
-            println!("  - World ID {:?}: '{}' (imports: {}, exports: {})", 
-                id, world.name, world.imports.len(), world.exports.len());
+            println!(
+                "  - World ID {:?}: '{}' (imports: {}, exports: {})",
+                id,
+                world.name,
+                world.imports.len(),
+                world.exports.len()
+            );
         }
-        
-        let world = resolve.worlds.get(world_id)
+
+        let world = resolve
+            .worlds
+            .get(world_id)
             .ok_or_else(|| anyhow!("World not found in resolve"))?;
 
         println!("🌍 Analyzing world: {} (ID: {:?})", world.name, world_id);
@@ -193,25 +222,19 @@ impl WitAnalyzer {
         // Extract imports
         for (key, import) in &world.imports {
             println!("  🔍 Processing import: {key:?} -> {import:?}");
-            let interface = Self::extract_world_item_interface(
-                resolve,
-                key,
-                import,
-                WitInterfaceType::Import
-            ).await?;
+            let interface =
+                Self::extract_world_item_interface(resolve, key, import, WitInterfaceType::Import)
+                    .await?;
             println!("  ✅ Created import interface: {}", interface.name);
             imports.push(interface);
         }
 
-        // Extract exports  
+        // Extract exports
         for (key, export) in &world.exports {
             println!("  🔍 Processing export: {key:?} -> {export:?}");
-            let interface = Self::extract_world_item_interface(
-                resolve,
-                key,
-                export,
-                WitInterfaceType::Export
-            ).await?;
+            let interface =
+                Self::extract_world_item_interface(resolve, key, export, WitInterfaceType::Export)
+                    .await?;
             println!("  ✅ Created export interface: {}", interface.name);
             exports.push(interface);
         }
@@ -249,27 +272,31 @@ impl WitAnalyzer {
     async fn extract_wit_from_package(
         component_name: String,
         resolve: &Resolve,
-        package_id: PackageId
+        package_id: PackageId,
     ) -> Result<ComponentWitAnalysis> {
-        let package = resolve.packages.get(package_id)
+        let package = resolve
+            .packages
+            .get(package_id)
             .ok_or_else(|| anyhow!("Package not found in resolve"))?;
 
-        println!("📦 Analyzing package: {}:{}", package.name.namespace, package.name.name);
+        println!(
+            "📦 Analyzing package: {}:{}",
+            package.name.namespace, package.name.name
+        );
 
         let mut exports = Vec::new();
         let mut all_types = Vec::new();
 
         // Extract interfaces from package
         for (name, interface_id) in &package.interfaces {
-            let interface = resolve.interfaces.get(*interface_id)
+            let interface = resolve
+                .interfaces
+                .get(*interface_id)
                 .ok_or_else(|| anyhow!("Interface not found: {}", name))?;
 
-            let wit_interface = Self::convert_interface_to_wit(
-                resolve,
-                name,
-                interface,
-                WitInterfaceType::Export
-            ).await?;
+            let wit_interface =
+                Self::convert_interface_to_wit(resolve, name, interface, WitInterfaceType::Export)
+                    .await?;
             exports.push(wit_interface);
         }
 
@@ -293,28 +320,32 @@ impl WitAnalyzer {
         resolve: &Resolve,
         key: &wit_parser::WorldKey,
         item: &wit_parser::WorldItem,
-        interface_type: WitInterfaceType
+        interface_type: WitInterfaceType,
     ) -> Result<WitInterface> {
         use wit_parser::{WorldItem, WorldKey};
 
         match (key, item) {
             (WorldKey::Name(name), WorldItem::Interface { id, .. }) => {
-                let interface = resolve.interfaces.get(*id)
+                let interface = resolve
+                    .interfaces
+                    .get(*id)
                     .ok_or_else(|| anyhow!("Interface not found for key: {}", name))?;
-                
+
                 Self::convert_interface_to_wit(resolve, name, interface, interface_type).await
             }
             (WorldKey::Interface(interface_id), WorldItem::Interface { .. }) => {
-                let interface = resolve.interfaces.get(*interface_id)
+                let interface = resolve
+                    .interfaces
+                    .get(*interface_id)
                     .ok_or_else(|| anyhow!("Interface not found for id: {:?}", interface_id))?;
-                
+
                 let name = interface.name.as_deref().unwrap_or("unnamed");
                 Self::convert_interface_to_wit(resolve, name, interface, interface_type).await
             }
             (WorldKey::Name(name), WorldItem::Function(func)) => {
                 // Single function export/import
                 let function = Self::convert_function_to_wit(resolve, name, func).await?;
-                
+
                 Ok(WitInterface {
                     name: name.clone(),
                     namespace: None,
@@ -325,9 +356,7 @@ impl WitAnalyzer {
                     types: vec![],
                 })
             }
-            _ => {
-                Err(anyhow!("Unsupported world item type"))
-            }
+            _ => Err(anyhow!("Unsupported world item type")),
         }
     }
 
@@ -336,7 +365,7 @@ impl WitAnalyzer {
         resolve: &Resolve,
         name: &str,
         interface: &Interface,
-        interface_type: WitInterfaceType
+        interface_type: WitInterfaceType,
     ) -> Result<WitInterface> {
         let mut functions = Vec::new();
         let mut types = Vec::new();
@@ -358,7 +387,7 @@ impl WitAnalyzer {
         Ok(WitInterface {
             name: name.to_string(),
             namespace: None, // TODO: Extract from package info
-            package: None,   // TODO: Extract from package info  
+            package: None,   // TODO: Extract from package info
             version: None,   // TODO: Extract from package info
             interface_type,
             functions,
@@ -370,7 +399,7 @@ impl WitAnalyzer {
     async fn convert_function_to_wit(
         resolve: &Resolve,
         name: &str,
-        func: &wit_parser::Function
+        func: &wit_parser::Function,
     ) -> Result<WitFunction> {
         let mut params = Vec::new();
         let mut results = Vec::new();
@@ -415,7 +444,7 @@ impl WitAnalyzer {
     /// Convert a WIT type to our type representation
     async fn convert_type_to_wit(
         _resolve: &Resolve,
-        wit_type: &wit_parser::Type
+        wit_type: &wit_parser::Type,
     ) -> Result<WitType> {
         use wit_parser::Type;
 
@@ -446,7 +475,7 @@ impl WitAnalyzer {
     async fn convert_type_def_to_wit(
         resolve: &Resolve,
         name: &str,
-        type_def: &wit_parser::TypeDef
+        type_def: &wit_parser::TypeDef,
     ) -> Result<WitType> {
         use wit_parser::TypeDefKind;
 
@@ -478,7 +507,11 @@ impl WitAnalyzer {
                 WitTypeDefinition::Variant { cases }
             }
             TypeDefKind::Enum(enum_def) => {
-                let cases = enum_def.cases.iter().map(|case| case.name.clone()).collect();
+                let cases = enum_def
+                    .cases
+                    .iter()
+                    .map(|case| case.name.clone())
+                    .collect();
                 WitTypeDefinition::Enum { cases }
             }
             // Note: Union type handling may vary by wit-parser version
@@ -492,7 +525,9 @@ impl WitAnalyzer {
             // }
             TypeDefKind::Option(option_type) => {
                 let inner_type = Self::convert_type_to_wit(resolve, option_type).await?;
-                WitTypeDefinition::Option { inner: Box::new(inner_type) }
+                WitTypeDefinition::Option {
+                    inner: Box::new(inner_type),
+                }
             }
             TypeDefKind::Result(result_type) => {
                 let ok_type = if let Some(ok) = &result_type.ok {
@@ -505,11 +540,16 @@ impl WitAnalyzer {
                 } else {
                     None
                 };
-                WitTypeDefinition::Result { ok: ok_type, error: error_type }
+                WitTypeDefinition::Result {
+                    ok: ok_type,
+                    error: error_type,
+                }
             }
             TypeDefKind::List(list_type) => {
                 let element_type = Self::convert_type_to_wit(resolve, list_type).await?;
-                WitTypeDefinition::List { element: Box::new(element_type) }
+                WitTypeDefinition::List {
+                    element: Box::new(element_type),
+                }
             }
             TypeDefKind::Tuple(tuple) => {
                 let mut elements = Vec::new();
@@ -538,7 +578,7 @@ impl WitAnalyzer {
     /// Extract types from a package
     async fn extract_types_from_package(
         resolve: &Resolve,
-        package: &Package
+        package: &Package,
     ) -> Result<Vec<WitType>> {
         let mut types = Vec::new();
 
@@ -546,7 +586,8 @@ impl WitAnalyzer {
             if let Some(interface) = resolve.interfaces.get(*interface_id) {
                 for (type_name, type_id) in &interface.types {
                     if let Some(type_def) = resolve.types.get(*type_id) {
-                        let wit_type = Self::convert_type_def_to_wit(resolve, type_name, type_def).await?;
+                        let wit_type =
+                            Self::convert_type_def_to_wit(resolve, type_name, type_def).await?;
                         types.push(wit_type);
                     }
                 }
@@ -560,7 +601,9 @@ impl WitAnalyzer {
     fn generate_wit_text(resolve: &Resolve, world_id: WorldId) -> Result<String> {
         // Use wit-component's built-in WIT printing
         // This is a simplified version - in practice you'd want more sophisticated formatting
-        let world = resolve.worlds.get(world_id)
+        let world = resolve
+            .worlds
+            .get(world_id)
             .ok_or_else(|| anyhow!("World not found"))?;
 
         let mut wit_text = String::new();
@@ -604,13 +647,13 @@ impl WitAnalyzer {
     /// Debug method to test interface extraction from a specific component
     pub async fn debug_component_interfaces<P: AsRef<Path>>(path: P) -> Result<()> {
         let analysis = Self::analyze_component(path.as_ref()).await?;
-        
+
         println!("🐛 DEBUG: Component Analysis Results");
         println!("=====================================");
         println!("Component: {}", analysis.component_name);
         println!("World: {:?}", analysis.world_name);
         println!();
-        
+
         println!("📥 IMPORTS ({})", analysis.imports.len());
         for (i, import) in analysis.imports.iter().enumerate() {
             println!("  {}. {}", i + 1, import.name);
@@ -620,7 +663,7 @@ impl WitAnalyzer {
             }
         }
         println!();
-        
+
         println!("📤 EXPORTS ({})", analysis.exports.len());
         for (i, export) in analysis.exports.iter().enumerate() {
             println!("  {}. {}", i + 1, export.name);
@@ -630,12 +673,12 @@ impl WitAnalyzer {
             }
         }
         println!();
-        
+
         println!("🔗 DEPENDENCIES ({})", analysis.dependencies.len());
         for dep in &analysis.dependencies {
             println!("  - {}", dep.package);
         }
-        
+
         println!("=====================================");
         Ok(())
     }
@@ -644,13 +687,44 @@ impl WitAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[tokio::test]
-    async fn test_wit_analyzer_with_sample_component() {
-        // This test would require a sample WASM component file
-        // For now, we'll just test that the analyzer can be instantiated
-        let analyzer = WitAnalyzer;
-        assert!(true); // Placeholder test
+    async fn test_wit_analyzer_basic() {
+        // Test that the analyzer can be instantiated
+        let _analyzer = WitAnalyzer;
+
+        // Test analyzing a non-existent file
+        let result = WitAnalyzer::analyze_component("non-existent.wasm").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    #[ignore] // Ignore by default since it requires specific test files
+    async fn test_wit_analyzer_with_real_component() {
+        // This test requires actual WASM component files in the workspace
+        let test_paths = [
+            "../workspace/adas-wasm-components/wasm-outputs/vehicle-control.wasm",
+            "../workspace/adas-wasm-components/dist/input-video-decoder.wasm",
+        ];
+
+        for path in &test_paths {
+            if std::path::Path::new(path).exists() {
+                println!("Testing WIT analysis for: {path}");
+                match WitAnalyzer::analyze_component(path).await {
+                    Ok(analysis) => {
+                        println!("Successfully analyzed: {}", analysis.component_name);
+                        println!("World: {:?}", analysis.world_name);
+                        println!("Imports: {}", analysis.imports.len());
+                        println!("Exports: {}", analysis.exports.len());
+                        // Basic validation
+                        assert!(!analysis.component_name.is_empty());
+                    }
+                    Err(e) => {
+                        println!("Failed to analyze {path}: {e}");
+                    }
+                }
+                break; // Test with first available file
+            }
+        }
     }
 }

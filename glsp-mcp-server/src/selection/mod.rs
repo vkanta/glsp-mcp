@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectionState {
@@ -63,12 +63,12 @@ impl SelectionState {
         if !append {
             self.selected_elements.clear();
         }
-        
+
         for id in element_ids {
             self.selected_elements.insert(id.clone());
             self.last_selected = Some(id);
         }
-        
+
         self.selection_mode = SelectionMode::Multiple;
     }
 
@@ -127,11 +127,11 @@ mod tests {
     #[test]
     fn test_single_selection() {
         let mut state = SelectionState::new();
-        
+
         state.select_element("node1".to_string(), SelectionMode::Single);
         assert_eq!(state.get_selected_count(), 1);
         assert!(state.is_selected("node1"));
-        
+
         state.select_element("node2".to_string(), SelectionMode::Single);
         assert_eq!(state.get_selected_count(), 1);
         assert!(!state.is_selected("node1"));
@@ -141,11 +141,11 @@ mod tests {
     #[test]
     fn test_multiple_selection() {
         let mut state = SelectionState::new();
-        
+
         state.select_element("node1".to_string(), SelectionMode::Multiple);
         state.select_element("node2".to_string(), SelectionMode::Multiple);
         assert_eq!(state.get_selected_count(), 2);
-        
+
         // Toggle selection
         state.select_element("node1".to_string(), SelectionMode::Multiple);
         assert_eq!(state.get_selected_count(), 1);
@@ -156,8 +156,12 @@ mod tests {
     #[test]
     fn test_select_all() {
         let mut state = SelectionState::new();
-        let all_ids = vec!["node1".to_string(), "node2".to_string(), "node3".to_string()];
-        
+        let all_ids = vec![
+            "node1".to_string(),
+            "node2".to_string(),
+            "node3".to_string(),
+        ];
+
         state.select_all(all_ids);
         assert_eq!(state.get_selected_count(), 3);
         assert!(state.is_selected("node1"));

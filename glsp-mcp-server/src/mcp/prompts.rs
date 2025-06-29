@@ -1,4 +1,6 @@
-use crate::mcp::protocol::{Prompt, PromptArgument, GetPromptParams, GetPromptResult, PromptMessage, TextContent};
+use crate::mcp::protocol::{
+    GetPromptParams, GetPromptResult, Prompt, PromptArgument, PromptMessage, TextContent,
+};
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -28,7 +30,9 @@ impl DiagramPrompts {
                     },
                     PromptArgument {
                         name: "style".to_string(),
-                        description: Some("Style of workflow (bpmn, flowchart, simple)".to_string()),
+                        description: Some(
+                            "Style of workflow (bpmn, flowchart, simple)".to_string(),
+                        ),
                         required: Some(false),
                     },
                 ]),
@@ -44,7 +48,9 @@ impl DiagramPrompts {
                     },
                     PromptArgument {
                         name: "criteria".to_string(),
-                        description: Some("Optimization criteria (readability, compactness, flow)".to_string()),
+                        description: Some(
+                            "Optimization criteria (readability, compactness, flow)".to_string(),
+                        ),
                         required: Some(false),
                     },
                 ]),
@@ -60,14 +66,18 @@ impl DiagramPrompts {
                     },
                     PromptArgument {
                         name: "error_types".to_string(),
-                        description: Some("Types of errors to handle (validation, system, business)".to_string()),
+                        description: Some(
+                            "Types of errors to handle (validation, system, business)".to_string(),
+                        ),
                         required: Some(false),
                     },
                 ]),
             },
             Prompt {
                 name: "analyze_diagram".to_string(),
-                description: Some("Analyze a diagram for potential issues and improvements".to_string()),
+                description: Some(
+                    "Analyze a diagram for potential issues and improvements".to_string(),
+                ),
                 arguments: Some(vec![
                     PromptArgument {
                         name: "diagram_id".to_string(),
@@ -76,14 +86,18 @@ impl DiagramPrompts {
                     },
                     PromptArgument {
                         name: "focus".to_string(),
-                        description: Some("Analysis focus (performance, maintainability, compliance)".to_string()),
+                        description: Some(
+                            "Analysis focus (performance, maintainability, compliance)".to_string(),
+                        ),
                         required: Some(false),
                     },
                 ]),
             },
             Prompt {
                 name: "create_subprocess".to_string(),
-                description: Some("Create a subprocess for a complex task in a workflow".to_string()),
+                description: Some(
+                    "Create a subprocess for a complex task in a workflow".to_string(),
+                ),
                 arguments: Some(vec![
                     PromptArgument {
                         name: "task_description".to_string(),
@@ -128,10 +142,16 @@ impl DiagramPrompts {
         }
     }
 
-    async fn generate_workflow_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn generate_workflow_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let description = args.get("description").cloned().unwrap_or_default();
-        let style = args.get("style").cloned().unwrap_or_else(|| "flowchart".to_string());
+        let style = args
+            .get("style")
+            .cloned()
+            .unwrap_or_else(|| "flowchart".to_string());
 
         let prompt_text = format!(
             r#"You are an expert diagram designer. Create a workflow diagram based on this description:
@@ -181,10 +201,16 @@ Remember to:
         })
     }
 
-    async fn optimize_layout_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn optimize_layout_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let diagram_id = args.get("diagram_id").cloned().unwrap_or_default();
-        let criteria = args.get("criteria").cloned().unwrap_or_else(|| "readability".to_string());
+        let criteria = args
+            .get("criteria")
+            .cloned()
+            .unwrap_or_else(|| "readability".to_string());
 
         let prompt_text = format!(
             r#"You are a diagram layout expert. Optimize the layout of diagram '{diagram_id}' focusing on {criteria}.
@@ -230,10 +256,16 @@ Use the 'apply_layout' tool with the appropriate algorithm, then make manual adj
         })
     }
 
-    async fn add_error_handling_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn add_error_handling_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let diagram_id = args.get("diagram_id").cloned().unwrap_or_default();
-        let error_types = args.get("error_types").cloned().unwrap_or_else(|| "validation,system".to_string());
+        let error_types = args
+            .get("error_types")
+            .cloned()
+            .unwrap_or_else(|| "validation,system".to_string());
 
         let prompt_text = format!(
             r#"You are a workflow design expert specializing in error handling and resilience patterns. Add comprehensive error handling to diagram '{diagram_id}' for these error types: {error_types}.
@@ -279,7 +311,9 @@ Remember to maintain the original workflow logic while making it more robust."#
         );
 
         Ok(GetPromptResult {
-            description: Some("Add comprehensive error handling patterns to a workflow".to_string()),
+            description: Some(
+                "Add comprehensive error handling patterns to a workflow".to_string(),
+            ),
             messages: vec![PromptMessage {
                 role: "user".to_string(),
                 content: TextContent {
@@ -290,10 +324,16 @@ Remember to maintain the original workflow logic while making it more robust."#
         })
     }
 
-    async fn analyze_diagram_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn analyze_diagram_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let diagram_id = args.get("diagram_id").cloned().unwrap_or_default();
-        let focus = args.get("focus").cloned().unwrap_or_else(|| "general".to_string());
+        let focus = args
+            .get("focus")
+            .cloned()
+            .unwrap_or_else(|| "general".to_string());
 
         let prompt_text = format!(
             r#"You are a diagram analysis expert. Perform a comprehensive analysis of diagram '{diagram_id}' with focus on {focus}.
@@ -343,7 +383,9 @@ Format your analysis clearly with specific element IDs and actionable recommenda
         );
 
         Ok(GetPromptResult {
-            description: Some("Analyze diagram for issues and improvement opportunities".to_string()),
+            description: Some(
+                "Analyze diagram for issues and improvement opportunities".to_string(),
+            ),
             messages: vec![PromptMessage {
                 role: "user".to_string(),
                 content: TextContent {
@@ -354,10 +396,16 @@ Format your analysis clearly with specific element IDs and actionable recommenda
         })
     }
 
-    async fn create_subprocess_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn create_subprocess_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let task_description = args.get("task_description").cloned().unwrap_or_default();
-        let detail_level = args.get("detail_level").cloned().unwrap_or_else(|| "medium".to_string());
+        let detail_level = args
+            .get("detail_level")
+            .cloned()
+            .unwrap_or_else(|| "medium".to_string());
 
         let prompt_text = format!(
             r#"You are a process decomposition expert. Break down this complex task into a detailed subprocess: "{task_description}"
@@ -423,7 +471,10 @@ Remember to:
         })
     }
 
-    async fn convert_diagram_prompt(&self, args: Option<HashMap<String, String>>) -> Result<GetPromptResult> {
+    async fn convert_diagram_prompt(
+        &self,
+        args: Option<HashMap<String, String>>,
+    ) -> Result<GetPromptResult> {
         let args = args.unwrap_or_default();
         let diagram_id = args.get("diagram_id").cloned().unwrap_or_default();
         let target_type = args.get("target_type").cloned().unwrap_or_default();
@@ -473,7 +524,9 @@ After conversion:
         );
 
         Ok(GetPromptResult {
-            description: Some("Convert diagram between different formats and standards".to_string()),
+            description: Some(
+                "Convert diagram between different formats and standards".to_string(),
+            ),
             messages: vec![PromptMessage {
                 role: "user".to_string(),
                 content: TextContent {

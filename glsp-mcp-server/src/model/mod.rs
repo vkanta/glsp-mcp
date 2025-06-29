@@ -1,9 +1,9 @@
+use crate::selection::SelectionState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
-use crate::selection::SelectionState;
 use std::fmt;
 use std::str::FromStr;
+use uuid::Uuid;
 
 /// Core diagram model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,7 +166,10 @@ impl ElementType {
     }
 
     pub fn is_node_like(&self) -> bool {
-        matches!(self, ElementType::Node | ElementType::Task | ElementType::Component)
+        matches!(
+            self,
+            ElementType::Node | ElementType::Task | ElementType::Component
+        )
     }
 
     pub fn is_edge_like(&self) -> bool {
@@ -234,7 +237,7 @@ impl DiagramModel {
     pub fn new(diagram_type: &str) -> Self {
         let id = Uuid::new_v4().to_string();
         let root_id = format!("{id}_root");
-        
+
         let root = ModelElement {
             id: root_id.clone(),
             element_type: ElementType::Graph,
@@ -301,7 +304,8 @@ impl DiagramModel {
     }
 
     pub fn get_all_element_ids(&self) -> Vec<String> {
-        self.elements.keys()
+        self.elements
+            .keys()
             .filter(|id| *id != &self.root.id)
             .cloned()
             .collect()
@@ -310,10 +314,11 @@ impl DiagramModel {
     pub fn get_element_at_position(&self, x: f64, y: f64, tolerance: f64) -> Option<String> {
         for (id, element) in &self.elements {
             if let Some(bounds) = &element.bounds {
-                if x >= bounds.x - tolerance 
-                   && x <= bounds.x + bounds.width + tolerance
-                   && y >= bounds.y - tolerance 
-                   && y <= bounds.y + bounds.height + tolerance {
+                if x >= bounds.x - tolerance
+                    && x <= bounds.x + bounds.width + tolerance
+                    && y >= bounds.y - tolerance
+                    && y <= bounds.y + bounds.height + tolerance
+                {
                     return Some(id.clone());
                 }
             }
@@ -326,9 +331,12 @@ impl Node {
     pub fn new(node_type: &str, position: Position, label: Option<String>) -> Self {
         let id = Uuid::new_v4().to_string();
         let mut properties = HashMap::new();
-        
+
         if let Some(ref label_text) = label {
-            properties.insert("label".to_string(), serde_json::Value::String(label_text.clone()));
+            properties.insert(
+                "label".to_string(),
+                serde_json::Value::String(label_text.clone()),
+            );
         }
 
         Self {
@@ -363,12 +371,20 @@ impl Node {
 }
 
 impl Edge {
-    pub fn new(edge_type: &str, source_id: String, target_id: String, label: Option<String>) -> Self {
+    pub fn new(
+        edge_type: &str,
+        source_id: String,
+        target_id: String,
+        label: Option<String>,
+    ) -> Self {
         let id = Uuid::new_v4().to_string();
         let mut properties = HashMap::new();
-        
+
         if let Some(ref label_text) = label {
-            properties.insert("label".to_string(), serde_json::Value::String(label_text.clone()));
+            properties.insert(
+                "label".to_string(),
+                serde_json::Value::String(label_text.clone()),
+            );
         }
 
         Self {

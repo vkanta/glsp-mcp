@@ -1,15 +1,15 @@
 //! Persistence layer for GLSP diagrams
-//! 
+//!
 //! Implements dual-file storage:
 //! - Content file (.glsp.json): Semantic model (nodes, edges, properties)
 //! - Layout file (.glsp.layout.json): Graphical representation (positions, sizes)
 
-use crate::model::{DiagramModel, ModelElement, Bounds, ElementType};
+use crate::model::{Bounds, DiagramModel, ElementType, ModelElement};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use chrono::{DateTime, Utc};
 
 /// Content file structure - semantic model only
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -79,7 +79,7 @@ impl PersistenceManager {
             base_path: base_path.as_ref().to_path_buf(),
         }
     }
-    
+
     pub fn get_base_path(&self) -> &Path {
         &self.base_path
     }
@@ -100,32 +100,32 @@ impl PersistenceManager {
     /// Save a diagram to disk (both content and layout)
     pub async fn save_diagram(&self, diagram: &DiagramModel) -> std::io::Result<()> {
         self.ensure_storage_dir().await?;
-        
+
         // Extract content and layout from the diagram model
         let (content, layout) = self.split_diagram(diagram);
-        
+
         // Get file paths
         let (content_path, layout_path) = self.get_file_paths(&diagram.name);
-        
+
         // Save content file
         let content_json = serde_json::to_string_pretty(&content)?;
         fs::write(&content_path, content_json).await?;
-        
+
         // Save layout file
         let layout_json = serde_json::to_string_pretty(&layout)?;
         fs::write(&layout_path, layout_json).await?;
-        
+
         Ok(())
     }
 
     /// Load a diagram from disk
     pub async fn load_diagram(&self, diagram_name: &str) -> std::io::Result<DiagramModel> {
         let (content_path, layout_path) = self.get_file_paths(diagram_name);
-        
+
         // Load content file (required)
         let content_json = fs::read_to_string(&content_path).await?;
         let content: DiagramContent = serde_json::from_str(&content_json)?;
-        
+
         // Load layout file (optional)
         let layout = if layout_path.exists() {
             let layout_json = fs::read_to_string(&layout_path).await?;
@@ -133,7 +133,7 @@ impl PersistenceManager {
         } else {
             None
         };
-        
+
         // Merge content and layout into DiagramModel
         Ok(self.merge_diagram(content, layout))
     }
@@ -141,10 +141,10 @@ impl PersistenceManager {
     /// List all available diagrams
     pub async fn list_diagrams(&self) -> std::io::Result<Vec<DiagramInfo>> {
         self.ensure_storage_dir().await?;
-        
+
         let mut diagrams = Vec::new();
         let mut entries = fs::read_dir(&self.base_path).await?;
-        
+
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if let Some(file_name) = path.file_name() {
@@ -152,7 +152,7 @@ impl PersistenceManager {
                 if name.ends_with(".glsp.json") {
                     // Extract diagram name
                     let diagram_name = name.trim_end_matches(".glsp.json");
-                    
+
                     // Try to load basic info
                     if let Ok(content_json) = fs::read_to_string(&path).await {
                         if let Ok(content) = serde_json::from_str::<DiagramContent>(&content_json) {
@@ -169,24 +169,24 @@ impl PersistenceManager {
                 }
             }
         }
-        
+
         Ok(diagrams)
     }
 
     /// Delete a diagram from disk
     pub async fn delete_diagram(&self, diagram_name: &str) -> std::io::Result<()> {
         let (content_path, layout_path) = self.get_file_paths(diagram_name);
-        
+
         // Delete content file
         if content_path.exists() {
             fs::remove_file(&content_path).await?;
         }
-        
+
         // Delete layout file if it exists
         if layout_path.exists() {
             fs::remove_file(&layout_path).await?;
         }
-        
+
         Ok(())
     }
 
@@ -195,25 +195,30 @@ impl PersistenceManager {
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
         let mut element_layouts = HashMap::new();
-        
+
         // Process all elements
         for (id, element) in &diagram.elements {
             // Extract layout information
             if let Some(bounds) = &element.bounds {
-                element_layouts.insert(id.clone(), ElementLayout {
-                    bounds: bounds.clone(),
-                    z_index: element.z_index,
-                    visible: element.visible,
-                    style: element.style.clone(),
-                });
+                element_layouts.insert(
+                    id.clone(),
+                    ElementLayout {
+                        bounds: bounds.clone(),
+                        z_index: element.z_index,
+                        visible: element.visible,
+                        style: element.style.clone(),
+                    },
+                );
             }
-            
+
             // Extract content based on element type
             match &element.element_type {
                 ElementType::Edge => {
                     edges.push(EdgeContent {
                         id: id.clone(),
-                        edge_type: element.properties.get("edgeType")
+                        edge_type: element
+                            .properties
+                            .get("edgeType")
                             .and_then(|v| v.as_str())
                             .unwrap_or("flow")
                             .to_string(),
@@ -237,7 +242,7 @@ impl PersistenceManager {
                 }
             }
         }
-        
+
         let content = DiagramContent {
             id: diagram.id.clone(),
             name: diagram.name.clone(),
@@ -249,7 +254,7 @@ impl PersistenceManager {
             edges,
             metadata: diagram.metadata.clone(),
         };
-        
+
         let layout = DiagramLayout {
             diagram_id: diagram.id.clone(),
             revision: diagram.revision,
@@ -257,12 +262,16 @@ impl PersistenceManager {
             elements: element_layouts,
             viewport: None, // TODO: Add viewport support
         };
-        
+
         (content, layout)
     }
 
     /// Merge content and layout into a DiagramModel
-    fn merge_diagram(&self, content: DiagramContent, layout: Option<DiagramLayout>) -> DiagramModel {
+    fn merge_diagram(
+        &self,
+        content: DiagramContent,
+        layout: Option<DiagramLayout>,
+    ) -> DiagramModel {
         // Create root graph element first
         let root_id = format!("{}_root", content.id);
         let root = ModelElement {
@@ -296,7 +305,7 @@ impl PersistenceManager {
             selection: Some(crate::selection::SelectionState::new()),
             metadata: content.metadata,
         };
-        
+
         // Add nodes
         for node in content.nodes {
             let mut element = ModelElement {
@@ -314,7 +323,7 @@ impl PersistenceManager {
                 z_index: None,
                 style: HashMap::new(),
             };
-            
+
             // Apply layout if available
             if let Some(layout) = &layout {
                 if let Some(element_layout) = layout.elements.get(&node.id) {
@@ -324,17 +333,17 @@ impl PersistenceManager {
                     element.style = element_layout.style.clone();
                 }
             }
-            
+
             // Add to root's children
             if let Some(root) = diagram.elements.get_mut(&root_id) {
                 if let Some(children) = &mut root.children {
                     children.push(node.id.clone());
                 }
             }
-            
+
             diagram.elements.insert(node.id, element);
         }
-        
+
         // Add edges
         for edge in content.edges {
             let mut element = ModelElement {
@@ -352,10 +361,12 @@ impl PersistenceManager {
                 z_index: None,
                 style: HashMap::new(),
             };
-            
+
             // Store edge type in properties
-            element.properties.insert("edgeType".to_string(), serde_json::json!(edge.edge_type));
-            
+            element
+                .properties
+                .insert("edgeType".to_string(), serde_json::json!(edge.edge_type));
+
             // Apply layout if available
             if let Some(layout) = &layout {
                 if let Some(element_layout) = layout.elements.get(&edge.id) {
@@ -365,10 +376,10 @@ impl PersistenceManager {
                     element.style = element_layout.style.clone();
                 }
             }
-            
+
             diagram.elements.insert(edge.id, element);
         }
-        
+
         diagram
     }
 }

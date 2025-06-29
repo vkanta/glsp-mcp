@@ -1,12 +1,12 @@
-use crate::model::{DiagramModel, Node, Edge, Position, ElementType};
-use crate::mcp::protocol::{Tool, CallToolParams, CallToolResult, TextContent};
+use crate::mcp::protocol::{CallToolParams, CallToolResult, TextContent, Tool};
+use crate::model::{DiagramModel, Edge, ElementType, Node, Position};
 use crate::selection::SelectionMode;
-use crate::wasm::{WasmFileWatcher, WasmComponent};
+use crate::wasm::{WasmComponent, WasmFileWatcher};
+use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono::{DateTime, Utc};
-use anyhow::Result;
 
 pub struct DiagramTools {
     models: HashMap<String, DiagramModel>,
@@ -379,7 +379,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "remove_missing_component".to_string(),
-                description: Some("Permanently remove a missing WASM component from tracking".to_string()),
+                description: Some(
+                    "Permanently remove a missing WASM component from tracking".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -438,7 +440,9 @@ impl DiagramTools {
             "get_element_at_position" => self.get_element_at_position(params.arguments).await,
             // WASM component tools
             "scan_wasm_components" => self.scan_wasm_components().await,
-            "check_wasm_component_status" => self.check_wasm_component_status(params.arguments).await,
+            "check_wasm_component_status" => {
+                self.check_wasm_component_status(params.arguments).await
+            }
             "remove_missing_component" => self.remove_missing_component(params.arguments).await,
             "load_wasm_component" => self.load_wasm_component(params.arguments).await,
             _ => Ok(CallToolResult {
@@ -453,9 +457,10 @@ impl DiagramTools {
 
     async fn create_diagram(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_type = args["diagramType"].as_str()
+        let diagram_type = args["diagramType"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramType"))?;
-        
+
         let diagram = DiagramModel::new(diagram_type);
         let diagram_id = diagram.id.clone();
         self.models.insert(diagram_id.clone(), diagram);
@@ -471,26 +476,32 @@ impl DiagramTools {
 
     async fn create_node(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let node_type = args["nodeType"].as_str()
+        let node_type = args["nodeType"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing nodeType"))?;
-        
+
         let position = Position {
-            x: args["position"]["x"].as_f64()
+            x: args["position"]["x"]
+                .as_f64()
                 .ok_or_else(|| anyhow::anyhow!("Missing position.x"))?,
-            y: args["position"]["y"].as_f64()
+            y: args["position"]["y"]
+                .as_f64()
                 .ok_or_else(|| anyhow::anyhow!("Missing position.y"))?,
         };
 
         let label = args["label"].as_str().map(|s| s.to_string());
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         let node = Node::new(node_type, position, label);
         let node_id = node.base.id.clone();
-        
+
         diagram.add_element(node.base);
         diagram.add_child_to_root(&node_id);
 
@@ -505,18 +516,24 @@ impl DiagramTools {
 
     async fn create_edge(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let edge_type = args["edgeType"].as_str()
+        let edge_type = args["edgeType"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing edgeType"))?;
-        let source_id = args["sourceId"].as_str()
+        let source_id = args["sourceId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing sourceId"))?;
-        let target_id = args["targetId"].as_str()
+        let target_id = args["targetId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing targetId"))?;
 
         let label = args["label"].as_str().map(|s| s.to_string());
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         // Verify source and target exist
@@ -540,14 +557,25 @@ impl DiagramTools {
             });
         }
 
-        let edge = Edge::new(edge_type, source_id.to_string(), target_id.to_string(), label);
+        let edge = Edge::new(
+            edge_type,
+            source_id.to_string(),
+            target_id.to_string(),
+            label,
+        );
         let edge_id = edge.base.id.clone();
-        
+
         // Convert Edge to ModelElement with sourceId and targetId in properties
         let mut edge_element = edge.base;
-        edge_element.properties.insert("sourceId".to_string(), serde_json::Value::String(source_id.to_string()));
-        edge_element.properties.insert("targetId".to_string(), serde_json::Value::String(target_id.to_string()));
-        
+        edge_element.properties.insert(
+            "sourceId".to_string(),
+            serde_json::Value::String(source_id.to_string()),
+        );
+        edge_element.properties.insert(
+            "targetId".to_string(),
+            serde_json::Value::String(target_id.to_string()),
+        );
+
         diagram.add_element(edge_element);
         diagram.add_child_to_root(&edge_id);
 
@@ -562,12 +590,16 @@ impl DiagramTools {
 
     async fn delete_element(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let element_id = args["elementId"].as_str()
+        let element_id = args["elementId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing elementId"))?;
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         match diagram.remove_element(element_id) {
@@ -590,15 +622,20 @@ impl DiagramTools {
 
     async fn update_element(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let element_id = args["elementId"].as_str()
+        let element_id = args["elementId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing elementId"))?;
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
-        let element = diagram.get_element_mut(element_id)
+        let element = diagram
+            .get_element_mut(element_id)
             .ok_or_else(|| anyhow::anyhow!("Element not found"))?;
 
         if let Some(properties) = args["properties"].as_object() {
@@ -627,12 +664,16 @@ impl DiagramTools {
 
     async fn apply_layout(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let algorithm = args["algorithm"].as_str()
+        let algorithm = args["algorithm"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing algorithm"))?;
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         // Simple layout implementation - in practice, this would use a proper layout engine
@@ -661,12 +702,16 @@ impl DiagramTools {
 
     async fn export_diagram(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let format = args["format"].as_str()
+        let format = args["format"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing format"))?;
 
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         match format {
@@ -747,8 +792,9 @@ impl DiagramTools {
     }
 
     fn generate_svg(&self, diagram: &DiagramModel) -> String {
-        let mut svg = String::from(r#"<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">"#);
-        
+        let mut svg =
+            String::from(r#"<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">"#);
+
         // Add elements
         for element in diagram.elements.values() {
             if element.element_type != ElementType::Graph {
@@ -758,7 +804,7 @@ impl DiagramTools {
                             r#"<rect x="{}" y="{}" width="{}" height="{}" fill="lightblue" stroke="black" stroke-width="1"/>"#,
                             bounds.x, bounds.y, bounds.width, bounds.height
                         ));
-                        
+
                         if let Some(label) = element.properties.get("label") {
                             if let Some(label_text) = label.as_str() {
                                 svg.push_str(&format!(
@@ -773,7 +819,7 @@ impl DiagramTools {
                 }
             }
         }
-        
+
         svg.push_str("</svg>");
         svg
     }
@@ -793,14 +839,18 @@ impl DiagramTools {
     // Selection tool implementations
     async fn select_elements(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let element_ids = args["elementIds"].as_array()
+        let element_ids = args["elementIds"]
+            .as_array()
             .ok_or_else(|| anyhow::anyhow!("Missing elementIds"))?;
         let mode = args["mode"].as_str().unwrap_or("single");
         let append = args["append"].as_bool().unwrap_or(false);
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         if let Some(selection) = &mut diagram.selection {
@@ -845,10 +895,13 @@ impl DiagramTools {
 
     async fn select_all(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         let all_ids = diagram.get_all_element_ids();
@@ -877,10 +930,13 @@ impl DiagramTools {
 
     async fn clear_selection(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         if let Some(selection) = &mut diagram.selection {
@@ -906,10 +962,13 @@ impl DiagramTools {
 
     async fn get_selection(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
 
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         if let Some(selection) = &diagram.selection {
@@ -942,11 +1001,14 @@ impl DiagramTools {
 
     async fn hover_element(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
         let element_id = args["elementId"].as_str().map(|s| s.to_string());
 
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         if let Some(selection) = &mut diagram.selection {
@@ -975,15 +1037,20 @@ impl DiagramTools {
 
     async fn get_element_at_position(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let x = args["x"].as_f64()
+        let x = args["x"]
+            .as_f64()
             .ok_or_else(|| anyhow::anyhow!("Missing x coordinate"))?;
-        let y = args["y"].as_f64()
+        let y = args["y"]
+            .as_f64()
             .ok_or_else(|| anyhow::anyhow!("Missing y coordinate"))?;
         let tolerance = args["tolerance"].as_f64().unwrap_or(5.0);
 
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
 
         match diagram.get_element_at_position(x, y, tolerance) {
@@ -1031,7 +1098,10 @@ impl DiagramTools {
     }
 
     pub fn get_wasm_watch_path(&self) -> String {
-        self.wasm_watcher.get_watch_path().to_string_lossy().to_string()
+        self.wasm_watcher
+            .get_watch_path()
+            .to_string_lossy()
+            .to_string()
     }
 
     pub fn get_last_wasm_scan_time(&self) -> DateTime<Utc> {
@@ -1077,7 +1147,8 @@ impl DiagramTools {
 
     async fn check_wasm_component_status(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let component_name = args["componentName"].as_str()
+        let component_name = args["componentName"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
 
         match self.wasm_watcher.get_component(component_name) {
@@ -1113,7 +1184,8 @@ impl DiagramTools {
 
     async fn remove_missing_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let component_name = args["componentName"].as_str()
+        let component_name = args["componentName"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
 
         if self.wasm_watcher.remove_missing_component(component_name) {
@@ -1137,47 +1209,56 @@ impl DiagramTools {
 
     async fn load_wasm_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        let diagram_id = args["diagramId"].as_str()
+        let diagram_id = args["diagramId"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing diagramId"))?;
-        let component_name = args["componentName"].as_str()
+        let component_name = args["componentName"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
-        
+
         let position = Position {
             x: args["position"]["x"].as_f64().unwrap_or(100.0),
             y: args["position"]["y"].as_f64().unwrap_or(100.0),
         };
 
         // Check if component exists and is available
-        let component = self.wasm_watcher.get_component(component_name)
+        let component = self
+            .wasm_watcher
+            .get_component(component_name)
             .ok_or_else(|| anyhow::anyhow!("WASM component '{}' not found", component_name))?;
 
         if !component.file_exists {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Cannot load component '{component_name}': file is missing at {}", component.path),
+                    text: format!(
+                        "Cannot load component '{component_name}': file is missing at {}",
+                        component.path
+                    ),
                 }],
                 is_error: Some(true),
             });
         }
 
         // Get the diagram
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram '{}' not found", diagram_id))?;
 
         // Create a WASM component node with appropriate size for metadata and interfaces
         let pos_x = position.x;
         let pos_y = position.y;
         let mut node = Node::new("wasm-component", position, Some(component.name.clone()));
-        
+
         // Calculate dynamic size based on content
         let interface_count = component.interfaces.len() as f64;
         let description_lines = component.description.len() as f64 / 50.0; // Rough estimate
-        
+
         // Base size + space for interfaces + metadata
         let width = 220.0_f64.max(component.name.len() as f64 * 8.0); // Minimum width based on name
         let height = 120.0_f64.max(80.0 + (interface_count * 25.0) + (description_lines * 15.0));
-        
+
         // Update the bounds and size for proper rendering
         node.base.bounds = Some(crate::model::Bounds {
             x: pos_x,
@@ -1186,12 +1267,20 @@ impl DiagramTools {
             height,
         });
         node.size = Some(crate::model::Size { width, height });
-        
+
         // Add component-specific properties
-        node.base.properties.insert("componentName".to_string(), json!(component.name));
-        node.base.properties.insert("componentPath".to_string(), json!(component.path));
-        node.base.properties.insert("description".to_string(), json!(component.description));
-        node.base.properties.insert("interfaces".to_string(), json!(component.interfaces));
+        node.base
+            .properties
+            .insert("componentName".to_string(), json!(component.name));
+        node.base
+            .properties
+            .insert("componentPath".to_string(), json!(component.path));
+        node.base
+            .properties
+            .insert("description".to_string(), json!(component.description));
+        node.base
+            .properties
+            .insert("interfaces".to_string(), json!(component.interfaces));
 
         let node_id = node.base.id.clone();
         diagram.add_element(node.base);
@@ -1200,7 +1289,9 @@ impl DiagramTools {
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Loaded WASM component '{component_name}' into diagram with ID: {node_id}"),
+                text: format!(
+                    "Loaded WASM component '{component_name}' into diagram with ID: {node_id}"
+                ),
             }],
             is_error: None,
         })
