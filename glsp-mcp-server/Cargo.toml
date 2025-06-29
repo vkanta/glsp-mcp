@@ -4,10 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# PulseEngine MCP Framework dependencies - using local workspace paths
-# Working within the mcp-loxone workspace for dependency resolution
-mcp-protocol = { package = "pulseengine-mcp-protocol", path = "../mcp-loxone/loxone-mcp-rust/mcp-framework/mcp-protocol" }
-mcp-transport = { package = "pulseengine-mcp-transport", path = "../mcp-loxone/loxone-mcp-rust/mcp-framework/mcp-transport" }
+# PulseEngine MCP Framework dependencies from crates.io (0.2.0)
+pulseengine-mcp-protocol = "0.2.0"
+pulseengine-mcp-transport = "0.2.0"
+pulseengine-mcp-server = "0.2.0"
+
+# CLI framework for enhanced developer experience
+pulseengine-mcp-cli = "0.2.0"
+pulseengine-mcp-cli-derive = "0.2.0"
+
+# Enhanced capabilities for production readiness
+pulseengine-mcp-logging = "0.2.0"
+pulseengine-mcp-monitoring = "0.2.0"
 
 # Workspace dependencies
 serde = { workspace = true }
@@ -21,10 +29,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 
-# HTTP and server dependencies (still needed for custom code)
-axum = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
+# HTTP and server dependencies are now provided by the framework
 
 # WASM processing
 wasm-tools = { workspace = true }
@@ -36,10 +41,7 @@ chrono = { workspace = true }
 # Filesystem watching
 notify = "6.1"
 
-# SSE support
-axum-extra = { version = "0.9", features = ["typed-header"] }
-async-stream = "0.3"
-tokio-stream = "0.1"
+# SSE support is now provided by the framework
 
 # CLI argument parsing
 clap = { version = "4.0", features = ["derive"] }
