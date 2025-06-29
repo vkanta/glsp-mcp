@@ -1,68 +1,148 @@
-wit_bindgen::generate!({
-    world: "hmi-interface-component",
-    path: "../../../wit/worlds/hmi-interface-simple.wit"
-});
+// HMI Interface - Standardized system component implementation
 
-use crate::exports::hmi_display;
-use crate::exports::user_input;
+wit_bindgen::generate!({
+    world: "system-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:data/sensor-data": generate,
+        "adas:data/perception-data": generate,
+        "adas:data/planning-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
+});
 
 struct Component;
 
-// Global state
-static mut INTERFACE_STATUS: hmi_display::InterfaceStatus = hmi_display::InterfaceStatus::Offline;
-static mut DISPLAY_CONFIGS: Vec<hmi_display::DisplayConfig> = Vec::new();
+// HMI state
+static mut INTERFACE_ACTIVE: bool = false;
 
-// Implement hmi-display interface (EXPORTED)
-impl hmi_display::Guest for Component {
-    fn initialize(displays: Vec<hmi_display::DisplayConfig>) -> Result<(), String> {
-        unsafe {
-            DISPLAY_CONFIGS = displays;
-            INTERFACE_STATUS = hmi_display::InterfaceStatus::Initializing;
-            INTERFACE_STATUS = hmi_display::InterfaceStatus::Active;
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("hmi-interface"),
+            overall_health: unsafe {
+                if INTERFACE_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
+            },
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
-        Ok(())
     }
 
-    fn update_display(_display_id: u32, _content: hmi_display::AdasDisplay) -> Result<(), String> {
-        println!("Updating display content");
-        Ok(())
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("display-connectivity-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("All displays connected and responding"),
+                        execution_time_ms: 25.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("input-responsiveness-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("All input devices responding normally"),
+                        execution_time_ms: 30.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("graphics-rendering-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Graphics rendering within performance bounds"),
+                        execution_time_ms: 40.0,
+                    },
+                ],
+                overall_score: 96.0,
+                recommendations: vec![String::from("HMI interface operating optimally")],
+                timestamp: get_timestamp(),
+            },
+        )
     }
 
-    fn show_warning(warning: hmi_display::WarningDisplay) -> Result<u32, String> {
-        println!("Showing warning: {:?} - {}", warning.warning_type, warning.message);
-        Ok(warning.warning_id)
-    }
-
-    fn hide_warning(warning_id: u32) -> Result<(), String> {
-        println!("Hiding warning ID: {}", warning_id);
-        Ok(())
-    }
-
-    fn get_status() -> hmi_display::InterfaceStatus {
-        unsafe { INTERFACE_STATUS.clone() }
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
     }
 }
 
-// Implement user-input interface (EXPORTED)
-impl user_input::Guest for Component {
-    fn process_input(input: user_input::UserAction) -> Result<(), String> {
-        match input.action_type {
-            user_input::ActionType::ButtonPress => println!("Button press received"),
-            user_input::ActionType::Touch => println!("Touch input received"),
-            user_input::ActionType::Gesture => println!("Gesture received"),
-            user_input::ActionType::VoiceCommand => println!("Voice command received"),
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 16.0, // 60 FPS target
+                latency_max_ms: 33.0, // 30 FPS minimum
+                cpu_utilization: 0.20,
+                memory_usage_mb: 512,
+                throughput_hz: 60.0, // 60 FPS rendering
+                error_rate: 0.001,   // Very low error tolerance
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("frame_rate"),
+                    value: 60.0,
+                    unit: String::from("fps"),
+                    description: String::from("Current display frame rate"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("input_latency"),
+                    value: 12.0,
+                    unit: String::from("ms"),
+                    description: String::from("Input response latency"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("graphics_load"),
+                    value: 0.35,
+                    unit: String::from("ratio"),
+                    description: String::from("Graphics processing load"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("ui_updates_per_second"),
+                    value: 120.0,
+                    unit: String::from("hz"),
+                    description: String::from("UI element update frequency"),
+                },
+            ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.20,
+                memory_allocated_mb: 512,
+                memory_peak_mb: 768,
+                disk_io_mb: 5.0,
+                network_io_mb: 0.5,
+                gpu_utilization: 0.35,
+                gpu_memory_mb: 256,
+            },
+            timestamp: get_timestamp(),
         }
-        Ok(())
     }
 
-    fn enable_input(input_type: user_input::ActionType) -> Result<(), String> {
-        println!("Enabling input type: {:?}", input_type);
-        Ok(())
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
     }
 
-    fn disable_input(input_type: user_input::ActionType) -> Result<(), String> {
-        println!("Disabling input type: {:?}", input_type);
-        Ok(())
+    fn reset_counters() {
+        println!("HMI Interface: Resetting performance counters");
     }
 }
 

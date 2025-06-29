@@ -1,0 +1,27 @@
+// TODO: This is a template - implement actual component logic
+wit_bindgen::generate!({
+    world: "ai-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:control/sensor-control": generate,
+        "adas:control/ai-control": generate,
+        "adas:control/vehicle-control": generate,
+        "adas:data/sensor-data": generate,
+        "adas:data/perception-data": generate,
+        "adas:data/planning-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
+});
+
+struct Component;
+
+// TODO: Implement required traits based on component type
+// For sensor: sensor_control, health_monitoring, performance_monitoring
+// For ai: ai_control, perception_data/planning_data, health_monitoring, performance_monitoring  
+// For vehicle: vehicle_control, health_monitoring, performance_monitoring
+
+export!(Component);

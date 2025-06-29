@@ -1,215 +1,199 @@
-// Camera Surround ECU - Exports 360° camera data stream
+// Camera Surround ECU - Standardized sensor component implementation
 
 wit_bindgen::generate!({
-    world: "camera-surround-component",
-    path: "../../../wit/worlds/camera-surround.wit",
+    world: "sensor-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:control/sensor-control": generate,
+        "adas:data/sensor-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
 });
-
-use crate::exports::camera_data;
-use crate::exports::surround_control;
 
 struct Component;
 
-// Resource state for camera stream
-pub struct CameraStreamState {
-    id: u32,
+// Sensor state
+static mut SENSOR_ACTIVE: bool = false;
+static mut POWER_MODE: exports::adas::control::sensor_control::PowerMode =
+    exports::adas::control::sensor_control::PowerMode::Standard;
+
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
-// Surround camera configuration state
-static mut SURROUND_CONFIG: Option<surround_control::SurroundConfig> = None;
-static mut SURROUND_STATUS: surround_control::SurroundStatus = surround_control::SurroundStatus::Offline;
+// Implement standardized sensor control interface
+impl exports::adas::control::sensor_control::Guest for Component {
+    fn initialize(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!(
+            "Camera Surround: Initializing with power mode {:?}",
+            config.power_mode
+        );
+        unsafe {
+            POWER_MODE = config.power_mode;
+            SENSOR_ACTIVE = false;
+        }
+        Ok(())
+    }
 
-// Implement the camera-data interface
-impl camera_data::Guest for Component {
-    type CameraStream = CameraStreamState;
-    
-    fn create_stream() -> camera_data::CameraStream {
-        camera_data::CameraStream::new(CameraStreamState { id: 1 })
+    fn start() -> Result<(), String> {
+        println!("Camera Surround: Starting sensor");
+        unsafe {
+            SENSOR_ACTIVE = true;
+        }
+        Ok(())
+    }
+
+    fn stop() -> Result<(), String> {
+        println!("Camera Surround: Stopping sensor");
+        unsafe {
+            SENSOR_ACTIVE = false;
+        }
+        Ok(())
+    }
+
+    fn update_config(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!("Camera Surround: Updating configuration");
+        unsafe {
+            POWER_MODE = config.power_mode;
+        }
+        Ok(())
+    }
+
+    fn get_status() -> exports::adas::control::sensor_control::SensorStatus {
+        unsafe {
+            if SENSOR_ACTIVE {
+                adas::common_types::types::HealthStatus::Ok
+            } else {
+                adas::common_types::types::HealthStatus::Offline
+            }
+        }
+    }
+
+    fn get_performance() -> exports::adas::control::sensor_control::PerformanceMetrics {
+        adas::common_types::types::PerformanceMetrics {
+            latency_avg_ms: 16.7, // 60 FPS
+            latency_max_ms: 20.0,
+            cpu_utilization: 0.15,
+            memory_usage_mb: 128,
+            throughput_hz: 60.0, // 60 FPS surround view
+            error_rate: 0.001,
+        }
     }
 }
 
-impl camera_data::GuestCameraStream for CameraStreamState {
-    fn get_frame(&self) -> Result<camera_data::CameraFrame, String> {
-        // Simulate 360° surround view frame generation (320x320 for AI efficiency)
-        Ok(camera_data::CameraFrame {
-            width: 320,
-            height: 320,
-            data: generate_surround_scene(320, 320), // RGB8 stitched surround view
-            format: camera_data::PixelFormat::Rgb8,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            exposure_time: 16.67,
-            gain: 1.0,
-            sensor_pose: camera_data::CameraPose {
-                position: camera_data::Position3d { x: 0.0, y: 0.0, z: 2.0 }, // Higher mounted
-                orientation: camera_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+// Note: In standardized architecture, sensor-data interface would be provided
+// through orchestration layer rather than direct resource exports.
+// The component would push camera frames through the data layer.
+
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("camera-surround"),
+            overall_health: unsafe {
+                if SENSOR_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
             },
-        })
-    }
-
-    fn get_intrinsics(&self) -> camera_data::CameraIntrinsics {
-        // Surround view intrinsics (composite from multiple cameras, 320x320)
-        camera_data::CameraIntrinsics {
-            focal_length_x: 400.0,  // Adjusted for 320x320
-            focal_length_y: 400.0,  // Adjusted for 320x320
-            principal_point_x: 160.0,  // Center of 320x320
-            principal_point_y: 160.0,  // Center of 320x320
-            distortion: vec![-0.2, 0.1, 0.0, 0.0, 0.0], // Higher distortion for wide-angle
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
     }
 
-    fn is_available(&self) -> bool {
-        unsafe {
-            matches!(SURROUND_STATUS, surround_control::SurroundStatus::Active)
-        }
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("camera-alignment-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("All 4 cameras properly aligned"),
+                        execution_time_ms: 25.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("stitching-quality-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("360° stitching within tolerance"),
+                        execution_time_ms: 50.0,
+                    },
+                ],
+                overall_score: 95.0,
+                recommendations: vec![String::from("Surround camera system operating normally")],
+                timestamp: get_timestamp(),
+            },
+        )
+    }
+
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
     }
 }
 
-// Implement the surround control interface
-impl surround_control::Guest for Component {
-    fn initialize(config: surround_control::SurroundConfig) -> Result<(), String> {
-        unsafe {
-            SURROUND_CONFIG = Some(config);
-            SURROUND_STATUS = surround_control::SurroundStatus::Initializing;
-        }
-        Ok(())
-    }
-
-    fn start_processing() -> Result<(), String> {
-        unsafe {
-            if SURROUND_CONFIG.is_some() {
-                SURROUND_STATUS = surround_control::SurroundStatus::Active;
-                Ok(())
-            } else {
-                Err("Surround camera not initialized".to_string())
-            }
-        }
-    }
-
-    fn stop_processing() -> Result<(), String> {
-        unsafe {
-            SURROUND_STATUS = surround_control::SurroundStatus::Offline;
-        }
-        Ok(())
-    }
-
-    fn update_config(config: surround_control::SurroundConfig) -> Result<(), String> {
-        unsafe {
-            SURROUND_CONFIG = Some(config);
-        }
-        Ok(())
-    }
-
-    fn get_status() -> surround_control::SurroundStatus {
-        unsafe { SURROUND_STATUS.clone() }
-    }
-
-    fn run_calibration() -> Result<surround_control::CalibrationResult, String> {
-        Ok(surround_control::CalibrationResult {
-            camera_alignment: surround_control::TestResult::Passed,
-            stitch_accuracy: surround_control::TestResult::Passed,
-            distortion_correction: surround_control::TestResult::Passed,
-            color_matching: surround_control::TestResult::Passed,
-            overlap_zones: surround_control::TestResult::Passed,
-            overall_score: 95.2,
-        })
-    }
-}
-
-// Generate synthetic surround view scene (top-down perspective)
-fn generate_surround_scene(width: u32, height: u32) -> Vec<u8> {
-    let mut data = vec![0u8; (width * height * 3) as usize];
-    let w = width as usize;
-    let h = height as usize;
-    
-    // Fill with ground/parking lot texture
-    for y in 0..h {
-        for x in 0..w {
-            let idx = (y * w + x) * 3;
-            
-            // Create a parking lot texture
-            if (x / 40) % 2 == (y / 40) % 2 {
-                // Lighter tiles
-                data[idx] = 160;     // R
-                data[idx + 1] = 160; // G
-                data[idx + 2] = 160; // B
-            } else {
-                // Darker tiles  
-                data[idx] = 120;     // R
-                data[idx + 1] = 120; // G
-                data[idx + 2] = 120; // B
-            }
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 16.7, // 60 FPS
+                latency_max_ms: 20.0,
+                cpu_utilization: 0.15,
+                memory_usage_mb: 128,
+                throughput_hz: 60.0,
+                error_rate: 0.001,
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("stitching_latency"),
+                    value: 10.0,
+                    unit: String::from("ms"),
+                    description: String::from("Time to stitch 4 camera views"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("frame_resolution"),
+                    value: 320.0,
+                    unit: String::from("pixels"),
+                    description: String::from("Resolution of surround view output"),
+                },
+            ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.15,
+                memory_allocated_mb: 128,
+                memory_peak_mb: 192,
+                disk_io_mb: 0.0,
+                network_io_mb: 50.0, // High bandwidth for video
+                gpu_utilization: 0.0,
+                gpu_memory_mb: 0,
+            },
+            timestamp: get_timestamp(),
         }
     }
-    
-    // Add vehicles around the ego vehicle (center) - surround view
-    add_surround_vehicle(&mut data, w, h, 60, 50, 30, 15, [255, 100, 100]);   // Left side
-    add_surround_vehicle(&mut data, w, h, 230, 60, 35, 18, [100, 255, 100]);  // Right side  
-    add_surround_vehicle(&mut data, w, h, 140, 30, 40, 20, [100, 100, 255]);  // Front
-    add_surround_vehicle(&mut data, w, h, 130, 270, 45, 25, [255, 255, 100]); // Rear
-    
-    // Add pedestrians at various positions
-    add_surround_pedestrian(&mut data, w, h, 80, 120, [255, 200, 0]);  // Left
-    add_surround_pedestrian(&mut data, w, h, 200, 180, [255, 0, 200]); // Right
-    
-    // Draw ego vehicle outline in center (our vehicle)
-    let center_x = w / 2;
-    let center_y = h / 2;
-    add_surround_vehicle(&mut data, w, h, center_x - 20, center_y - 15, 40, 30, [50, 50, 50]); // Our car
-    
-    data
-}
 
-// Add a vehicle to surround view (top-down perspective)
-fn add_surround_vehicle(
-    data: &mut [u8],
-    width: usize,
-    height: usize,
-    x: usize,
-    y: usize,
-    w: usize,
-    h: usize,
-    color: [u8; 3],
-) {
-    for dy in 0..h {
-        for dx in 0..w {
-            let px = x + dx;
-            let py = y + dy;
-            
-            if px < width && py < height {
-                let idx = (py * width + px) * 3;
-                data[idx] = color[0];     // R
-                data[idx + 1] = color[1]; // G
-                data[idx + 2] = color[2]; // B
-            }
-        }
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
     }
-}
 
-// Add a pedestrian to surround view (small circle/square)
-fn add_surround_pedestrian(
-    data: &mut [u8],
-    width: usize,
-    height: usize,
-    x: usize,
-    y: usize,
-    color: [u8; 3],
-) {
-    // Small 6x6 square for person in top-down view
-    for dy in 0..6 {
-        for dx in 0..6 {
-            let px = x + dx;
-            let py = y + dy;
-            
-            if px < width && py < height {
-                let idx = (py * width + px) * 3;
-                data[idx] = color[0];     // R
-                data[idx + 1] = color[1]; // G
-                data[idx + 2] = color[2]; // B
-            }
-        }
+    fn reset_counters() {
+        println!("Camera Surround: Resetting performance counters");
     }
 }
 

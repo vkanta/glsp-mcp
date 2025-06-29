@@ -6,12 +6,12 @@ wit_bindgen::generate!({
 });
 
 use crate::exports::camera_data;
-use crate::exports::video_control;
 use crate::exports::feo_control;
+use crate::exports::video_control;
 use lru::LruCache;
-use std::num::NonZeroUsize;
 use mp4parse::{MediaContext, TrackType};
 use std::io::Cursor;
+use std::num::NonZeroUsize;
 
 struct Component;
 
@@ -56,7 +56,7 @@ const CACHE_SIZE: usize = 10; // Cache last 10 decoded frames
 // Implement the camera-data interface (EXPORTED) - Compatible with existing pipeline
 impl camera_data::Guest for Component {
     type CameraStream = VideoStreamState;
-    
+
     fn create_stream() -> camera_data::CameraStream {
         let state = VideoStreamState {
             id: 1,
@@ -70,7 +70,7 @@ impl camera_data::Guest for Component {
             frame_cache: LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap()),
             video_loaded: false,
         };
-        
+
         unsafe {
             VIDEO_STREAM_STATE = Some(VideoStreamState {
                 id: 1,
@@ -85,7 +85,7 @@ impl camera_data::Guest for Component {
                 video_loaded: false,
             });
         }
-        
+
         camera_data::CameraStream::new(state)
     }
 }
@@ -98,13 +98,13 @@ impl camera_data::GuestCameraStream for VideoStreamState {
                 if state.playing {
                     let now = std::time::Instant::now();
                     let frame_duration = std::time::Duration::from_millis(
-                        (1000.0 / (state.frame_rate * state.playback_speed)) as u64
+                        (1000.0 / (state.frame_rate * state.playback_speed)) as u64,
                     );
-                    
+
                     if now.duration_since(state.last_frame_time) >= frame_duration {
                         state.current_frame += 1;
                         state.last_frame_time = now;
-                        
+
                         // Handle looping
                         if state.current_frame >= state.total_frames {
                             if state.loop_enabled {
@@ -116,13 +116,14 @@ impl camera_data::GuestCameraStream for VideoStreamState {
                         }
                     }
                 }
-                
+
                 // Get frame data (from cache or decode)
                 let frame_data = get_or_decode_frame(state, state.current_frame)?;
-                
+
                 // Calculate timestamp based on frame index
-                let timestamp = (state.current_frame as f64 / state.frame_rate as f64 * 1000.0) as u64;
-                
+                let timestamp =
+                    (state.current_frame as f64 / state.frame_rate as f64 * 1000.0) as u64;
+
                 Ok(camera_data::CameraFrame {
                     width: VIDEO_WIDTH,
                     height: VIDEO_HEIGHT,
@@ -132,8 +133,17 @@ impl camera_data::GuestCameraStream for VideoStreamState {
                     exposure_time: 40.0, // 25 FPS = 40ms exposure
                     gain: 1.0,
                     sensor_pose: camera_data::CameraPose {
-                        position: camera_data::Position3d { x: 0.0, y: 0.0, z: 1.5 }, // Car mounted camera
-                        orientation: camera_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                        position: camera_data::Position3d {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 1.5,
+                        }, // Car mounted camera
+                        orientation: camera_data::Quaternion {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 0.0,
+                            w: 1.0,
+                        },
                     },
                 })
             } else {
@@ -145,19 +155,22 @@ impl camera_data::GuestCameraStream for VideoStreamState {
     fn get_intrinsics(&self) -> camera_data::CameraIntrinsics {
         // Camera intrinsics for 320x200 automotive camera
         camera_data::CameraIntrinsics {
-            focal_length_x: 240.0,  // Adjusted for 320x200
-            focal_length_y: 240.0,  // Adjusted for 320x200
-            principal_point_x: 160.0,  // Center of 320x200
-            principal_point_y: 100.0,  // Center of 320x200
+            focal_length_x: 240.0,                       // Adjusted for 320x200
+            focal_length_y: 240.0,                       // Adjusted for 320x200
+            principal_point_x: 160.0,                    // Center of 320x200
+            principal_point_y: 100.0,                    // Center of 320x200
             distortion: vec![-0.1, 0.05, 0.0, 0.0, 0.0], // Typical automotive camera distortion
         }
     }
 
     fn is_available(&self) -> bool {
         unsafe {
-            matches!(VIDEO_STATUS, video_control::VideoStatus::Ready | 
-                                 video_control::VideoStatus::Playing |
-                                 video_control::VideoStatus::Paused)
+            matches!(
+                VIDEO_STATUS,
+                video_control::VideoStatus::Ready
+                    | video_control::VideoStatus::Playing
+                    | video_control::VideoStatus::Paused
+            )
         }
     }
 }
@@ -168,21 +181,24 @@ fn get_or_decode_frame(state: &mut VideoStreamState, frame_index: u32) -> Result
     if let Some(cached_frame) = state.frame_cache.get(&frame_index) {
         return Ok(cached_frame.clone());
     }
-    
+
     // Decode frame from MP4 (simplified - in real implementation would use proper MP4 decoder)
     let decoded_frame = decode_mp4_frame(frame_index)?;
-    
+
     // Cache the decoded frame
     state.frame_cache.put(frame_index, decoded_frame.clone());
-    
+
     Ok(decoded_frame)
 }
 
 // Real MP4 frame decoder using mp4parse crate
 fn decode_mp4_frame(frame_index: u32) -> Result<Vec<u8>, String> {
-    println!("Decoding MP4 frame {} from embedded video ({} bytes)", 
-             frame_index, EMBEDDED_VIDEO_DATA.len());
-    
+    println!(
+        "Decoding MP4 frame {} from embedded video ({} bytes)",
+        frame_index,
+        EMBEDDED_VIDEO_DATA.len()
+    );
+
     unsafe {
         // Parse MP4 if not already done
         if MP4_CONTEXT.is_none() {
@@ -198,27 +214,29 @@ fn decode_mp4_frame(frame_index: u32) -> Result<Vec<u8>, String> {
                 }
             }
         }
-        
+
         if let Some(ref context) = MP4_CONTEXT {
             // Find video track
-            let video_track = context.tracks.iter()
+            let video_track = context
+                .tracks
+                .iter()
                 .find(|track| matches!(track.track_type, TrackType::Video))
                 .ok_or("No video track found")?;
-            
+
             println!("Video track found: ID {}", video_track.id);
-            
+
             // For H.264/AVC decoding, we'd need a full decoder like libav
             // Since we're in WebAssembly, we'll extract basic frame timing
             // and generate representative frames based on the actual MP4 structure
-            
+
             let frame_time = frame_index as f64 / VIDEO_FRAME_RATE as f64;
             println!("Frame {} at time {:.2}s", frame_index, frame_time);
-            
+
             // Generate frame data that varies based on actual video timing
             return generate_frame_from_mp4_timing(frame_index, frame_time);
         }
     }
-    
+
     // Fallback to synthetic frames if MP4 parsing fails
     generate_synthetic_frame(frame_index)
 }
@@ -226,39 +244,39 @@ fn decode_mp4_frame(frame_index: u32) -> Result<Vec<u8>, String> {
 // Generate frames based on MP4 timing information
 fn generate_frame_from_mp4_timing(_frame_index: u32, time_seconds: f64) -> Result<Vec<u8>, String> {
     let mut frame_data = vec![0u8; (VIDEO_WIDTH * VIDEO_HEIGHT * 3) as usize];
-    
+
     // Use time-based variations that would correspond to actual driving footage
     let road_curve = (time_seconds * 0.3).sin() * 0.2; // Gentle road curvature
     let lighting_variation = (time_seconds * 0.1).cos(); // Day/shadow variations
-    
+
     // Generate more realistic automotive scene
     for y in 0..VIDEO_HEIGHT {
         for x in 0..VIDEO_WIDTH {
             let idx = ((y * VIDEO_WIDTH + x) * 3) as usize;
             let x_norm = (x as f32 / VIDEO_WIDTH as f32 - 0.5) * 2.0;
             let _y_norm = (y as f32 / VIDEO_HEIGHT as f32 - 0.5) * 2.0;
-            
+
             if y < VIDEO_HEIGHT / 3 {
                 // Sky with realistic color variations
                 let base_sky = 180.0 + lighting_variation as f32 * 30.0;
-                frame_data[idx] = (base_sky * 0.7) as u8;     // R
-                frame_data[idx + 1] = (base_sky * 0.8) as u8; // G  
-                frame_data[idx + 2] = base_sky as u8;         // B
+                frame_data[idx] = (base_sky * 0.7) as u8; // R
+                frame_data[idx + 1] = (base_sky * 0.8) as u8; // G
+                frame_data[idx + 2] = base_sky as u8; // B
             } else if y < VIDEO_HEIGHT * 2 / 3 {
                 // Horizon/trees with depth
                 let depth_factor = 1.0 - (y as f32 / VIDEO_HEIGHT as f32);
                 let tree_intensity = (80.0 + depth_factor * 40.0) as u8;
-                frame_data[idx] = (tree_intensity as f32 * 0.6) as u8;     // R
-                frame_data[idx + 1] = tree_intensity;                      // G
+                frame_data[idx] = (tree_intensity as f32 * 0.6) as u8; // R
+                frame_data[idx + 1] = tree_intensity; // G
                 frame_data[idx + 2] = (tree_intensity as f32 * 0.4) as u8; // B
             } else {
                 // Road with lane markings and curvature
                 let road_base = 70.0 + lighting_variation as f32 * 15.0;
                 let lane_x = x_norm + road_curve as f32;
-                
+
                 // Lane markings
                 if (lane_x.abs() - 0.1).abs() < 0.05 || (lane_x.abs() - 0.9).abs() < 0.02 {
-                    frame_data[idx] = 255;     // White lane markings
+                    frame_data[idx] = 255; // White lane markings
                     frame_data[idx + 1] = 255;
                     frame_data[idx + 2] = 255;
                 } else {
@@ -269,24 +287,24 @@ fn generate_frame_from_mp4_timing(_frame_index: u32, time_seconds: f64) -> Resul
             }
         }
     }
-    
+
     // Add time-based vehicles (representing traffic patterns)
     let traffic_density = ((time_seconds * 0.5).sin() + 1.0) * 0.5; // 0-1
     if traffic_density > 0.3 {
         let car1_x = (100.0 + time_seconds * 30.0) as u32 % (VIDEO_WIDTH - 40);
         add_vehicle(&mut frame_data, car1_x as usize, 140, 40, 20, [180, 60, 60]);
     }
-    
+
     if traffic_density > 0.6 {
         let car2_x = (200.0 - time_seconds * 25.0) as u32 % (VIDEO_WIDTH - 35);
         add_vehicle(&mut frame_data, car2_x as usize, 155, 35, 18, [60, 180, 60]);
     }
-    
+
     // Occasional pedestrians near crosswalks
     if (time_seconds * 2.0).sin() > 0.8 {
         add_pedestrian(&mut frame_data, 80, 170, [255, 200, 100]);
     }
-    
+
     Ok(frame_data)
 }
 
@@ -294,12 +312,12 @@ fn generate_frame_from_mp4_timing(_frame_index: u32, time_seconds: f64) -> Resul
 fn generate_synthetic_frame(frame_index: u32) -> Result<Vec<u8>, String> {
     let mut frame_data = vec![0u8; (VIDEO_WIDTH * VIDEO_HEIGHT * 3) as usize];
     let scene_phase = (frame_index as f32 / VIDEO_FRAME_COUNT as f32) * 2.0 * std::f32::consts::PI;
-    
+
     // Basic automotive scene generation (fallback)
     for y in 0..VIDEO_HEIGHT {
         for x in 0..VIDEO_WIDTH {
             let idx = ((y * VIDEO_WIDTH + x) * 3) as usize;
-            
+
             if y < VIDEO_HEIGHT / 3 {
                 let sky_intensity = (150.0 + 50.0 * scene_phase.cos()) as u8;
                 frame_data[idx] = (sky_intensity as f32 * 0.7) as u8;
@@ -317,39 +335,32 @@ fn generate_synthetic_frame(frame_index: u32) -> Result<Vec<u8>, String> {
             }
         }
     }
-    
+
     // Moving vehicles
     let vehicle_positions = [
         (50 + ((frame_index * 2) % 220), 140),
         (200 - ((frame_index * 3) % 180), 150),
     ];
-    
+
     for (i, (vx, vy)) in vehicle_positions.iter().enumerate() {
         let color = if i == 0 { [200, 50, 50] } else { [50, 200, 50] };
         add_vehicle(&mut frame_data, *vx as usize, *vy as usize, 40, 20, color);
     }
-    
+
     Ok(frame_data)
 }
 
 // Helper function to add vehicle to frame
-fn add_vehicle(
-    data: &mut [u8],
-    x: usize,
-    y: usize,
-    w: usize,
-    h: usize,
-    color: [u8; 3],
-) {
+fn add_vehicle(data: &mut [u8], x: usize, y: usize, w: usize, h: usize, color: [u8; 3]) {
     for dy in 0..h {
         for dx in 0..w {
             let px = x + dx;
             let py = y + dy;
-            
+
             if px < VIDEO_WIDTH as usize && py < VIDEO_HEIGHT as usize {
                 let idx = (py * VIDEO_WIDTH as usize + px) * 3;
                 if idx + 2 < data.len() {
-                    data[idx] = color[0];     // R
+                    data[idx] = color[0]; // R
                     data[idx + 1] = color[1]; // G
                     data[idx + 2] = color[2]; // B
                 }
@@ -359,22 +370,17 @@ fn add_vehicle(
 }
 
 // Helper function to add pedestrian to frame
-fn add_pedestrian(
-    data: &mut [u8],
-    x: usize,
-    y: usize,
-    color: [u8; 3],
-) {
+fn add_pedestrian(data: &mut [u8], x: usize, y: usize, color: [u8; 3]) {
     // Small 6x12 rectangle for person
     for dy in 0..12 {
         for dx in 0..6 {
             let px = x + dx;
             let py = y + dy;
-            
+
             if px < VIDEO_WIDTH as usize && py < VIDEO_HEIGHT as usize {
                 let idx = (py * VIDEO_WIDTH as usize + px) * 3;
                 if idx + 2 < data.len() {
-                    data[idx] = color[0];     // R
+                    data[idx] = color[0]; // R
                     data[idx + 1] = color[1]; // G
                     data[idx + 2] = color[2]; // B
                 }
@@ -388,9 +394,12 @@ impl video_control::Guest for Component {
     fn load_embedded_video() -> Result<video_control::VideoInfo, String> {
         unsafe {
             VIDEO_STATUS = video_control::VideoStatus::Loading;
-            
-            println!("Loading embedded CarND driving video: {} bytes", EMBEDDED_VIDEO_DATA.len());
-            
+
+            println!(
+                "Loading embedded CarND driving video: {} bytes",
+                EMBEDDED_VIDEO_DATA.len()
+            );
+
             // Parse MP4 header (simplified - real implementation would use mp4parse crate)
             let info = video_control::VideoInfo {
                 width: VIDEO_WIDTH,
@@ -400,18 +409,23 @@ impl video_control::Guest for Component {
                 duration_ms: VIDEO_DURATION_MS,
                 file_size: EMBEDDED_VIDEO_DATA.len() as u64,
             };
-            
+
             VIDEO_INFO = Some(info.clone());
             VIDEO_STATUS = video_control::VideoStatus::Ready;
-            
+
             // Mark video as loaded in stream state
             if let Some(ref mut state) = VIDEO_STREAM_STATE {
                 state.video_loaded = true;
             }
-            
-            println!("CarND video loaded: {}x{}, {} frames, {:.1}s duration", 
-                     info.width, info.height, info.frame_count, info.duration_ms as f32 / 1000.0);
-            
+
+            println!(
+                "CarND video loaded: {}x{}, {} frames, {:.1}s duration",
+                info.width,
+                info.height,
+                info.frame_count,
+                info.duration_ms as f32 / 1000.0
+            );
+
             Ok(info)
         }
     }
@@ -469,7 +483,11 @@ impl video_control::Guest for Component {
                     println!("Seeked to frame {}", frame);
                     Ok(())
                 } else {
-                    Err(format!("Frame {} out of range (0-{})", frame, state.total_frames - 1))
+                    Err(format!(
+                        "Frame {} out of range (0-{})",
+                        frame,
+                        state.total_frames - 1
+                    ))
                 }
             } else {
                 Err("Video stream not initialized".to_string())
@@ -498,7 +516,10 @@ impl video_control::Guest for Component {
         unsafe {
             if let Some(ref mut state) = VIDEO_STREAM_STATE {
                 state.loop_enabled = enabled;
-                println!("Video looping {}", if enabled { "enabled" } else { "disabled" });
+                println!(
+                    "Video looping {}",
+                    if enabled { "enabled" } else { "disabled" }
+                );
                 Ok(())
             } else {
                 Err("Video stream not initialized".to_string())
@@ -509,17 +530,17 @@ impl video_control::Guest for Component {
     fn update_config(config: video_control::VideoConfig) -> Result<(), String> {
         unsafe {
             VIDEO_CONFIG = Some(config.clone());
-            
+
             if let Some(ref mut state) = VIDEO_STREAM_STATE {
                 state.loop_enabled = config.loop_enabled;
                 state.playback_speed = config.playback_speed;
                 state.current_frame = config.start_frame;
-                
+
                 if config.auto_play && state.video_loaded {
                     Self::play()?;
                 }
             }
-            
+
             Ok(())
         }
     }
@@ -530,7 +551,8 @@ impl video_control::Guest for Component {
 
     fn get_current_frame() -> u32 {
         unsafe {
-            VIDEO_STREAM_STATE.as_ref()
+            VIDEO_STREAM_STATE
+                .as_ref()
                 .map(|s| s.current_frame)
                 .unwrap_or(0)
         }
@@ -538,7 +560,8 @@ impl video_control::Guest for Component {
 
     fn get_elapsed_time() -> u64 {
         unsafe {
-            VIDEO_STREAM_STATE.as_ref()
+            VIDEO_STREAM_STATE
+                .as_ref()
                 .map(|s| (s.current_frame as f64 / s.frame_rate as f64 * 1000.0) as u64)
                 .unwrap_or(0)
         }
@@ -549,7 +572,8 @@ impl video_control::Guest for Component {
             if let Some(ref state) = VIDEO_STREAM_STATE {
                 video_control::PlaybackMetrics {
                     current_frame: state.current_frame,
-                    elapsed_time_ms: (state.current_frame as f64 / state.frame_rate as f64 * 1000.0) as u64,
+                    elapsed_time_ms: (state.current_frame as f64 / state.frame_rate as f64 * 1000.0)
+                        as u64,
                     playback_speed: state.playback_speed,
                     frames_decoded: state.frame_cache.len() as u32,
                     cache_hit_rate: 0.8, // Estimated cache hit rate
@@ -567,25 +591,33 @@ impl video_control::Guest for Component {
     }
 
     fn get_video_info() -> Result<video_control::VideoInfo, String> {
-        unsafe {
-            VIDEO_INFO.clone().ok_or("Video not loaded".to_string())
-        }
+        unsafe { VIDEO_INFO.clone().ok_or("Video not loaded".to_string()) }
     }
 
     fn run_diagnostic() -> Result<String, String> {
         unsafe {
             let status = VIDEO_STATUS.clone();
-            let state_info = VIDEO_STREAM_STATE.as_ref()
-                .map(|s| format!("Frame {}/{}, Playing: {}, Speed: {:.1}x", 
-                               s.current_frame, s.total_frames, s.playing, s.playback_speed))
+            let state_info = VIDEO_STREAM_STATE
+                .as_ref()
+                .map(|s| {
+                    format!(
+                        "Frame {}/{}, Playing: {}, Speed: {:.1}x",
+                        s.current_frame, s.total_frames, s.playing, s.playback_speed
+                    )
+                })
                 .unwrap_or("No state".to_string());
-            
-            Ok(format!("Video Decoder Diagnostic:\n\
+
+            Ok(format!(
+                "Video Decoder Diagnostic:\n\
                        Status: {:?}\n\
                        Embedded video size: {} bytes\n\
                        State: {}\n\
-                       Cache size: {} frames", 
-                       status, EMBEDDED_VIDEO_DATA.len(), state_info, CACHE_SIZE))
+                       Cache size: {} frames",
+                status,
+                EMBEDDED_VIDEO_DATA.len(),
+                state_info,
+                CACHE_SIZE
+            ))
         }
     }
 }
@@ -607,14 +639,14 @@ impl feo_control::Guest for Component {
 
             FEO_STATE = feo_control::ExecutionState::Processing;
             let start_time = std::time::Instant::now();
-            
+
             // Execute one cycle: decode next frame and store in output slot
             let mut metrics = feo_control::ExecutionMetrics {
                 execution_time_us: 0,
                 input_items_consumed: 1, // Always consumes "time" as input
                 output_items_produced: 0,
                 errors_encountered: 0,
-                memory_used_bytes: 192000, // Estimated: 320x200x3 bytes
+                memory_used_bytes: 192000,   // Estimated: 320x200x3 bytes
                 cpu_cycles_estimated: 50000, // Estimated MP4 decode cycles
             };
 
@@ -623,7 +655,7 @@ impl feo_control::Guest for Component {
                 if state.video_loaded {
                     // Advance to next frame (FEO controlled)
                     state.current_frame += 1;
-                    
+
                     // Handle looping
                     if state.current_frame >= state.total_frames {
                         if state.loop_enabled {
@@ -633,12 +665,13 @@ impl feo_control::Guest for Component {
                             FEO_STATE = feo_control::ExecutionState::Completed;
                         }
                     }
-                    
+
                     // Decode frame and store in output slot
                     match get_or_decode_frame(state, state.current_frame) {
                         Ok(frame_data) => {
-                            let timestamp = (state.current_frame as f64 / state.frame_rate as f64 * 1000.0) as u64;
-                            
+                            let timestamp = (state.current_frame as f64 / state.frame_rate as f64
+                                * 1000.0) as u64;
+
                             let camera_frame = camera_data::CameraFrame {
                                 width: VIDEO_WIDTH,
                                 height: VIDEO_HEIGHT,
@@ -648,11 +681,20 @@ impl feo_control::Guest for Component {
                                 exposure_time: 40.0,
                                 gain: 1.0,
                                 sensor_pose: camera_data::CameraPose {
-                                    position: camera_data::Position3d { x: 0.0, y: 0.0, z: 1.5 },
-                                    orientation: camera_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+                                    position: camera_data::Position3d {
+                                        x: 0.0,
+                                        y: 0.0,
+                                        z: 1.5,
+                                    },
+                                    orientation: camera_data::Quaternion {
+                                        x: 0.0,
+                                        y: 0.0,
+                                        z: 0.0,
+                                        w: 1.0,
+                                    },
                                 },
                             };
-                            
+
                             // Store frame in output slot
                             FEO_OUTPUT_FRAME = Some(camera_frame);
                             metrics.output_items_produced = 1;
@@ -674,7 +716,7 @@ impl feo_control::Guest for Component {
 
             let execution_time = start_time.elapsed();
             metrics.execution_time_us = execution_time.as_micros() as u64;
-            
+
             FEO_LAST_METRICS = Some(metrics.clone());
             Ok(metrics)
         }
@@ -682,8 +724,12 @@ impl feo_control::Guest for Component {
 
     fn can_execute() -> bool {
         unsafe {
-            FEO_ENABLED && VIDEO_STREAM_STATE.is_some() && 
-            VIDEO_STREAM_STATE.as_ref().map(|s| s.video_loaded).unwrap_or(false)
+            FEO_ENABLED
+                && VIDEO_STREAM_STATE.is_some()
+                && VIDEO_STREAM_STATE
+                    .as_ref()
+                    .map(|s| s.video_loaded)
+                    .unwrap_or(false)
         }
     }
 
@@ -739,14 +785,16 @@ impl feo_control::Guest for Component {
 
     fn get_last_metrics() -> feo_control::ExecutionMetrics {
         unsafe {
-            FEO_LAST_METRICS.clone().unwrap_or(feo_control::ExecutionMetrics {
-                execution_time_us: 0,
-                input_items_consumed: 0,
-                output_items_produced: 0,
-                errors_encountered: 0,
-                memory_used_bytes: 0,
-                cpu_cycles_estimated: 0,
-            })
+            FEO_LAST_METRICS
+                .clone()
+                .unwrap_or(feo_control::ExecutionMetrics {
+                    execution_time_us: 0,
+                    input_items_consumed: 0,
+                    output_items_produced: 0,
+                    errors_encountered: 0,
+                    memory_used_bytes: 0,
+                    cpu_cycles_estimated: 0,
+                })
         }
     }
 
@@ -764,25 +812,29 @@ impl feo_control::Guest for Component {
 
     fn get_data_slot_status() -> Vec<feo_control::DataSlotInfo> {
         unsafe {
-            vec![
-                feo_control::DataSlotInfo {
-                    slot_name: "frame-output".to_string(),
-                    slot_type: "camera-frame".to_string(),
-                    buffer_size: if FEO_OUTPUT_FRAME.is_some() { 1 } else { 0 },
-                    buffer_capacity: 1,
-                    items_available: if FEO_OUTPUT_FRAME.is_some() { 1 } else { 0 },
-                    items_pending: 0,
-                }
-            ]
+            vec![feo_control::DataSlotInfo {
+                slot_name: "frame-output".to_string(),
+                slot_type: "camera-frame".to_string(),
+                buffer_size: if FEO_OUTPUT_FRAME.is_some() { 1 } else { 0 },
+                buffer_capacity: 1,
+                items_available: if FEO_OUTPUT_FRAME.is_some() { 1 } else { 0 },
+                items_pending: 0,
+            }]
         }
     }
 
     fn get_diagnostics() -> Result<String, String> {
         unsafe {
-            let state_info = VIDEO_STREAM_STATE.as_ref()
-                .map(|s| format!("Frame {}/{}, Loaded: {}", s.current_frame, s.total_frames, s.video_loaded))
+            let state_info = VIDEO_STREAM_STATE
+                .as_ref()
+                .map(|s| {
+                    format!(
+                        "Frame {}/{}, Loaded: {}",
+                        s.current_frame, s.total_frames, s.video_loaded
+                    )
+                })
                 .unwrap_or("No state".to_string());
-            
+
             Ok(format!(
                 "Video Decoder FEO Diagnostics:\\n\
                  Execution State: {:?}\\n\
@@ -796,7 +848,10 @@ impl feo_control::Guest for Component {
                 state_info,
                 FEO_OUTPUT_FRAME.is_some(),
                 EMBEDDED_VIDEO_DATA.len(),
-                FEO_LAST_METRICS.as_ref().map(|m| m.execution_time_us).unwrap_or(0)
+                FEO_LAST_METRICS
+                    .as_ref()
+                    .map(|m| m.execution_time_us)
+                    .unwrap_or(0)
             ))
         }
     }
@@ -804,14 +859,14 @@ impl feo_control::Guest for Component {
     fn has_input_data(slot_name: String) -> Result<bool, String> {
         match slot_name.as_str() {
             "embedded-video" => Ok(true), // Always has embedded video data
-            _ => Err(format!("Unknown input slot: {}", slot_name))
+            _ => Err(format!("Unknown input slot: {}", slot_name)),
         }
     }
 
     fn has_output_space(slot_name: String) -> Result<bool, String> {
         match slot_name.as_str() {
             "frame-output" => Ok(true), // Always has space (single slot)
-            _ => Err(format!("Unknown output slot: {}", slot_name))
+            _ => Err(format!("Unknown output slot: {}", slot_name)),
         }
     }
 
@@ -820,7 +875,7 @@ impl feo_control::Guest for Component {
             match slot_name.as_str() {
                 "frame-output" => Ok(if FEO_OUTPUT_FRAME.is_some() { 1 } else { 0 }),
                 "embedded-video" => Ok(1), // Always has embedded video
-                _ => Err(format!("Unknown slot: {}", slot_name))
+                _ => Err(format!("Unknown slot: {}", slot_name)),
             }
         }
     }
@@ -832,7 +887,7 @@ impl feo_control::Guest for Component {
                     FEO_OUTPUT_FRAME = None;
                     Ok(())
                 }
-                _ => Err(format!("Cannot clear slot: {}", slot_name))
+                _ => Err(format!("Cannot clear slot: {}", slot_name)),
             }
         }
     }

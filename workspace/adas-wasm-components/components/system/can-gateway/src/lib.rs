@@ -1,122 +1,154 @@
-wit_bindgen::generate!({
-    world: "can-gateway-component",
-    path: "../../../wit/worlds/can-gateway.wit"
-});
+// CAN Gateway - Standardized system component implementation
 
-use crate::exports::can_interface;
-use crate::exports::gateway_control;
+wit_bindgen::generate!({
+    world: "system-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:data/sensor-data": generate,
+        "adas:data/perception-data": generate,
+        "adas:data/planning-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
+});
 
 struct Component;
 
-// Global state
-static mut GATEWAY_STATUS: gateway_control::GatewayStatus = gateway_control::GatewayStatus::Offline;
-static mut GATEWAY_CONFIG: Option<gateway_control::GatewayConfig> = None;
+// CAN gateway state
+static mut GATEWAY_ACTIVE: bool = false;
 
-// Implement can-interface (EXPORTED)
-impl can_interface::Guest for Component {
-    fn send_message(message: can_interface::CanMessage) -> Result<(), String> {
-        println!("Sending CAN message ID: 0x{:X} on bus {}", message.message_id, message.bus_id);
-        Ok(())
-    }
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
-    fn send_batch(messages: Vec<can_interface::CanMessage>) -> Result<(), String> {
-        println!("Sending batch of {} CAN messages", messages.len());
-        Ok(())
-    }
-
-    fn get_messages(timeout_ms: Option<u32>) -> Result<Vec<can_interface::CanMessage>, String> {
-        unsafe {
-            if matches!(GATEWAY_STATUS, gateway_control::GatewayStatus::Active) {
-                // Return simulated received messages
-                Ok(vec![
-                    can_interface::CanMessage {
-                        bus_id: 1,
-                        message_id: 0x123,
-                        data: vec![0x01, 0x02, 0x03, 0x04],
-                        is_extended: false,
-                        is_remote_frame: false,
-                        timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_millis() as u64,
-                        priority: can_interface::MessagePriority::Normal,
-                    }
-                ])
-            } else {
-                Err("Gateway not active".to_string())
-            }
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("can-gateway"),
+            overall_health: unsafe {
+                if GATEWAY_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
+            },
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
     }
 
-    fn get_bus_status(bus_id: u32) -> Result<can_interface::BusStatus, String> {
-        Ok(can_interface::BusStatus {
-            bus_id,
-            state: can_interface::BusState::Active,
-            error_count: 0,
-            bus_load: 25.5,
-            bit_rate: 500000,
-        })
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("can-bus-connectivity-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("All CAN buses connected and responsive"),
+                        execution_time_ms: 35.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("message-routing-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Message routing functioning correctly"),
+                        execution_time_ms: 20.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("gateway-filter-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Message filtering and validation working"),
+                        execution_time_ms: 15.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("error-handling-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Error detection and recovery mechanisms functional"),
+                        execution_time_ms: 25.0,
+                    },
+                ],
+                overall_score: 98.0,
+                recommendations: vec![String::from("CAN gateway operating at optimal performance")],
+                timestamp: get_timestamp(),
+            },
+        )
+    }
+
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
     }
 }
 
-// Implement gateway-control (EXPORTED)
-impl gateway_control::Guest for Component {
-    fn initialize(config: gateway_control::GatewayConfig) -> Result<(), String> {
-        unsafe {
-            GATEWAY_CONFIG = Some(config);
-            GATEWAY_STATUS = gateway_control::GatewayStatus::Initializing;
-        }
-        Ok(())
-    }
-
-    fn start_gateway() -> Result<(), String> {
-        unsafe {
-            if GATEWAY_CONFIG.is_some() {
-                GATEWAY_STATUS = gateway_control::GatewayStatus::Active;
-                Ok(())
-            } else {
-                Err("Gateway not initialized".to_string())
-            }
-        }
-    }
-
-    fn stop_gateway() -> Result<(), String> {
-        unsafe {
-            GATEWAY_STATUS = gateway_control::GatewayStatus::Offline;
-        }
-        Ok(())
-    }
-
-    fn update_config(config: gateway_control::GatewayConfig) -> Result<(), String> {
-        unsafe {
-            GATEWAY_CONFIG = Some(config);
-        }
-        Ok(())
-    }
-
-    fn get_status() -> gateway_control::GatewayStatus {
-        unsafe { GATEWAY_STATUS.clone() }
-    }
-
-    fn get_statistics() -> gateway_control::GatewayStatistics {
-        gateway_control::GatewayStatistics {
-            messages_sent: 12345,
-            messages_received: 23456,
-            messages_filtered: 1234,
-            messages_routed: 11111,
-            errors: 2,
-            uptime_seconds: 86400,
-            bus_statistics: vec![
-                gateway_control::BusStatistics {
-                    bus_id: 1,
-                    tx_count: 5000,
-                    rx_count: 7500,
-                    error_count: 1,
-                    bus_load_avg: 25.5,
-                    bus_load_peak: 45.2,
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 2.0, // Very low latency for CAN messages
+                latency_max_ms: 5.0,
+                cpu_utilization: 0.10,
+                memory_usage_mb: 64,
+                throughput_hz: 10000.0, // High throughput for CAN messages
+                error_rate: 0.0001,     // Extremely low error tolerance
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("messages_per_second"),
+                    value: 10000.0,
+                    unit: String::from("msgs/s"),
+                    description: String::from("CAN messages processed per second"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("bus_utilization"),
+                    value: 0.45,
+                    unit: String::from("ratio"),
+                    description: String::from("Average CAN bus utilization"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("dropped_messages"),
+                    value: 0.0,
+                    unit: String::from("count"),
+                    description: String::from("Number of dropped messages"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("gateway_load"),
+                    value: 0.25,
+                    unit: String::from("ratio"),
+                    description: String::from("Gateway processing load"),
                 },
             ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.10,
+                memory_allocated_mb: 64,
+                memory_peak_mb: 96,
+                disk_io_mb: 0.1,
+                network_io_mb: 50.0, // High network I/O for CAN traffic
+                gpu_utilization: 0.0,
+                gpu_memory_mb: 0,
+            },
+            timestamp: get_timestamp(),
         }
+    }
+
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
+    }
+
+    fn reset_counters() {
+        println!("CAN Gateway: Resetting performance counters");
     }
 }
 

@@ -1,124 +1,209 @@
-// Radar Corner ECU - Exports short-range radar data for blind spot/cross-traffic
+// Radar Corner ECU - Standardized sensor component implementation
 
 wit_bindgen::generate!({
-    world: "radar-corner-component",
-    path: "../../../wit/worlds/radar-corner.wit",
+    world: "sensor-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:control/sensor-control": generate,
+        "adas:data/sensor-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
 });
-
-use crate::exports::radar_data;
-use crate::exports::corner_control;
 
 struct Component;
 
-// Resource state for radar stream
-pub struct RadarStreamState {
-    id: u32,
+// Sensor state
+static mut SENSOR_ACTIVE: bool = false;
+static mut POWER_MODE: exports::adas::control::sensor_control::PowerMode =
+    exports::adas::control::sensor_control::PowerMode::Standard;
+
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
-// Corner radar configuration state
-static mut CORNER_CONFIG: Option<corner_control::CornerConfig> = None;
-static mut CORNER_STATUS: corner_control::CornerStatus = corner_control::CornerStatus::Offline;
-
-// Implement the radar-data interface
-impl radar_data::Guest for Component {
-    type RadarStream = RadarStreamState;
-    
-    fn create_stream() -> radar_data::RadarStream {
-        radar_data::RadarStream::new(RadarStreamState { id: 1 })
-    }
-}
-
-impl radar_data::GuestRadarStream for RadarStreamState {
-    fn get_scan(&self) -> Result<radar_data::RadarScan, String> {
-        // Simulate corner radar scan (shorter range, wider angle)
-        let targets = vec![
-            radar_data::RadarTarget {
-                position: radar_data::Position3d { x: -2.0, y: 15.0, z: 0.0 }, // Vehicle in blind spot
-                velocity: radar_data::Velocity3d { vx: 5.0, vy: -2.0, vz: 0.0, speed: 5.4 },
-                range: 15.1,
-                azimuth: 82.5, // degrees - side angle
-                elevation: 0.0,
-                rcs: 8.0, // Smaller cross-section
-                signal_strength: -25.0,
-                confidence: 0.92,
-            },
-        ];
-
-        Ok(radar_data::RadarScan {
-            targets,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            scan_id: 67890,
-            sensor_pose: radar_data::RadarPose {
-                position: radar_data::Position3d { x: -1.5, y: 0.8, z: 0.6 }, // Rear corner
-                orientation: radar_data::Quaternion { x: 0.0, y: 0.0, z: 0.707, w: 0.707 }, // 90° rotated
-            },
-        })
-    }
-
-    fn is_available(&self) -> bool {
+// Implement standardized sensor control interface
+impl exports::adas::control::sensor_control::Guest for Component {
+    fn initialize(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!(
+            "Radar Corner: Initializing with power mode {:?}",
+            config.power_mode
+        );
         unsafe {
-            matches!(CORNER_STATUS, corner_control::CornerStatus::Monitoring)
-        }
-    }
-
-    fn get_range(&self) -> f64 {
-        unsafe {
-            CORNER_CONFIG.as_ref().map(|c| c.max_range).unwrap_or(30.0)
-        }
-    }
-}
-
-// Implement the corner control interface
-impl corner_control::Guest for Component {
-    fn initialize(config: corner_control::CornerConfig) -> Result<(), String> {
-        unsafe {
-            CORNER_CONFIG = Some(config);
-            CORNER_STATUS = corner_control::CornerStatus::Initializing;
+            POWER_MODE = config.power_mode;
+            SENSOR_ACTIVE = false;
         }
         Ok(())
     }
 
-    fn start_monitoring() -> Result<(), String> {
+    fn start() -> Result<(), String> {
+        println!("Radar Corner: Starting sensor");
         unsafe {
-            if CORNER_CONFIG.is_some() {
-                CORNER_STATUS = corner_control::CornerStatus::Monitoring;
-                Ok(())
+            SENSOR_ACTIVE = true;
+        }
+        Ok(())
+    }
+
+    fn stop() -> Result<(), String> {
+        println!("Radar Corner: Stopping sensor");
+        unsafe {
+            SENSOR_ACTIVE = false;
+        }
+        Ok(())
+    }
+
+    fn update_config(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!("Radar Corner: Updating configuration");
+        unsafe {
+            POWER_MODE = config.power_mode;
+        }
+        Ok(())
+    }
+
+    fn get_status() -> exports::adas::control::sensor_control::SensorStatus {
+        unsafe {
+            if SENSOR_ACTIVE {
+                adas::common_types::types::HealthStatus::Ok
             } else {
-                Err("Corner radar not initialized".to_string())
+                adas::common_types::types::HealthStatus::Offline
             }
         }
     }
 
-    fn stop_monitoring() -> Result<(), String> {
-        unsafe {
-            CORNER_STATUS = corner_control::CornerStatus::Offline;
+    fn get_performance() -> exports::adas::control::sensor_control::PerformanceMetrics {
+        adas::common_types::types::PerformanceMetrics {
+            latency_avg_ms: 40.0, // 25 Hz radar scan rate
+            latency_max_ms: 50.0,
+            cpu_utilization: 0.20,
+            memory_usage_mb: 48,
+            throughput_hz: 25.0, // 25 Hz radar updates
+            error_rate: 0.001,
         }
-        Ok(())
     }
+}
 
-    fn update_config(config: corner_control::CornerConfig) -> Result<(), String> {
-        unsafe {
-            CORNER_CONFIG = Some(config);
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("radar-corner"),
+            overall_health: unsafe {
+                if SENSOR_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
+            },
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
-        Ok(())
     }
 
-    fn get_status() -> corner_control::CornerStatus {
-        unsafe { CORNER_STATUS.clone() }
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("blind-spot-detection-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Blind spot monitoring functional"),
+                        execution_time_ms: 20.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("cross-traffic-alert-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Cross traffic detection operational"),
+                        execution_time_ms: 25.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("wide-angle-coverage-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Wide-angle radar coverage verified"),
+                        execution_time_ms: 30.0,
+                    },
+                ],
+                overall_score: 94.0,
+                recommendations: vec![String::from(
+                    "Corner radar operating normally for blind spot monitoring",
+                )],
+                timestamp: get_timestamp(),
+            },
+        )
     }
 
-    fn run_diagnostic() -> Result<corner_control::DiagnosticResult, String> {
-        Ok(corner_control::DiagnosticResult {
-            detection_accuracy: corner_control::TestResult::Passed,
-            false_alarm_rate: corner_control::TestResult::Passed,
-            coverage_area: corner_control::TestResult::Passed,
-            signal_quality: corner_control::TestResult::Passed,
-            environmental_adaptation: corner_control::TestResult::Passed,
-            overall_score: 89.7,
-        })
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
+    }
+}
+
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 40.0, // 25 Hz scan rate
+                latency_max_ms: 50.0,
+                cpu_utilization: 0.20,
+                memory_usage_mb: 48,
+                throughput_hz: 25.0,
+                error_rate: 0.001,
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("detection_range"),
+                    value: 30.0,
+                    unit: String::from("meters"),
+                    description: String::from("Short-range detection capability"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("angular_coverage"),
+                    value: 150.0,
+                    unit: String::from("degrees"),
+                    description: String::from("Wide-angle coverage for blind spots"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("false_alarm_rate"),
+                    value: 0.01,
+                    unit: String::from("ratio"),
+                    description: String::from("False alarm rate for blind spot alerts"),
+                },
+            ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.20,
+                memory_allocated_mb: 48,
+                memory_peak_mb: 72,
+                disk_io_mb: 0.0,
+                network_io_mb: 3.0, // Short-range radar data
+                gpu_utilization: 0.0,
+                gpu_memory_mb: 0,
+            },
+            timestamp: get_timestamp(),
+        }
+    }
+
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
+    }
+
+    fn reset_counters() {
+        println!("Radar Corner: Resetting performance counters");
     }
 }
 

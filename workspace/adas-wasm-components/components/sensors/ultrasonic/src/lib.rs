@@ -1,139 +1,209 @@
-// Ultrasonic ECU - Exports close-range ultrasonic data for parking assistance
+// Ultrasonic ECU - Standardized sensor component implementation
 
 wit_bindgen::generate!({
-    world: "ultrasonic-component",
-    path: "../../../wit/worlds/ultrasonic.wit",
+    world: "sensor-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:control/sensor-control": generate,
+        "adas:data/sensor-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
 });
-
-use crate::exports::ultrasonic_data;
-use crate::exports::ultrasonic_control;
 
 struct Component;
 
-// Resource state for ultrasonic stream
-pub struct UltrasonicStreamState {
-    id: u32,
+// Sensor state
+static mut SENSOR_ACTIVE: bool = false;
+static mut POWER_MODE: exports::adas::control::sensor_control::PowerMode =
+    exports::adas::control::sensor_control::PowerMode::Standard;
+
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
-// Ultrasonic configuration state
-static mut ULTRASONIC_CONFIG: Option<ultrasonic_control::UltrasonicConfig> = None;
-static mut ULTRASONIC_STATUS: ultrasonic_control::UltrasonicStatus = ultrasonic_control::UltrasonicStatus::Offline;
-
-// Implement the ultrasonic-data interface
-impl ultrasonic_data::Guest for Component {
-    type UltrasonicStream = UltrasonicStreamState;
-    
-    fn create_stream() -> ultrasonic_data::UltrasonicStream {
-        ultrasonic_data::UltrasonicStream::new(UltrasonicStreamState { id: 1 })
-    }
-}
-
-impl ultrasonic_data::GuestUltrasonicStream for UltrasonicStreamState {
-    fn get_scan(&self) -> Result<ultrasonic_data::UltrasonicScan, String> {
-        // Simulate ultrasonic sensor readings from 8 sensors
-        let sensors = vec![
-            ultrasonic_data::SensorReading {
-                sensor_id: 1,
-                distance: 1.2, // 1.2m to obstacle
-                confidence: 0.95,
-                sensor_position: ultrasonic_data::SensorPosition::FrontLeft,
-                sensor_pose: ultrasonic_data::UltrasonicPose {
-                    position: ultrasonic_data::Position3d { x: 2.0, y: 0.8, z: 0.5 },
-                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-                },
-            },
-            ultrasonic_data::SensorReading {
-                sensor_id: 2,
-                distance: 0.8, // Close obstacle
-                confidence: 0.98,
-                sensor_position: ultrasonic_data::SensorPosition::FrontCenterLeft,
-                sensor_pose: ultrasonic_data::UltrasonicPose {
-                    position: ultrasonic_data::Position3d { x: 2.1, y: 0.3, z: 0.5 },
-                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-                },
-            },
-            ultrasonic_data::SensorReading {
-                sensor_id: 5,
-                distance: 0.4, // Very close rear obstacle
-                confidence: 0.99,
-                sensor_position: ultrasonic_data::SensorPosition::RearCenterLeft,
-                sensor_pose: ultrasonic_data::UltrasonicPose {
-                    position: ultrasonic_data::Position3d { x: -2.1, y: 0.3, z: 0.5 },
-                    orientation: ultrasonic_data::Quaternion { x: 0.0, y: 0.0, z: 1.0, w: 0.0 }, // 180° rotated
-                },
-            },
-        ];
-
-        Ok(ultrasonic_data::UltrasonicScan {
-            sensors,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            scan_id: 11111,
-        })
-    }
-
-    fn is_available(&self) -> bool {
+// Implement standardized sensor control interface
+impl exports::adas::control::sensor_control::Guest for Component {
+    fn initialize(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!(
+            "Ultrasonic: Initializing with power mode {:?}",
+            config.power_mode
+        );
         unsafe {
-            matches!(ULTRASONIC_STATUS, ultrasonic_control::UltrasonicStatus::Monitoring | ultrasonic_control::UltrasonicStatus::Detecting)
-        }
-    }
-
-    fn get_min_distance(&self) -> f64 {
-        // Return minimum distance from all sensors
-        0.4 // From the scan above
-    }
-}
-
-// Implement the ultrasonic control interface
-impl ultrasonic_control::Guest for Component {
-    fn initialize(config: ultrasonic_control::UltrasonicConfig) -> Result<(), String> {
-        unsafe {
-            ULTRASONIC_CONFIG = Some(config);
-            ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Initializing;
+            POWER_MODE = config.power_mode;
+            SENSOR_ACTIVE = false;
         }
         Ok(())
     }
 
-    fn start_monitoring() -> Result<(), String> {
+    fn start() -> Result<(), String> {
+        println!("Ultrasonic: Starting sensor");
         unsafe {
-            if ULTRASONIC_CONFIG.is_some() {
-                ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Monitoring;
-                Ok(())
+            SENSOR_ACTIVE = true;
+        }
+        Ok(())
+    }
+
+    fn stop() -> Result<(), String> {
+        println!("Ultrasonic: Stopping sensor");
+        unsafe {
+            SENSOR_ACTIVE = false;
+        }
+        Ok(())
+    }
+
+    fn update_config(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!("Ultrasonic: Updating configuration");
+        unsafe {
+            POWER_MODE = config.power_mode;
+        }
+        Ok(())
+    }
+
+    fn get_status() -> exports::adas::control::sensor_control::SensorStatus {
+        unsafe {
+            if SENSOR_ACTIVE {
+                adas::common_types::types::HealthStatus::Ok
             } else {
-                Err("Ultrasonic system not initialized".to_string())
+                adas::common_types::types::HealthStatus::Offline
             }
         }
     }
 
-    fn stop_monitoring() -> Result<(), String> {
-        unsafe {
-            ULTRASONIC_STATUS = ultrasonic_control::UltrasonicStatus::Offline;
+    fn get_performance() -> exports::adas::control::sensor_control::PerformanceMetrics {
+        adas::common_types::types::PerformanceMetrics {
+            latency_avg_ms: 10.0, // 100 Hz ultrasonic updates
+            latency_max_ms: 15.0,
+            cpu_utilization: 0.05,
+            memory_usage_mb: 16,
+            throughput_hz: 100.0, // 100 Hz ultrasonic pulses
+            error_rate: 0.001,
         }
-        Ok(())
     }
+}
 
-    fn update_config(config: ultrasonic_control::UltrasonicConfig) -> Result<(), String> {
-        unsafe {
-            ULTRASONIC_CONFIG = Some(config);
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("ultrasonic"),
+            overall_health: unsafe {
+                if SENSOR_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
+            },
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
-        Ok(())
     }
 
-    fn get_status() -> ultrasonic_control::UltrasonicStatus {
-        unsafe { ULTRASONIC_STATUS.clone() }
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("transducer-functionality-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("All ultrasonic transducers responding"),
+                        execution_time_ms: 10.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("echo-timing-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Echo timing accuracy within spec"),
+                        execution_time_ms: 15.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("noise-filtering-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Background noise filtering operational"),
+                        execution_time_ms: 20.0,
+                    },
+                ],
+                overall_score: 96.0,
+                recommendations: vec![String::from(
+                    "Ultrasonic sensors operating optimally for parking assistance",
+                )],
+                timestamp: get_timestamp(),
+            },
+        )
     }
 
-    fn run_diagnostic() -> Result<ultrasonic_control::DiagnosticResult, String> {
-        Ok(ultrasonic_control::DiagnosticResult {
-            sensor_integrity: ultrasonic_control::TestResult::Passed,
-            range_accuracy: ultrasonic_control::TestResult::Passed,
-            response_time: ultrasonic_control::TestResult::Passed,
-            environmental_immunity: ultrasonic_control::TestResult::Passed,
-            cross_talk_suppression: ultrasonic_control::TestResult::Passed,
-            overall_score: 94.3,
-        })
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
+    }
+}
+
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 10.0, // 100 Hz update rate
+                latency_max_ms: 15.0,
+                cpu_utilization: 0.05,
+                memory_usage_mb: 16,
+                throughput_hz: 100.0,
+                error_rate: 0.001,
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("detection_range"),
+                    value: 2.5,
+                    unit: String::from("meters"),
+                    description: String::from("Maximum reliable detection range"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("range_accuracy"),
+                    value: 0.02,
+                    unit: String::from("meters"),
+                    description: String::from("Distance measurement accuracy"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("beam_angle"),
+                    value: 60.0,
+                    unit: String::from("degrees"),
+                    description: String::from("Ultrasonic beam coverage angle"),
+                },
+            ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.05,
+                memory_allocated_mb: 16,
+                memory_peak_mb: 24,
+                disk_io_mb: 0.0,
+                network_io_mb: 1.0, // Low-bandwidth distance data
+                gpu_utilization: 0.0,
+                gpu_memory_mb: 0,
+            },
+            timestamp: get_timestamp(),
+        }
+    }
+
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
+    }
+
+    fn reset_counters() {
+        println!("Ultrasonic: Resetting performance counters");
     }
 }
 

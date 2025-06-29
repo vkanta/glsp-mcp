@@ -1,0 +1,4 @@
+# Dependencies for adas:orchestration interface package
+
+[deps."adas:common-types"]
+path = "../../deps/adas-common-types"

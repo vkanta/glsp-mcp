@@ -10,7 +10,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-wit-bindgen = "0.33"
+wit-bindgen = { git = "https://github.com/avrabe/wit-bindgen.git", branch = "feat/developer-experience-enhancements", package = "wit-bindgen" }
 
 # Configuration for building WASM components
 [profile.release]

@@ -5,8 +5,8 @@ wit_bindgen::generate!({
     path: "../../../wit/worlds/sensor-fusion.wit",
 });
 
-use crate::exports::fusion_data;
 use crate::exports::fusion_control;
+use crate::exports::fusion_data;
 use std::collections::HashMap;
 
 struct Component;
@@ -15,7 +15,7 @@ struct Component;
 #[derive(Clone)]
 struct KalmanState {
     // State vector: [x, y, z, vx, vy, vz]
-    x: Vec<f64>,  
+    x: Vec<f64>,
     // State covariance matrix (6x6)
     p: Vec<Vec<f64>>,
     // Last update timestamp
@@ -26,7 +26,7 @@ impl KalmanState {
     fn new(x: f64, y: f64, z: f64) -> Self {
         // Initialize state with position and zero velocity
         let x_vec = vec![x, y, z, 0.0, 0.0, 0.0];
-        
+
         // Initialize covariance with high uncertainty
         let mut p = vec![vec![0.0; 6]; 6];
         // Position uncertainty: 10m
@@ -37,7 +37,7 @@ impl KalmanState {
         p[3][3] = 100.0;
         p[4][4] = 100.0;
         p[5][5] = 100.0;
-        
+
         Self {
             x: x_vec,
             p,
@@ -87,8 +87,8 @@ static mut FUSION_STATUS: fusion_control::FusionStatus = fusion_control::FusionS
 static mut FUSION_STREAM_STATE: Option<FusionStreamState> = None;
 
 // Constants for Kalman filtering
-const PROCESS_NOISE_POS: f64 = 0.1;    // Position process noise (m²/s⁴)
-const PROCESS_NOISE_VEL: f64 = 1.0;    // Velocity process noise (m²/s²)
+const PROCESS_NOISE_POS: f64 = 0.1; // Position process noise (m²/s⁴)
+const PROCESS_NOISE_VEL: f64 = 1.0; // Velocity process noise (m²/s²)
 const MEASUREMENT_NOISE_POS: f64 = 1.0; // Position measurement noise (m²)
 const MEASUREMENT_NOISE_VEL: f64 = 0.5; // Velocity measurement noise (m²/s²)
 const ASSOCIATION_THRESHOLD: f64 = 10.0; // Max distance for data association (m)
@@ -101,7 +101,7 @@ static mut DETECTION_STREAM: Option<crate::detection_data::DetectionStream> = No
 // Implement the fusion-data interface (EXPORTED)
 impl fusion_data::Guest for Component {
     type FusionStream = FusionStreamState;
-    
+
     fn create_stream() -> fusion_data::FusionStream {
         let state = FusionStreamState {
             id: 1,
@@ -136,13 +136,13 @@ impl fusion_data::GuestFusionStream for FusionStreamState {
             if let Some(ref mut state) = FUSION_STREAM_STATE {
                 // Collect sensor measurements
                 collect_sensor_data(state)?;
-                
+
                 // Perform data association and Kalman filtering
                 let fused_objects = perform_fusion(state)?;
-                
+
                 // Calculate fusion quality based on sensor availability
                 let fusion_quality = calculate_fusion_quality(state);
-                
+
                 Ok(fusion_data::EnvironmentModel {
                     objects: fused_objects,
                     timestamp: get_timestamp(),
@@ -160,9 +160,7 @@ impl fusion_data::GuestFusionStream for FusionStreamState {
     }
 
     fn is_available(&self) -> bool {
-        unsafe {
-            matches!(FUSION_STATUS, fusion_control::FusionStatus::Fusing)
-        }
+        unsafe { matches!(FUSION_STATUS, fusion_control::FusionStatus::Fusing) }
     }
 
     fn get_object_count(&self) -> u32 {
@@ -180,14 +178,18 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
                 // For now, simulate detections
                 state.camera_buffer.clear();
                 state.camera_buffer.push(CameraDetection {
-                    position: fusion_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
+                    position: fusion_data::Position3d {
+                        x: 50.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                     object_type: fusion_data::ObjectType::Vehicle,
                     confidence: 0.85,
                     timestamp: frame.timestamp,
                 });
             }
         }
-        
+
         // Get radar targets
         if let Some(ref radar) = RADAR_STREAM {
             if let Ok(scan) = radar.get_scan() {
@@ -211,7 +213,7 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
                 }
             }
         }
-        
+
         // Get AI detections
         if let Some(ref detection) = DETECTION_STREAM {
             if let Ok(results) = detection.get_detections() {
@@ -224,9 +226,15 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
                             z: det.position.z,
                         },
                         object_type: match det.object_type {
-                            crate::detection_data::ObjectType::Vehicle => fusion_data::ObjectType::Vehicle,
-                            crate::detection_data::ObjectType::Pedestrian => fusion_data::ObjectType::Pedestrian,
-                            crate::detection_data::ObjectType::Cyclist => fusion_data::ObjectType::Cyclist,
+                            crate::detection_data::ObjectType::Vehicle => {
+                                fusion_data::ObjectType::Vehicle
+                            }
+                            crate::detection_data::ObjectType::Pedestrian => {
+                                fusion_data::ObjectType::Pedestrian
+                            }
+                            crate::detection_data::ObjectType::Cyclist => {
+                                fusion_data::ObjectType::Cyclist
+                            }
                             _ => fusion_data::ObjectType::Unknown,
                         },
                         confidence: det.confidence,
@@ -243,17 +251,17 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
 fn perform_fusion(state: &mut FusionStreamState) -> Result<Vec<fusion_data::FusedObject>, String> {
     let current_time = get_timestamp();
     let mut fused_objects = Vec::new();
-    
+
     // Update existing tracks with predictions
     for (_id, kalman) in state.kalman_states.iter_mut() {
         let dt = (current_time - kalman.last_update) as f64 / 1000.0; // Convert to seconds
         predict_kalman_state(kalman, dt);
     }
-    
+
     // Data association: match measurements to existing tracks
     let mut unmatched_cameras = vec![true; state.camera_buffer.len()];
     let mut unmatched_radars = vec![true; state.radar_buffer.len()];
-    
+
     // For each existing track, find best matching measurements
     for (object_id, kalman) in state.kalman_states.iter_mut() {
         let predicted_pos = fusion_data::Position3d {
@@ -261,7 +269,7 @@ fn perform_fusion(state: &mut FusionStreamState) -> Result<Vec<fusion_data::Fuse
             y: kalman.x[1],
             z: kalman.x[2],
         };
-        
+
         // Find closest camera detection
         let mut best_camera_idx = None;
         let mut best_camera_dist = f64::MAX;
@@ -274,7 +282,7 @@ fn perform_fusion(state: &mut FusionStreamState) -> Result<Vec<fusion_data::Fuse
                 }
             }
         }
-        
+
         // Find closest radar target
         let mut best_radar_idx = None;
         let mut best_radar_dist = f64::MAX;
@@ -287,12 +295,12 @@ fn perform_fusion(state: &mut FusionStreamState) -> Result<Vec<fusion_data::Fuse
                 }
             }
         }
-        
+
         // Update Kalman filter with matched measurements
         let mut source_sensors = Vec::new();
         let mut confidence: f32 = 0.5; // Base confidence
         let mut object_type = fusion_data::ObjectType::Unknown;
-        
+
         if let Some(cam_idx) = best_camera_idx {
             unmatched_cameras[cam_idx] = false;
             let cam_det = &state.camera_buffer[cam_idx];
@@ -302,69 +310,91 @@ fn perform_fusion(state: &mut FusionStreamState) -> Result<Vec<fusion_data::Fuse
             object_type = cam_det.object_type.clone();
             kalman.last_update = current_time;
         }
-        
+
         if let Some(radar_idx) = best_radar_idx {
             unmatched_radars[radar_idx] = false;
             let radar_target = &state.radar_buffer[radar_idx];
-            update_kalman_with_position_velocity(kalman, &radar_target.position, &radar_target.velocity);
+            update_kalman_with_position_velocity(
+                kalman,
+                &radar_target.position,
+                &radar_target.velocity,
+            );
             source_sensors.push(fusion_data::SensorType::Radar);
-            confidence = if source_sensors.len() > 1 { 0.95 } else { radar_target.confidence };
+            confidence = if source_sensors.len() > 1 {
+                0.95
+            } else {
+                radar_target.confidence
+            };
             kalman.last_update = current_time;
         }
-        
+
         // Add lidar if available
         // TODO: Process lidar clusters
-        
+
         // Create fused object from updated Kalman state
         fused_objects.push(fusion_data::FusedObject {
             object_id: *object_id,
             object_type,
             position: fusion_data::Position3d {
                 x: kalman.x[0],
-                y: kalman.x[1], 
+                y: kalman.x[1],
                 z: kalman.x[2],
             },
             velocity: fusion_data::Velocity3d {
                 vx: kalman.x[3],
                 vy: kalman.x[4],
                 vz: kalman.x[5],
-                speed: (kalman.x[3]*kalman.x[3] + kalman.x[4]*kalman.x[4] + kalman.x[5]*kalman.x[5]).sqrt(),
+                speed: (kalman.x[3] * kalman.x[3]
+                    + kalman.x[4] * kalman.x[4]
+                    + kalman.x[5] * kalman.x[5])
+                    .sqrt(),
             },
             confidence,
             source_sensors,
             tracking_state: fusion_data::TrackingState::Tracked,
         });
     }
-    
+
     // Create new tracks for unmatched measurements
     for (idx, det) in state.camera_buffer.iter().enumerate() {
         if unmatched_cameras[idx] {
             let new_id = state.next_object_id;
             state.next_object_id += 1;
-            
+
             let mut kalman = KalmanState::new(det.position.x, det.position.y, det.position.z);
             kalman.last_update = current_time;
             state.kalman_states.insert(new_id, kalman);
-            
+
             fused_objects.push(fusion_data::FusedObject {
                 object_id: new_id,
                 object_type: det.object_type.clone(),
                 position: det.position.clone(),
-                velocity: fusion_data::Velocity3d { vx: 0.0, vy: 0.0, vz: 0.0, speed: 0.0 },
+                velocity: fusion_data::Velocity3d {
+                    vx: 0.0,
+                    vy: 0.0,
+                    vz: 0.0,
+                    speed: 0.0,
+                },
                 confidence: det.confidence,
                 source_sensors: vec![fusion_data::SensorType::Camera],
                 tracking_state: fusion_data::TrackingState::New,
             });
         }
     }
-    
+
     // Clean up old tracks
     let old_threshold = current_time - 5000; // 5 seconds
-    state.kalman_states.retain(|_, kalman| kalman.last_update > old_threshold);
-    
-    println!("Fused {} objects from {} cameras, {} radars", 
-             fused_objects.len(), state.camera_buffer.len(), state.radar_buffer.len());
-    
+    state
+        .kalman_states
+        .retain(|_, kalman| kalman.last_update > old_threshold);
+
+    println!(
+        "Fused {} objects from {} cameras, {} radars",
+        fused_objects.len(),
+        state.camera_buffer.len(),
+        state.radar_buffer.len()
+    );
+
     Ok(fused_objects)
 }
 
@@ -373,14 +403,17 @@ fn predict_kalman_state(kalman: &mut KalmanState, dt: f64) {
     // State transition matrix F
     let mut f = vec![vec![0.0; 6]; 6];
     // Position updates with velocity
-    f[0][0] = 1.0; f[0][3] = dt;
-    f[1][1] = 1.0; f[1][4] = dt;
-    f[2][2] = 1.0; f[2][5] = dt;
+    f[0][0] = 1.0;
+    f[0][3] = dt;
+    f[1][1] = 1.0;
+    f[1][4] = dt;
+    f[2][2] = 1.0;
+    f[2][5] = dt;
     // Velocity remains constant
     f[3][3] = 1.0;
     f[4][4] = 1.0;
     f[5][5] = 1.0;
-    
+
     // Predict state: x = F * x
     let mut new_x = vec![0.0; 6];
     for i in 0..6 {
@@ -389,34 +422,34 @@ fn predict_kalman_state(kalman: &mut KalmanState, dt: f64) {
         }
     }
     kalman.x = new_x;
-    
+
     // Process noise matrix Q
     let mut q = vec![vec![0.0; 6]; 6];
     let dt2 = dt * dt;
     let dt3 = dt2 * dt;
     let dt4 = dt3 * dt;
-    
+
     // Position process noise
-    q[0][0] = dt4/4.0 * PROCESS_NOISE_POS;
-    q[1][1] = dt4/4.0 * PROCESS_NOISE_POS;
-    q[2][2] = dt4/4.0 * PROCESS_NOISE_POS;
-    
+    q[0][0] = dt4 / 4.0 * PROCESS_NOISE_POS;
+    q[1][1] = dt4 / 4.0 * PROCESS_NOISE_POS;
+    q[2][2] = dt4 / 4.0 * PROCESS_NOISE_POS;
+
     // Velocity process noise
     q[3][3] = dt2 * PROCESS_NOISE_VEL;
     q[4][4] = dt2 * PROCESS_NOISE_VEL;
     q[5][5] = dt2 * PROCESS_NOISE_VEL;
-    
+
     // Cross terms
-    q[0][3] = dt3/2.0 * PROCESS_NOISE_POS;
-    q[3][0] = dt3/2.0 * PROCESS_NOISE_POS;
-    q[1][4] = dt3/2.0 * PROCESS_NOISE_POS;
-    q[4][1] = dt3/2.0 * PROCESS_NOISE_POS;
-    q[2][5] = dt3/2.0 * PROCESS_NOISE_POS;
-    q[5][2] = dt3/2.0 * PROCESS_NOISE_POS;
-    
+    q[0][3] = dt3 / 2.0 * PROCESS_NOISE_POS;
+    q[3][0] = dt3 / 2.0 * PROCESS_NOISE_POS;
+    q[1][4] = dt3 / 2.0 * PROCESS_NOISE_POS;
+    q[4][1] = dt3 / 2.0 * PROCESS_NOISE_POS;
+    q[2][5] = dt3 / 2.0 * PROCESS_NOISE_POS;
+    q[5][2] = dt3 / 2.0 * PROCESS_NOISE_POS;
+
     // Predict covariance: P = F * P * F' + Q
     let mut new_p = vec![vec![0.0; 6]; 6];
-    
+
     // First: temp = F * P
     let mut temp = vec![vec![0.0; 6]; 6];
     for i in 0..6 {
@@ -426,7 +459,7 @@ fn predict_kalman_state(kalman: &mut KalmanState, dt: f64) {
             }
         }
     }
-    
+
     // Second: new_p = temp * F' + Q
     for i in 0..6 {
         for j in 0..6 {
@@ -436,7 +469,7 @@ fn predict_kalman_state(kalman: &mut KalmanState, dt: f64) {
             new_p[i][j] += q[i][j];
         }
     }
-    
+
     kalman.p = new_p;
 }
 
@@ -447,13 +480,13 @@ fn update_kalman_with_position(kalman: &mut KalmanState, position: &fusion_data:
     h[0][0] = 1.0; // x
     h[1][1] = 1.0; // y
     h[2][2] = 1.0; // z
-    
+
     // Measurement noise matrix R
     let mut r = vec![vec![0.0; 3]; 3];
     r[0][0] = MEASUREMENT_NOISE_POS;
     r[1][1] = MEASUREMENT_NOISE_POS;
     r[2][2] = MEASUREMENT_NOISE_POS;
-    
+
     // Innovation: y = z - H * x
     let z = vec![position.x, position.y, position.z];
     let mut y = vec![0.0; 3];
@@ -463,11 +496,11 @@ fn update_kalman_with_position(kalman: &mut KalmanState, position: &fusion_data:
             y[i] -= h[i][j] * kalman.x[j];
         }
     }
-    
+
     // Innovation covariance: S = H * P * H' + R
     let mut s = vec![vec![0.0; 3]; 3];
     let mut temp = vec![vec![0.0; 3]; 6];
-    
+
     // temp = H * P
     for i in 0..3 {
         for j in 0..6 {
@@ -476,7 +509,7 @@ fn update_kalman_with_position(kalman: &mut KalmanState, position: &fusion_data:
             }
         }
     }
-    
+
     // S = temp * H' + R
     for i in 0..3 {
         for j in 0..3 {
@@ -486,11 +519,11 @@ fn update_kalman_with_position(kalman: &mut KalmanState, position: &fusion_data:
             s[i][j] += r[i][j];
         }
     }
-    
+
     // Kalman gain: K = P * H' * inv(S)
     // For simplicity, using a simplified update
     let mut kalman_gain = vec![vec![0.0; 3]; 6];
-    
+
     // Simplified gain calculation (assuming diagonal S)
     for i in 0..6 {
         for j in 0..3 {
@@ -499,14 +532,14 @@ fn update_kalman_with_position(kalman: &mut KalmanState, position: &fusion_data:
             }
         }
     }
-    
+
     // Update state: x = x + K * y
     for i in 0..6 {
         for j in 0..3 {
             kalman.x[i] += kalman_gain[i][j] * y[j];
         }
     }
-    
+
     // Update covariance: P = (I - K * H) * P
     let mut new_p = kalman.p.clone();
     for i in 0..6 {
@@ -527,7 +560,7 @@ fn update_kalman_with_position_velocity(
 ) {
     // For radar, we have both position and velocity measurements
     // This is a full state update
-    
+
     // Measurement matrix H (identity for full state)
     let _h = vec![
         vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -537,22 +570,29 @@ fn update_kalman_with_position_velocity(
         vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
     ];
-    
+
     // Measurement
-    let z = vec![position.x, position.y, position.z, velocity.vx, velocity.vy, velocity.vz];
-    
+    let z = vec![
+        position.x,
+        position.y,
+        position.z,
+        velocity.vx,
+        velocity.vy,
+        velocity.vz,
+    ];
+
     // Innovation
     let mut y = vec![0.0; 6];
     for i in 0..6 {
         y[i] = z[i] - kalman.x[i];
     }
-    
+
     // Simplified Kalman update with fixed gain
     let alpha = 0.3; // Gain factor
     for i in 0..6 {
         kalman.x[i] += alpha * y[i];
     }
-    
+
     // Reduce uncertainty after measurement
     for i in 0..6 {
         kalman.p[i][i] *= 1.0 - alpha;
@@ -564,7 +604,7 @@ fn calculate_distance(p1: &fusion_data::Position3d, p2: &fusion_data::Position3d
     let dx = p1.x - p2.x;
     let dy = p1.y - p2.y;
     let dz = p1.z - p2.z;
-    (dx*dx + dy*dy + dz*dz).sqrt()
+    (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
 // Calculate fusion quality based on sensor availability
@@ -572,11 +612,23 @@ fn calculate_fusion_quality(state: &FusionStreamState) -> f32 {
     let camera_weight = 0.4;
     let radar_weight = 0.4;
     let lidar_weight = 0.2;
-    
-    let camera_quality = if state.camera_buffer.is_empty() { 0.0 } else { 1.0 };
-    let radar_quality = if state.radar_buffer.is_empty() { 0.0 } else { 1.0 };
-    let lidar_quality = if state.lidar_buffer.is_empty() { 0.0 } else { 1.0 };
-    
+
+    let camera_quality = if state.camera_buffer.is_empty() {
+        0.0
+    } else {
+        1.0
+    };
+    let radar_quality = if state.radar_buffer.is_empty() {
+        0.0
+    } else {
+        1.0
+    };
+    let lidar_quality = if state.lidar_buffer.is_empty() {
+        0.0
+    } else {
+        1.0
+    };
+
     camera_weight * camera_quality + radar_weight * radar_quality + lidar_weight * lidar_quality
 }
 
@@ -594,12 +646,12 @@ impl fusion_control::Guest for Component {
         unsafe {
             FUSION_CONFIG = Some(config);
             FUSION_STATUS = fusion_control::FusionStatus::Initializing;
-            
+
             // Create input streams from various sensors and AI components
             CAMERA_STREAM = Some(crate::camera_data::create_stream());
             RADAR_STREAM = Some(crate::radar_data::create_stream());
             DETECTION_STREAM = Some(crate::detection_data::create_stream());
-            
+
             FUSION_STATUS = fusion_control::FusionStatus::Fusing;
         }
         Ok(())
@@ -609,10 +661,10 @@ impl fusion_control::Guest for Component {
         unsafe {
             if FUSION_CONFIG.is_some() {
                 FUSION_STATUS = fusion_control::FusionStatus::Calibrating;
-                
+
                 // Initialize calibration parameters
                 println!("Calibrating sensor fusion system...");
-                
+
                 FUSION_STATUS = fusion_control::FusionStatus::Fusing;
                 Ok(())
             } else {

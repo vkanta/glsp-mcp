@@ -1,0 +1,4 @@
+# Dependencies for adas:control interface package
+
+[deps."adas:common-types"]
+path = "./deps/adas-common-types"

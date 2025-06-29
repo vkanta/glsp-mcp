@@ -1,134 +1,210 @@
-// Radar Front ECU - Exports long-range radar data for ACC/AEB
+// Radar Front ECU - Standardized sensor component implementation
 
 wit_bindgen::generate!({
-    world: "radar-front-component",
-    path: "../../../wit/worlds/radar-front.wit",
+    world: "sensor-component",
+    path: "wit/",
+    with: {
+        "adas:common-types/types": generate,
+        "adas:control/sensor-control": generate,
+        "adas:data/sensor-data": generate,
+        "adas:diagnostics/health-monitoring": generate,
+        "adas:diagnostics/performance-monitoring": generate,
+        "adas:orchestration/execution-control": generate,
+        "adas:orchestration/resource-management": generate,
+    },
 });
-
-use crate::exports::radar_data;
-use crate::exports::radar_control;
 
 struct Component;
 
-// Resource state for radar stream
-pub struct RadarStreamState {
-    id: u32,
+// Sensor state
+static mut SENSOR_ACTIVE: bool = false;
+static mut POWER_MODE: exports::adas::control::sensor_control::PowerMode =
+    exports::adas::control::sensor_control::PowerMode::Standard;
+
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }
 
-// Radar configuration state
-static mut RADAR_CONFIG: Option<radar_control::RadarConfig> = None;
-static mut RADAR_STATUS: radar_control::RadarStatus = radar_control::RadarStatus::Offline;
-
-// Implement the radar-data interface
-impl radar_data::Guest for Component {
-    type RadarStream = RadarStreamState;
-    
-    fn create_stream() -> radar_data::RadarStream {
-        radar_data::RadarStream::new(RadarStreamState { id: 1 })
-    }
-}
-
-impl radar_data::GuestRadarStream for RadarStreamState {
-    fn get_scan(&self) -> Result<radar_data::RadarScan, String> {
-        // Simulate radar scan with detected targets
-        let targets = vec![
-            radar_data::RadarTarget {
-                position: radar_data::Position3d { x: 50.0, y: 0.0, z: 0.0 },
-                velocity: radar_data::Velocity3d { vx: -5.0, vy: 0.0, vz: 0.0, speed: 5.0 },
-                range: 50.0,
-                azimuth: 0.0,
-                elevation: 0.0,
-                rcs: 10.0, // Car-sized target
-                signal_strength: -30.0,
-                confidence: 0.95,
-            },
-            radar_data::RadarTarget {
-                position: radar_data::Position3d { x: 120.0, y: 3.5, z: 0.0 },
-                velocity: radar_data::Velocity3d { vx: -10.0, vy: 0.0, vz: 0.0, speed: 10.0 },
-                range: 120.2,
-                azimuth: 1.7, // degrees
-                elevation: 0.0,
-                rcs: 12.0,
-                signal_strength: -35.0,
-                confidence: 0.88,
-            },
-        ];
-
-        Ok(radar_data::RadarScan {
-            targets,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            scan_id: 12345,
-            sensor_pose: radar_data::RadarPose {
-                position: radar_data::Position3d { x: 0.0, y: 0.0, z: 0.8 },
-                orientation: radar_data::Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-            },
-        })
-    }
-
-    fn is_available(&self) -> bool {
+// Implement standardized sensor control interface
+impl exports::adas::control::sensor_control::Guest for Component {
+    fn initialize(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!(
+            "Radar Front: Initializing with power mode {:?}",
+            config.power_mode
+        );
         unsafe {
-            matches!(RADAR_STATUS, radar_control::RadarStatus::Scanning)
-        }
-    }
-
-    fn get_range(&self) -> f64 {
-        unsafe {
-            RADAR_CONFIG.as_ref().map(|c| c.detection_range).unwrap_or(200.0)
-        }
-    }
-}
-
-// Implement the radar control interface
-impl radar_control::Guest for Component {
-    fn initialize(config: radar_control::RadarConfig) -> Result<(), String> {
-        unsafe {
-            RADAR_CONFIG = Some(config);
-            RADAR_STATUS = radar_control::RadarStatus::Initializing;
+            POWER_MODE = config.power_mode;
+            SENSOR_ACTIVE = false;
         }
         Ok(())
     }
 
-    fn start_scanning() -> Result<(), String> {
+    fn start() -> Result<(), String> {
+        println!("Radar Front: Starting sensor");
         unsafe {
-            if RADAR_CONFIG.is_some() {
-                RADAR_STATUS = radar_control::RadarStatus::Scanning;
-                Ok(())
+            SENSOR_ACTIVE = true;
+        }
+        Ok(())
+    }
+
+    fn stop() -> Result<(), String> {
+        println!("Radar Front: Stopping sensor");
+        unsafe {
+            SENSOR_ACTIVE = false;
+        }
+        Ok(())
+    }
+
+    fn update_config(
+        config: exports::adas::control::sensor_control::SensorConfig,
+    ) -> Result<(), String> {
+        println!("Radar Front: Updating configuration");
+        unsafe {
+            POWER_MODE = config.power_mode;
+        }
+        Ok(())
+    }
+
+    fn get_status() -> exports::adas::control::sensor_control::SensorStatus {
+        unsafe {
+            if SENSOR_ACTIVE {
+                adas::common_types::types::HealthStatus::Ok
             } else {
-                Err("Radar not initialized".to_string())
+                adas::common_types::types::HealthStatus::Offline
             }
         }
     }
 
-    fn stop_scanning() -> Result<(), String> {
-        unsafe {
-            RADAR_STATUS = radar_control::RadarStatus::Offline;
+    fn get_performance() -> exports::adas::control::sensor_control::PerformanceMetrics {
+        adas::common_types::types::PerformanceMetrics {
+            latency_avg_ms: 50.0, // 20 Hz radar scan rate
+            latency_max_ms: 60.0,
+            cpu_utilization: 0.25,
+            memory_usage_mb: 64,
+            throughput_hz: 20.0, // 20 Hz radar updates
+            error_rate: 0.002,
         }
-        Ok(())
     }
+}
 
-    fn update_config(config: radar_control::RadarConfig) -> Result<(), String> {
-        unsafe {
-            RADAR_CONFIG = Some(config);
+// Note: In standardized architecture, radar-data would be provided
+// through the data layer via orchestration rather than direct exports.
+
+// Implement health monitoring interface
+impl exports::adas::diagnostics::health_monitoring::Guest for Component {
+    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
+        exports::adas::diagnostics::health_monitoring::HealthReport {
+            component_id: String::from("radar-front"),
+            overall_health: unsafe {
+                if SENSOR_ACTIVE {
+                    adas::common_types::types::HealthStatus::Ok
+                } else {
+                    adas::common_types::types::HealthStatus::Offline
+                }
+            },
+            subsystem_health: vec![],
+            last_diagnostic: None,
+            timestamp: get_timestamp(),
         }
-        Ok(())
     }
 
-    fn get_status() -> radar_control::RadarStatus {
-        unsafe { RADAR_STATUS.clone() }
+    fn run_diagnostic(
+    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
+        Ok(
+            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
+                test_results: vec![
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("rf-performance-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("RF transmitter and receiver functioning normally"),
+                        execution_time_ms: 30.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("antenna-integrity-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Antenna array integrity verified"),
+                        execution_time_ms: 15.0,
+                    },
+                    exports::adas::diagnostics::health_monitoring::TestExecution {
+                        test_name: String::from("target-detection-test"),
+                        test_result: adas::common_types::types::TestResult::Passed,
+                        details: String::from("Target detection algorithms functional"),
+                        execution_time_ms: 40.0,
+                    },
+                ],
+                overall_score: 92.5,
+                recommendations: vec![String::from("Front radar operating within specifications")],
+                timestamp: get_timestamp(),
+            },
+        )
     }
 
-    fn run_diagnostic() -> Result<radar_control::DiagnosticResult, String> {
-        Ok(radar_control::DiagnosticResult {
-            rf_performance: radar_control::TestResult::Passed,
-            antenna_integrity: radar_control::TestResult::Passed,
-            signal_processing: radar_control::TestResult::Passed,
-            target_tracking: radar_control::TestResult::Passed,
-            interference_handling: radar_control::TestResult::Passed,
-            overall_score: 92.5,
-        })
+    fn get_last_diagnostic(
+    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
+        None
+    }
+}
+
+// Implement performance monitoring interface
+impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
+    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance
+    {
+        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
+            base_metrics: adas::common_types::types::PerformanceMetrics {
+                latency_avg_ms: 50.0, // 20 Hz scan rate
+                latency_max_ms: 60.0,
+                cpu_utilization: 0.25,
+                memory_usage_mb: 64,
+                throughput_hz: 20.0,
+                error_rate: 0.002,
+            },
+            component_specific: vec![
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("detection_range"),
+                    value: 200.0,
+                    unit: String::from("meters"),
+                    description: String::from("Maximum reliable detection range"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("target_accuracy"),
+                    value: 0.95,
+                    unit: String::from("ratio"),
+                    description: String::from("Target position accuracy"),
+                },
+                exports::adas::diagnostics::performance_monitoring::Metric {
+                    name: String::from("false_positive_rate"),
+                    value: 0.02,
+                    unit: String::from("ratio"),
+                    description: String::from("False positive detection rate"),
+                },
+            ],
+            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
+                cpu_cores_used: 0.25,
+                memory_allocated_mb: 64,
+                memory_peak_mb: 96,
+                disk_io_mb: 0.0,
+                network_io_mb: 5.0, // Radar data transmission
+                gpu_utilization: 0.0,
+                gpu_memory_mb: 0,
+            },
+            timestamp: get_timestamp(),
+        }
+    }
+
+    fn get_performance_history(
+        _duration_seconds: u32,
+    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
+        vec![] // Return empty for now
+    }
+
+    fn reset_counters() {
+        println!("Radar Front: Resetting performance counters");
     }
 }
 

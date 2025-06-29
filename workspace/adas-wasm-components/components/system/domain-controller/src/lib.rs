@@ -3,13 +3,14 @@ wit_bindgen::generate!({
     path: "../../../wit/worlds/adas-domain-controller.wit"
 });
 
-use crate::exports::system_management;
 use crate::exports::controller_interface;
+use crate::exports::system_management;
 
 struct Component;
 
 // Global state
-static mut CONTROLLER_STATUS: controller_interface::ControllerStatus = controller_interface::ControllerStatus::Offline;
+static mut CONTROLLER_STATUS: controller_interface::ControllerStatus =
+    controller_interface::ControllerStatus::Offline;
 static mut CONTROLLER_CONFIG: Option<controller_interface::ControllerConfig> = None;
 
 // Implement system-management interface (EXPORTED)
@@ -116,8 +117,14 @@ impl system_management::Guest for Component {
         ]
     }
 
-    fn set_feature_state(feature: system_management::AdasFeature, enabled: bool) -> Result<(), String> {
-        println!("Setting feature '{}' (ID: {}) to enabled: {}", feature.name, feature.feature_id, enabled);
+    fn set_feature_state(
+        feature: system_management::AdasFeature,
+        enabled: bool,
+    ) -> Result<(), String> {
+        println!(
+            "Setting feature '{}' (ID: {}) to enabled: {}",
+            feature.name, feature.feature_id, enabled
+        );
         Ok(())
     }
 }
@@ -150,8 +157,13 @@ impl controller_interface::Guest for Component {
         Ok(())
     }
 
-    fn update_system(update_package: Vec<u8>) -> Result<controller_interface::UpdateResult, String> {
-        println!("Processing system update with {} bytes", update_package.len());
+    fn update_system(
+        update_package: Vec<u8>,
+    ) -> Result<controller_interface::UpdateResult, String> {
+        println!(
+            "Processing system update with {} bytes",
+            update_package.len()
+        );
         Ok(controller_interface::UpdateResult {
             success: true,
             updated_components: vec!["sensor-fusion".to_string(), "object-detection".to_string()],
@@ -163,16 +175,14 @@ impl controller_interface::Guest for Component {
     fn run_diagnostics() -> Result<controller_interface::DiagnosticReport, String> {
         Ok(controller_interface::DiagnosticReport {
             system_health: controller_interface::HealthStatus::Healthy,
-            component_diagnostics: vec![
-                controller_interface::ComponentDiagnostic {
-                    component: "sensor-fusion".to_string(),
-                    status: controller_interface::HealthStatus::Healthy,
-                    tests_passed: 25,
-                    tests_failed: 0,
-                    warnings: vec![],
-                    errors: vec![],
-                },
-            ],
+            component_diagnostics: vec![controller_interface::ComponentDiagnostic {
+                component: "sensor-fusion".to_string(),
+                status: controller_interface::HealthStatus::Healthy,
+                tests_passed: 25,
+                tests_failed: 0,
+                warnings: vec![],
+                errors: vec![],
+            }],
             performance_metrics: controller_interface::PerformanceMetrics {
                 avg_response_time: 8.5,
                 peak_cpu_usage: 45.2,
@@ -180,7 +190,9 @@ impl controller_interface::Guest for Component {
                 throughput: 125.5,
                 error_rate: 0.001,
             },
-            recommendations: vec!["Consider reducing sensor polling rate to improve efficiency".to_string()],
+            recommendations: vec![
+                "Consider reducing sensor polling rate to improve efficiency".to_string(),
+            ],
         })
     }
 
