@@ -5,7 +5,6 @@ edition = "2021"
 description = "CAN/Ethernet communication"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

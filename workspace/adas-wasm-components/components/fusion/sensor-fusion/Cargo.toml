@@ -5,7 +5,6 @@ edition = "2021"
 description = "Multi-modal sensor fusion ECU with Kalman filtering"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

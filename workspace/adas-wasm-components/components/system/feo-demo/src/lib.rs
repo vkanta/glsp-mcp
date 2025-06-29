@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "feo-demo-component",
-    path: "../../../wit/feo-demo.wit",
+    path: "../../../wit/worlds/feo-demo.wit",
 });
 
 use crate::exports::feo_demo;

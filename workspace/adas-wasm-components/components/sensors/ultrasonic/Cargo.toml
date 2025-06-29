@@ -5,7 +5,6 @@ edition = "2021"
 description = "Ultrasonic sensors for parking"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

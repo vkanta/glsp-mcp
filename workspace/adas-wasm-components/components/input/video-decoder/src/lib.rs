@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "video-decoder-component",
-    path: "../../../wit/video-decoder.wit",
+    path: "../../../wit/worlds/video-decoder.wit",
 });
 
 use crate::exports::camera_data;

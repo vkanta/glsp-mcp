@@ -5,7 +5,6 @@ edition = "2021"
 description = "Central ADAS coordinator"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

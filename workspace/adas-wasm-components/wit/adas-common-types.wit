@@ -17,10 +17,10 @@ interface types {
 
     /// 3D velocity vector
     record velocity3d {
-        vx: f32, // Forward velocity (m/s)
-        vy: f32, // Lateral velocity (m/s)
-        vz: f32, // Vertical velocity (m/s)
-        speed: f32, // Magnitude for convenience (m/s)
+        vx: f64, // Forward velocity (m/s)
+        vy: f64, // Lateral velocity (m/s)
+        vz: f64, // Vertical velocity (m/s)
+        speed: f64, // Magnitude for convenience (m/s)
     }
 
     /// 3D acceleration vector
@@ -38,12 +38,12 @@ interface types {
         height: f32, // Vertical dimension (meters)
     }
 
-    /// Quaternion for 3D orientation
+    /// Quaternion for 3D orientation (x,y,z,w order)
     record quaternion {
-        w: f32,
         x: f32,
         y: f32,
         z: f32,
+        w: f32,
     }
 
     /// Euler angles (radians)
@@ -146,7 +146,7 @@ interface types {
         velocity: velocity3d,
         acceleration: acceleration3d,
         orientation: orientation3d,
-        angular-velocity: velocity3d, // rad/s around each axis
+        angular-velocity: velocity3d, // rad/s around each axis (vx=roll, vy=pitch, vz=yaw)
         timestamp: timestamp,
     }
 

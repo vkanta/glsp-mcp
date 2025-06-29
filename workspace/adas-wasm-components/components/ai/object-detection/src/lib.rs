@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "object-detection-component",
-    path: "../../../wit/object-detection-ai.wit",
+    path: "../../../wit/worlds/object-detection-ai.wit",
 });
 
 use crate::exports::detection_data;

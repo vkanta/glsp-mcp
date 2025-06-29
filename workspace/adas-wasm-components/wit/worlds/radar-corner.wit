@@ -1,7 +1,7 @@
-/// Front Radar Component - EXPORTS radar data stream
-package adas:radar-front@0.1.0;
+/// Corner Radar Component - EXPORTS radar data stream
+package adas:radar-corner@0.1.0;
 
-world radar-front-component {
+world radar-corner-component {
     import wasi:cli/environment@0.2.3;
     import wasi:cli/exit@0.2.3;
     import wasi:io/streams@0.2.3;
@@ -37,43 +37,51 @@ world radar-front-component {
         run-diagnostic: func() -> result<diagnostic-result, string>;
     }
 
-    /// Radar configuration
+    /// Corner radar configuration (optimized for side/rear detection)
     record radar-config {
         range-mode: range-mode,
         scan-pattern: scan-pattern,
         power-mode: power-mode,
         tracking-mode: tracking-mode,
         frequency-band: frequency-band,
+        corner-position: corner-position,
     }
 
     enum range-mode {
-        short-range,    // 0-50m
-        medium-range,   // 0-100m
-        long-range,     // 0-250m
+        short-range,    // 0-30m (parking assistance)
+        medium-range,   // 0-60m (lane change assist)
+        adaptive,       // Dynamic based on speed
     }
 
     enum scan-pattern {
-        narrow-beam,    // ±15°
-        standard,       // ±45°
-        wide-angle,     // ±75°
+        narrow-beam,    // ±20°
+        wide-angle,     // ±80°
+        adaptive,       // Speed-dependent
     }
 
     enum power-mode {
         low-power,
         standard,
-        high-resolution,
+        high-sensitivity,
     }
 
     enum tracking-mode {
         single-target,
         multi-target,
-        adaptive,
+        blind-spot-optimized,
     }
 
     enum frequency-band {
-        band-24ghz,
-        band-77ghz,
-        band-79ghz,
+        band-twenty-four-ghz,
+        band-seventy-seven-ghz,
+        band-seventy-nine-ghz,
+    }
+
+    enum corner-position {
+        front-left,
+        front-right,
+        rear-left,
+        rear-right,
     }
 
     enum radar-status {
@@ -90,6 +98,7 @@ world radar-front-component {
         antenna-health: test-result,
         signal-processing: test-result,
         calibration-status: test-result,
+        blind-spot-detection: test-result,
         overall-score: f32,
     }
 

@@ -5,7 +5,6 @@ edition = "2021"
 description = "LiDAR point cloud processing ECU"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

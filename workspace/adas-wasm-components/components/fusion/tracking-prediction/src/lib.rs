@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "tracking-prediction-component",
-    path: "../../../wit/tracking-prediction.wit",
+    path: "../../../wit/worlds/tracking-prediction.wit",
 });
 
 use crate::exports::tracking_data;

@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "lidar-component",
-    path: "../../../wit/lidar.wit",
+    path: "../../../wit/worlds/lidar.wit",
 });
 
 use crate::exports::lidar_data;

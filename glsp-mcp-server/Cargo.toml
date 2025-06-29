@@ -4,14 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# MCP Framework dependencies - using git repository directly
-# Note: These crates are not published to crates.io yet, so we reference the git repo
-mcp-server = { package = "mcp-server", git = "https://github.com/avrabe/mcp-loxone.git" }
-mcp-protocol = { package = "mcp-protocol", git = "https://github.com/avrabe/mcp-loxone.git" }
-mcp-transport = { package = "mcp-transport", git = "https://github.com/avrabe/mcp-loxone.git" }
-mcp-auth = { package = "mcp-auth", git = "https://github.com/avrabe/mcp-loxone.git" }
-mcp-security = { package = "mcp-security", git = "https://github.com/avrabe/mcp-loxone.git" }
-mcp-monitoring = { package = "mcp-monitoring", git = "https://github.com/avrabe/mcp-loxone.git" }
+# PulseEngine MCP Framework dependencies - using local workspace paths
+# Working within the mcp-loxone workspace for dependency resolution
+mcp-protocol = { package = "pulseengine-mcp-protocol", path = "../mcp-loxone/loxone-mcp-rust/mcp-framework/mcp-protocol" }
+mcp-transport = { package = "pulseengine-mcp-transport", path = "../mcp-loxone/loxone-mcp-rust/mcp-framework/mcp-transport" }
 
 # Workspace dependencies
 serde = { workspace = true }

@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "camera-front-component",
-    path: "../../../wit/camera-front.wit",
+    path: "../../../wit/worlds/camera-front.wit",
 });
 
 use crate::exports::camera_data;

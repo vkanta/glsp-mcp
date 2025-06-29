@@ -1,0 +1,191 @@
+/// Perception Fusion Component - IMPORTS sensor fusion and AI predictions, EXPORTS unified perception model
+package adas:perception-fusion@0.1.0;
+
+world perception-fusion-component {
+    import wasi:cli/environment@0.2.3;
+    import wasi:cli/exit@0.2.3;
+    import wasi:io/streams@0.2.3;
+    import wasi:cli/stdout@0.2.3;
+    import wasi:cli/stderr@0.2.3;
+    import wasi:clocks/monotonic-clock@0.2.3;
+    import wasi:clocks/wall-clock@0.2.3;
+
+    /// Import FEO execution control (all components need this)
+    import adas:execution-control/execution-control@0.1.0;
+
+    /// Import sensor fusion data
+    import sensor-fusion-data: interface {
+        record fused-object {
+            object-id: u32,
+            position: position3d,
+            velocity: velocity3d,
+            confidence: f32,
+        }
+
+        record position3d {
+            x: f64,
+            y: f64,
+            z: f64,
+        }
+
+        record velocity3d {
+            vx: f64,
+            vy: f64,
+            vz: f64,
+            speed: f64,
+        }
+
+        get-fused-objects: func() -> result<list<fused-object>, string>;
+    }
+
+    /// Import AI detection data
+    import ai-detection-data: interface {
+        record ai-detection {
+            object-id: u32,
+            classification: object-classification,
+            confidence: f32,
+            attributes: list<object-attribute>,
+        }
+
+        enum object-classification {
+            vehicle,
+            pedestrian,
+            cyclist,
+            unknown,
+        }
+
+        record object-attribute {
+            name: string,
+            value: string,
+            confidence: f32,
+        }
+
+        get-detections: func() -> result<list<ai-detection>, string>;
+    }
+    
+    /// Export unified perception model
+    export perception-data: interface {
+        record perception-object {
+            object-id: u32,
+            position: position3d,
+            velocity: velocity3d,
+            classification: object-classification,
+            attributes: list<object-attribute>,
+            fusion-confidence: f32,
+            tracking-state: tracking-state,
+            prediction: object-prediction,
+        }
+
+        record object-prediction {
+            predicted-path: list<path-point>,
+            time-horizon: f32,
+            confidence: f32,
+        }
+
+        record path-point {
+            position: position3d,
+            timestamp-offset: f32,
+            uncertainty: f32,
+        }
+
+        enum tracking-state {
+            new,
+            stable,
+            unstable,
+            lost,
+        }
+
+        record perception-model {
+            objects: list<perception-object>,
+            scene-confidence: f32,
+            timestamp: u64,
+            coverage-quality: f32,
+        }
+
+        /// Get unified perception model
+        get-perception-model: func() -> result<perception-model, string>;
+        
+        /// Get specific object by ID
+        get-object: func(object-id: u32) -> result<perception-object, string>;
+        
+        /// Check if system is ready
+        is-ready: func() -> bool;
+    }
+    
+    /// Export perception control interface
+    export perception-control: interface {
+        record fusion-config {
+            sensor-weight: f32,
+            ai-weight: f32,
+            temporal-smoothing: f32,
+            confidence-threshold: f32,
+            prediction-horizon: f32,
+        }
+
+        enum fusion-status {
+            offline,
+            initializing,
+            active,
+            degraded,
+            error,
+        }
+
+        record performance-metrics {
+            fusion-latency: f32,
+            object-accuracy: f32,
+            prediction-accuracy: f32,
+            false-positive-rate: f32,
+            coverage-completeness: f32,
+        }
+
+        /// Initialize perception fusion
+        initialize: func(config: fusion-config) -> result<_, string>;
+        
+        /// Start perception processing
+        start-fusion: func() -> result<_, string>;
+        
+        /// Stop perception processing
+        stop-fusion: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: fusion-config) -> result<_, string>;
+        
+        /// Get system status
+        get-status: func() -> fusion-status;
+        
+        /// Get performance metrics
+        get-performance: func() -> performance-metrics;
+    }
+
+    /// Common types used in this world
+    record position3d {
+        x: f64,
+        y: f64,
+        z: f64,
+    }
+
+    record velocity3d {
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        speed: f64,
+    }
+
+    enum object-classification {
+        vehicle,
+        pedestrian,
+        cyclist,
+        motorcycle,
+        truck,
+        bus,
+        traffic-sign,
+        traffic-light,
+        unknown,
+    }
+
+    record object-attribute {
+        name: string,
+        value: string,
+        confidence: f32,
+    }
+}

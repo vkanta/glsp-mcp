@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "behavior-prediction-component",
-    path: "../../../wit/behavior-prediction-ai.wit",
+    path: "../../../wit/worlds/behavior-prediction.wit",
 });
 
 use crate::exports::prediction_data;

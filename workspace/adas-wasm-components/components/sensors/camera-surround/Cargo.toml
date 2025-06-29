@@ -5,7 +5,6 @@ edition = "2021"
 description = "360° surround-view camera system"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

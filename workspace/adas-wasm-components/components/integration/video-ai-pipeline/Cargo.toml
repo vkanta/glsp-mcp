@@ -5,7 +5,6 @@ edition = "2021"
 description = "Integration test: Video decoder -> YOLOv5n object detection pipeline"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

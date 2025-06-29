@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "camera-surround-component",
-    path: "../../../wit/camera-surround.wit",
+    path: "../../../wit/worlds/camera-surround.wit",
 });
 
 use crate::exports::camera_data;

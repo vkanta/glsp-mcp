@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "planning-decision-component",
-    path: "../../../wit/planning-decision.wit",
+    path: "../../../wit/worlds/planning-decision.wit",
 });
 
 use crate::exports::planning_data;

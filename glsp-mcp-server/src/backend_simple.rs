@@ -2,8 +2,6 @@
 //!
 //! This is a simplified version to get the basic structure working first.
 
-use async_trait::async_trait;
-use mcp_server::{McpBackend, BackendError};
 use mcp_protocol::*;
 use tracing::{info, error};
 use std::collections::HashMap;
@@ -39,29 +37,27 @@ impl Default for GlspConfig {
 /// Error type for GLSP backend operations
 #[derive(Debug, thiserror::Error)]
 pub enum GlspError {
-    #[error("Backend error: {0}")]
-    Backend(BackendError),
-    
     #[error("Tool execution failed: {0}")]
     ToolExecution(String),
     
     #[error("Not implemented: {0}")]
     NotImplemented(String),
+    
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 impl From<GlspError> for Error {
     fn from(err: GlspError) -> Self {
         match err {
-            GlspError::Backend(be) => be.into(),
             GlspError::ToolExecution(msg) => Error::internal_error(format!("Tool execution failed: {msg}")),
             GlspError::NotImplemented(msg) => Error::method_not_found(format!("Not implemented: {msg}")),
+            GlspError::Io(e) => Error::internal_error(format!("IO error: {e}")),
+            GlspError::Json(e) => Error::internal_error(format!("JSON error: {e}")),
         }
-    }
-}
-
-impl From<BackendError> for GlspError {
-    fn from(err: BackendError) -> Self {
-        Self::Backend(err)
     }
 }
 
@@ -75,12 +71,8 @@ pub struct GlspBackend {
     persistence: std::sync::Arc<PersistenceManager>,
 }
 
-#[async_trait]
-impl McpBackend for GlspBackend {
-    type Error = GlspError;
-    type Config = GlspConfig;
-
-    async fn initialize(config: Self::Config) -> std::result::Result<Self, Self::Error> {
+impl GlspBackend {
+    pub async fn initialize(config: GlspConfig) -> std::result::Result<Self, GlspError> {
         info!("Initializing GLSP backend with config: {:?}", config);
         
         let wasm_path = PathBuf::from(&config.wasm_path);
@@ -122,7 +114,7 @@ impl McpBackend for GlspBackend {
         Ok(backend)
     }
 
-    fn get_server_info(&self) -> ServerInfo {
+    pub fn get_server_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::default(),
             capabilities: ServerCapabilities::builder()
@@ -138,7 +130,7 @@ impl McpBackend for GlspBackend {
         }
     }
 
-    async fn health_check(&self) -> std::result::Result<(), Self::Error> {
+    pub async fn health_check(&self) -> std::result::Result<(), GlspError> {
         // Check if WASM components directory exists
         if !std::path::Path::new(&self.config.wasm_path).exists() {
             return Err(GlspError::ToolExecution(
@@ -150,7 +142,7 @@ impl McpBackend for GlspBackend {
         Ok(())
     }
 
-    async fn list_tools(&self, _request: PaginatedRequestParam) -> std::result::Result<ListToolsResult, Self::Error> {
+    pub async fn list_tools(&self, _request: PaginatedRequestParam) -> std::result::Result<ListToolsResult, GlspError> {
         let tools = vec![
             // Core diagram tools
             Tool {
@@ -455,11 +447,11 @@ impl McpBackend for GlspBackend {
         
         Ok(ListToolsResult {
             tools,
-            next_cursor: None,
+            next_cursor: String::new(),
         })
     }
 
-    async fn call_tool(&self, request: CallToolRequestParam) -> std::result::Result<CallToolResult, Self::Error> {
+    pub async fn call_tool(&self, request: CallToolRequestParam) -> std::result::Result<CallToolResult, GlspError> {
         match request.name.as_str() {
             "create_diagram" => self.create_diagram(request.arguments).await,
             "delete_diagram" => self.delete_diagram(request.arguments).await,
@@ -485,7 +477,7 @@ impl McpBackend for GlspBackend {
         }
     }
 
-    async fn list_resources(&self, _request: PaginatedRequestParam) -> std::result::Result<ListResourcesResult, Self::Error> {
+    pub async fn list_resources(&self, _request: PaginatedRequestParam) -> std::result::Result<ListResourcesResult, GlspError> {
         let models = self.models.lock().await;
         let mut resources = vec![
             Resource {
@@ -533,7 +525,7 @@ impl McpBackend for GlspBackend {
         })
     }
 
-    async fn read_resource(&self, request: ReadResourceRequestParam) -> std::result::Result<ReadResourceResult, Self::Error> {
+    pub async fn read_resource(&self, request: ReadResourceRequestParam) -> std::result::Result<ReadResourceResult, GlspError> {
         // Parse the URI to determine what resource is being requested
         if request.uri.starts_with("diagram://model/") {
             let diagram_id = request.uri.strip_prefix("diagram://model/").unwrap_or("");
@@ -641,7 +633,7 @@ impl McpBackend for GlspBackend {
         }
     }
 
-    async fn list_prompts(&self, _request: PaginatedRequestParam) -> std::result::Result<ListPromptsResult, Self::Error> {
+    pub async fn list_prompts(&self, _request: PaginatedRequestParam) -> std::result::Result<ListPromptsResult, GlspError> {
         // Return empty prompts for now
         Ok(ListPromptsResult {
             prompts: vec![],
@@ -649,29 +641,10 @@ impl McpBackend for GlspBackend {
         })
     }
 
-    async fn get_prompt(&self, request: GetPromptRequestParam) -> std::result::Result<GetPromptResult, Self::Error> {
+    pub async fn get_prompt(&self, request: GetPromptRequestParam) -> std::result::Result<GetPromptResult, GlspError> {
         Err(GlspError::NotImplemented(format!("Prompt not found: {}", request.name)))
     }
 
-    async fn on_startup(&self) -> std::result::Result<(), Self::Error> {
-        info!("GLSP backend starting up");
-        Ok(())
-    }
-
-    async fn on_shutdown(&self) -> std::result::Result<(), Self::Error> {
-        info!("GLSP backend shutting down");
-        Ok(())
-    }
-
-    async fn on_client_connect(&self, client_info: &Implementation) -> std::result::Result<(), Self::Error> {
-        info!("Client connected: {} v{}", client_info.name, client_info.version);
-        Ok(())
-    }
-
-    async fn on_client_disconnect(&self, client_info: &Implementation) -> std::result::Result<(), Self::Error> {
-        info!("Client disconnected: {} v{}", client_info.name, client_info.version);
-        Ok(())
-    }
 }
 
 impl GlspBackend {
@@ -1532,7 +1505,7 @@ impl GlspBackend {
         
         if !path.exists() {
             return Ok(CallToolResult {
-                content: vec![Content::text(format!("Component file not found: {}", component_path))],
+                content: vec![Content::text(format!("Component file not found: {component_path}"))],
                 is_error: Some(true),
             });
         }
@@ -1590,5 +1563,4 @@ impl GlspBackend {
             }
         }
     }
-    
 }

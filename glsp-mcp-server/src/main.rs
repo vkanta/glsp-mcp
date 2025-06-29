@@ -1,15 +1,11 @@
 //! Main entry point for GLSP MCP Server using the MCP framework
 
 use glsp_mcp_server::{GlspBackend, GlspConfig};
-use mcp_server::McpBackend;
-use mcp_transport::{Transport, stdio::StdioTransport, http::HttpTransport};
-use mcp_protocol::*;
-use std::sync::Arc;
-use tracing::{info, error, Level};
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 use clap::Parser;
 use std::path::Path;
 use std::fs;
-use serde_json::Value;
 
 /// GLSP MCP Server - AI-native graphical modeling platform
 #[derive(Parser)]
@@ -31,264 +27,225 @@ struct Args {
     #[arg(short, long, default_value = "3000")]
     port: u16,
 
-    /// Create directories if they don't exist
+    /// Force create directories if they don't exist
     #[arg(short, long)]
     force: bool,
 }
 
-// Type alias for request handler
-type RequestHandler = Box<dyn Fn(Request) -> 
-    std::pin::Pin<Box<dyn std::future::Future<Output = Response> + Send>> + Send + Sync>;
-
-/// Helper function to serialize results or return an error response
-fn serialize_result(value: impl serde::Serialize, request_id: Value) -> Response {
-    match serde_json::to_value(value) {
-        Ok(result) => Response {
-            jsonrpc: "2.0".to_string(),
-            id: request_id,
-            result: Some(result),
-            error: None,
-        },
-        Err(e) => {
-            error!("Failed to serialize response: {}", e);
-            Response {
-                jsonrpc: "2.0".to_string(),
-                id: request_id,
-                result: None,
-                error: Some(Error::internal_error(format!("Serialization failed: {}", e))),
-            }
-        }
-    }
-}
-
-fn create_mcp_handler(backend: Arc<GlspBackend>) -> RequestHandler {
-    Box::new(move |request: Request| {
-        let backend = backend.clone();
-        Box::pin(async move {
-            match request.method.as_str() {
-                "initialize" => {
-                    let server_info = backend.get_server_info();
-                    Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: Some(serde_json::json!({
-                            "protocolVersion": server_info.protocol_version.to_string(),
-                            "capabilities": server_info.capabilities,
-                            "serverInfo": server_info.server_info,
-                            "instructions": server_info.instructions
-                        })),
-                        error: None,
-                    }
-                }
-                "tools/list" => {
-                    match backend.list_tools(PaginatedRequestParam { cursor: None }).await {
-                        Ok(result) => serialize_result(result, request.id),
-                        Err(e) => Response {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(e.into()),
-                        }
-                    }
-                }
-                "tools/call" => {
-                    match serde_json::from_value::<CallToolRequestParam>(request.params) {
-                        Ok(params) => {
-                            match backend.call_tool(params).await {
-                                Ok(result) => serialize_result(result, request.id),
-                                Err(e) => Response {
-                                    jsonrpc: "2.0".to_string(),
-                                    id: request.id,
-                                    result: None,
-                                    error: Some(e.into()),
-                                }
-                            }
-                        }
-                        Err(e) => Response {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(Error::invalid_params(format!("Invalid parameters: {e}"))),
-                        }
-                    }
-                }
-                "resources/list" => {
-                    match backend.list_resources(PaginatedRequestParam { cursor: None }).await {
-                        Ok(result) => serialize_result(result, request.id),
-                        Err(e) => Response {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(e.into()),
-                        }
-                    }
-                }
-                "resources/read" => {
-                    match serde_json::from_value::<ReadResourceRequestParam>(request.params) {
-                        Ok(params) => {
-                            match backend.read_resource(params).await {
-                                Ok(result) => serialize_result(result, request.id),
-                                Err(e) => Response {
-                                    jsonrpc: "2.0".to_string(),
-                                    id: request.id,
-                                    result: None,
-                                    error: Some(e.into()),
-                                }
-                            }
-                        }
-                        Err(e) => Response {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(Error::invalid_params(format!("Invalid parameters: {e}"))),
-                        }
-                    }
-                }
-                "prompts/list" => {
-                    match backend.list_prompts(PaginatedRequestParam { cursor: None }).await {
-                        Ok(result) => serialize_result(result, request.id),
-                        Err(e) => Response {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(e.into()),
-                        }
-                    }
-                }
-                "initialized" => {
-                    // This is a notification, not a request - just acknowledge it
-                    Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: Some(serde_json::json!({})),
-                        error: None,
-                    }
-                }
-                "ping" => {
-                    // Handle ping requests
-                    Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: Some(serde_json::json!({"pong": true})),
-                        error: None,
-                    }
-                }
-                _ => {
-                    Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: None,
-                        error: Some(Error::method_not_found(format!("Unknown method: {}", request.method))),
-                    }
-                }
-            }
-        })
-    })
-}
-
-/// Validate and optionally create directories
-fn validate_directories(wasm_path: &str, diagrams_path: &str, force: bool) -> anyhow::Result<()> {
-    let wasm_dir = Path::new(wasm_path);
-    let diagrams_dir = Path::new(diagrams_path);
-
-    // Check WASM components directory
-    if !wasm_dir.exists() {
-        if force {
-            info!("Creating WASM components directory: {}", wasm_path);
-            fs::create_dir_all(wasm_dir)
-                .map_err(|e| anyhow::anyhow!("Failed to create WASM directory '{}': {}", wasm_path, e))?;
-        } else {
-            return Err(anyhow::anyhow!(
-                "WASM components directory '{}' does not exist. Use --force to create it.", 
-                wasm_path
-            ));
-        }
-    } else if !wasm_dir.is_dir() {
-        return Err(anyhow::anyhow!(
-            "WASM components path '{}' exists but is not a directory", 
-            wasm_path
-        ));
-    }
-
-    // Check diagrams directory
-    if !diagrams_dir.exists() {
-        if force {
-            info!("Creating diagrams directory: {}", diagrams_path);
-            fs::create_dir_all(diagrams_dir)
-                .map_err(|e| anyhow::anyhow!("Failed to create diagrams directory '{}': {}", diagrams_path, e))?;
-        } else {
-            return Err(anyhow::anyhow!(
-                "Diagrams directory '{}' does not exist. Use --force to create it.", 
-                diagrams_path
-            ));
-        }
-    } else if !diagrams_dir.is_dir() {
-        return Err(anyhow::anyhow!(
-            "Diagrams path '{}' exists but is not a directory", 
-            diagrams_path
-        ));
-    }
-
-    info!("Directory validation successful");
-    Ok(())
-}
-
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Parse command line arguments
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    // Initialize tracing
+    // Initialize logging
     tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("glsp_mcp_server=debug"))
+        )
         .init();
 
-    info!("Starting GLSP MCP Server with framework");
-    info!("WASM components path: {}", args.wasm_path);
-    info!("Diagrams storage path: {}", args.diagrams_path);
+    info!("Starting GLSP MCP Server...");
 
-    // Validate directories before proceeding
-    validate_directories(&args.wasm_path, &args.diagrams_path, args.force)?;
+    // Create directories if they don't exist (when force flag is used)
+    if args.force {
+        if !Path::new(&args.wasm_path).exists() {
+            info!("Creating WASM components directory: {}", args.wasm_path);
+            fs::create_dir_all(&args.wasm_path)?;
+        }
+        if !Path::new(&args.diagrams_path).exists() {
+            info!("Creating diagrams directory: {}", args.diagrams_path);
+            fs::create_dir_all(&args.diagrams_path)?;
+        }
+    } else {
+        // Verify paths exist when not forcing
+        if !Path::new(&args.wasm_path).exists() {
+            eprintln!("Warning: WASM components directory does not exist: {}", args.wasm_path);
+            eprintln!("Use --force flag to create it automatically");
+        }
+        if !Path::new(&args.diagrams_path).exists() {
+            eprintln!("Warning: Diagrams directory does not exist: {}", args.diagrams_path);
+            eprintln!("Use --force flag to create it automatically");
+        }
+    }
 
-    // Create GLSP backend configuration with CLI-provided paths
-    let glsp_config = GlspConfig {
+    // Create backend configuration
+    let backend_config = GlspConfig {
         wasm_path: args.wasm_path,
         diagrams_path: args.diagrams_path,
         server_name: "GLSP MCP Server".to_string(),
-        server_version: "0.1.0".to_string(),
+        server_version: env!("CARGO_PKG_VERSION").to_string(),
     };
-    
-    // Initialize the GLSP backend
-    let backend = Arc::new(GlspBackend::initialize(glsp_config).await?);
-    
-    // Create handler
-    let handler = create_mcp_handler(backend.clone());
-    
-    // Determine transport type from CLI args
+
+    // Initialize backend
+    info!("Initializing GLSP backend...");
+    let backend = GlspBackend::initialize(backend_config).await?;
+
+    // Determine transport type
     let transport_type = args.transport.as_deref().unwrap_or("http");
     
-    if transport_type == "stdio" {
-        info!("Starting stdio transport");
-        let mut transport = StdioTransport::new();
-        transport.start(handler).await?;
-    } else {
-        info!("Starting HTTP transport on port {}", args.port);
-        let mut transport = HttpTransport::new(args.port);
-        
-        // Start the transport and keep it running
-        match transport.start(handler).await {
-            Ok(_) => {
-                info!("HTTP transport started successfully");
-                // Keep the server running indefinitely
-                tokio::signal::ctrl_c().await?;
-                info!("Received shutdown signal, stopping server");
+    info!("Starting GLSP MCP Server with {} transport on port {}...", transport_type, args.port);
+    
+    // For now, we're using a simple HTTP server implementation
+    // The full framework integration will be completed when dependencies are resolved
+    use axum::{
+        routing::post,
+        Router,
+        extract::Json,
+        response::Json as JsonResponse,
+        http::{StatusCode, Method, header},
+    };
+    use mcp_protocol::{Request, Response};
+    use std::sync::Arc;
+    use tower_http::cors::{CorsLayer, Any};
+    
+    let backend = Arc::new(backend);
+    let backend_clone = backend.clone();
+    
+    // Configure CORS
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::ACCEPT]);
+    
+    let app = Router::new()
+        .route("/messages", post(move |Json(request): Json<Request>| {
+            let backend = backend_clone.clone();
+            async move {
+                match handle_mcp_request(backend, request).await {
+                    Ok(response) => (StatusCode::OK, JsonResponse(response)),
+                    Err(e) => {
+                        let error_response = Response {
+                            jsonrpc: "2.0".to_string(),
+                            result: None,
+                            error: Some(mcp_protocol::Error::internal_error(format!("Request handling failed: {e}"))),
+                            id: serde_json::Value::Null,
+                        };
+                        (StatusCode::INTERNAL_SERVER_ERROR, JsonResponse(error_response))
+                    }
+                }
             }
-            Err(e) => {
-                error!("Failed to start HTTP transport: {}", e);
-                return Err(e.into());
-            }
+        }))
+        .route("/health", axum::routing::get(|| async { "OK" }))
+        .layer(cors);
+    
+    let addr = format!("127.0.0.1:{}", args.port).parse::<std::net::SocketAddr>()?;
+    
+    info!("GLSP MCP Server listening on http://{}", addr);
+    
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    info!("GLSP MCP Server shutdown complete");
+    Ok(())
+}
+
+async fn handle_mcp_request(
+    backend: std::sync::Arc<GlspBackend>,
+    request: mcp_protocol::Request,
+) -> Result<mcp_protocol::Response, Box<dyn std::error::Error>> {
+    use mcp_protocol::{CallToolRequestParam, PaginatedRequestParam, ReadResourceRequestParam, GetPromptRequestParam};
+    
+    match request.method.as_str() {
+        "initialize" => {
+            let server_info = backend.get_server_info();
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(server_info)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "tools/list" => {
+            let params: PaginatedRequestParam = if request.params.is_null() {
+                PaginatedRequestParam { cursor: None }
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.list_tools(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "tools/call" => {
+            let params: CallToolRequestParam = if request.params.is_null() {
+                return Err("Missing parameters".into());
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.call_tool(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "resources/list" => {
+            let params: PaginatedRequestParam = if request.params.is_null() {
+                PaginatedRequestParam { cursor: None }
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.list_resources(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "resources/read" => {
+            let params: ReadResourceRequestParam = if request.params.is_null() {
+                return Err("Missing parameters".into());
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.read_resource(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "prompts/list" => {
+            let params: PaginatedRequestParam = if request.params.is_null() {
+                PaginatedRequestParam { cursor: None }
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.list_prompts(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        "prompts/get" => {
+            let params: GetPromptRequestParam = if request.params.is_null() {
+                return Err("Missing parameters".into());
+            } else {
+                serde_json::from_value(request.params)?
+            };
+            let result = backend.get_prompt(params).await?;
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: Some(serde_json::to_value(result)?),
+                error: None,
+                id: request.id.clone(),
+            })
+        }
+        method => {
+            Ok(mcp_protocol::Response {
+                jsonrpc: "2.0".to_string(),
+                result: None,
+                error: Some(mcp_protocol::Error::method_not_found(format!("Unknown method: {method}"))),
+                id: request.id.clone(),
+            })
         }
     }
-    
-    Ok(())
 }

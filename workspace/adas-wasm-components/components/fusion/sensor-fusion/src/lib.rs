@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "sensor-fusion-component",
-    path: "../../../wit/sensor-fusion.wit",
+    path: "../../../wit/worlds/sensor-fusion.wit",
 });
 
 use crate::exports::fusion_data;

@@ -1,0 +1,106 @@
+/// Surround Camera Component - EXPORTS 360° camera data stream
+package adas:camera-surround@0.1.0;
+
+world camera-surround-component {
+    /// Import FEO execution control (all components need this)
+    import adas:execution-control/execution-control@0.1.0;
+
+    /// Export the camera data stream for other components to consume
+    export adas:sensor-data/camera-data@0.1.0;
+    
+    /// Surround camera control interface for configuration and control
+    export surround-control: interface {
+        /// Surround camera configuration
+        record surround-config {
+            front-resolution: resolution,
+            rear-resolution: resolution,
+            left-resolution: resolution,
+            right-resolution: resolution,
+            frame-rate: u32,
+            exposure-mode: exposure-mode,
+            white-balance: white-balance-mode,
+            image-format: image-format,
+            auto-focus: bool,
+            hdr-enabled: bool,
+            stitch-mode: stitch-mode,
+        }
+
+        enum resolution {
+            hd-resolution,    // 1280x720
+            full-hd,          // 1920x1080  
+            uhd-four-k,       // 3840x2160
+        }
+
+        enum exposure-mode {
+            auto,
+            manual,
+            shutter-priority,
+            iso-priority,
+        }
+
+        enum white-balance-mode {
+            auto,
+            daylight,
+            cloudy,
+            tungsten,
+            fluorescent,
+            manual,
+        }
+
+        enum image-format {
+            jpeg,
+            png,
+            raw,
+            yuv,
+        }
+
+        enum stitch-mode {
+            disabled,
+            bird-eye-view,
+            panoramic,
+            full-sphere,
+        }
+
+        enum camera-status {
+            offline,
+            initializing,
+            streaming,
+            error,
+            maintenance,
+        }
+
+        record diagnostic-result {
+            front-camera-health: test-result,
+            rear-camera-health: test-result,
+            left-camera-health: test-result,
+            right-camera-health: test-result,
+            stitching-calibration: test-result,
+            overall-score: f32,
+        }
+
+        enum test-result {
+            passed,
+            failed,
+            warning,
+            not-tested,
+        }
+
+        /// Initialize surround camera system with configuration
+        initialize: func(config: surround-config) -> result<_, string>;
+        
+        /// Start camera streaming
+        start-streaming: func() -> result<_, string>;
+        
+        /// Stop camera streaming  
+        stop-streaming: func() -> result<_, string>;
+        
+        /// Update camera configuration
+        update-config: func(config: surround-config) -> result<_, string>;
+        
+        /// Get camera status
+        get-status: func() -> camera-status;
+        
+        /// Run camera diagnostics
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+    }
+}

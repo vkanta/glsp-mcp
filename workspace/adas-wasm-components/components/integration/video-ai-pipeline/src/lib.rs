@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "video-ai-pipeline-component",
-    path: "../../../wit/video-ai-pipeline.wit",
+    path: "../../../wit/worlds/video-ai-pipeline.wit",
 });
 
 use crate::exports::pipeline_control;

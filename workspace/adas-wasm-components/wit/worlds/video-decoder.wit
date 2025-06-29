@@ -1,0 +1,112 @@
+/// Video Decoder Component - IMPORTS video streams, EXPORTS decoded frames
+package adas:video-decoder@0.1.0;
+
+world video-decoder-component {
+    import wasi:cli/environment@0.2.3;
+    import wasi:cli/exit@0.2.3;
+    import wasi:io/streams@0.2.3;
+    import wasi:cli/stdout@0.2.3;
+    import wasi:cli/stderr@0.2.3;
+    import wasi:clocks/monotonic-clock@0.2.3;
+    import wasi:clocks/wall-clock@0.2.3;
+
+    /// Import FEO execution control (all components need this)
+    import adas:execution-control/execution-control@0.1.0;
+
+    /// Export decoded video frames
+    export video-data: interface {
+        record video-frame {
+            width: u32,
+            height: u32,
+            data: list<u8>,
+            format: pixel-format,
+            timestamp: u64,
+            frame-number: u64,
+            codec-info: codec-info,
+        }
+
+        record codec-info {
+            codec-type: codec-type,
+            bitrate: u32,
+            fps: f32,
+            quality: quality-level,
+        }
+
+        enum pixel-format {
+            rgb8,
+            rgba8,
+            yuv420,
+            yuv422,
+            yuv444,
+        }
+
+        enum codec-type {
+            h264,
+            h265,
+            av1,
+            mjpeg,
+        }
+
+        enum quality-level {
+            low,
+            medium,
+            high,
+            ultra,
+        }
+
+        resource video-stream {
+            get-frame: func() -> result<video-frame, string>;
+            is-available: func() -> bool;
+            get-codec-info: func() -> codec-info;
+        }
+        
+        create-stream: func() -> video-stream;
+    }
+
+    /// Export decoder control interface
+    export decoder-control: interface {
+        record decoder-config {
+            target-format: pixel-format,
+            scaling-mode: scaling-mode,
+            quality-preset: quality-preset,
+            buffer-size: u32,
+            hw-acceleration: bool,
+        }
+
+        enum scaling-mode {
+            none,
+            fit,
+            fill,
+            stretch,
+        }
+
+        enum quality-preset {
+            realtime,
+            balanced,
+            quality,
+        }
+
+        enum decoder-status {
+            offline,
+            initializing,
+            decoding,
+            error,
+            maintenance,
+        }
+
+        /// Initialize decoder
+        initialize: func(config: decoder-config) -> result<_, string>;
+        
+        /// Start decoding
+        start-decoding: func() -> result<_, string>;
+        
+        /// Stop decoding
+        stop-decoding: func() -> result<_, string>;
+        
+        /// Update configuration
+        update-config: func(config: decoder-config) -> result<_, string>;
+        
+        /// Get status
+        get-status: func() -> decoder-status;
+    }
+}

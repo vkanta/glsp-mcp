@@ -1,7 +1,7 @@
 /// Sensor Data Interfaces - Shared data types and interfaces for ADAS sensors
 package adas:sensor-data@0.1.0;
 
-/// Shared spatial types
+/// Shared spatial types (inline for compatibility)
 interface spatial-types {
     record position3d {
         x: f64,  // Forward (meters)
@@ -24,10 +24,10 @@ interface spatial-types {
     }
 
     record quaternion {
-        x: f64,
-        y: f64,
-        z: f64,
-        w: f64,
+        x: f32,
+        y: f32,
+        z: f32,
+        w: f32,
     }
 
     enum coordinate-frame {
@@ -149,7 +149,7 @@ interface lidar-data {
 
 /// Object detection data interface - EXPORTED by AI components
 interface detection-data {
-    use spatial-types.{position3d, velocity3d};
+    use spatial-types.{position3d, velocity3d, quaternion};
 
     record detection-results {
         objects: list<detected-object>,

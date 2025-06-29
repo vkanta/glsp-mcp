@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "perception-fusion-component",
-    path: "../../../wit/perception-fusion.wit",
+    path: "../../../wit/worlds/perception-fusion.wit",
 });
 
 use crate::exports::perception_data;

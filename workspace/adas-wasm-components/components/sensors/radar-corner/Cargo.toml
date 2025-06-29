@@ -5,7 +5,6 @@ edition = "2021"
 description = "Corner radars for blind spot detection"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

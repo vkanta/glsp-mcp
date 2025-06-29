@@ -192,7 +192,7 @@ impl WitAnalyzer {
 
         // Extract imports
         for (key, import) in &world.imports {
-            println!("  🔍 Processing import: {:?} -> {:?}", key, import);
+            println!("  🔍 Processing import: {key:?} -> {import:?}");
             let interface = Self::extract_world_item_interface(
                 resolve,
                 key,
@@ -205,7 +205,7 @@ impl WitAnalyzer {
 
         // Extract exports  
         for (key, export) in &world.exports {
-            println!("  🔍 Processing export: {:?} -> {:?}", key, export);
+            println!("  🔍 Processing export: {key:?} -> {export:?}");
             let interface = Self::extract_world_item_interface(
                 resolve,
                 key,

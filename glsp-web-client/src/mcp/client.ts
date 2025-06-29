@@ -1,6 +1,11 @@
 /**
  * MCP HTTP Client for GLSP
  * Implements Model Context Protocol over HTTP with JSON-RPC
+ * 
+ * Updated for PulseEngine MCP Framework:
+ * - Using /messages endpoint for compatibility
+ * - Session ID sent in headers (Mcp-Session-Id) instead of query params
+ * - Compatible with the new framework's HTTP streaming transport
  */
 
 export interface JsonRpcRequest {
@@ -156,18 +161,22 @@ export class McpClient {
         };
 
         try {
-            // Build URL with session ID if available
-            let url = `${this.baseUrl}/messages`;
+            // Use /messages endpoint
+            const url = `${this.baseUrl}/messages`;
+            
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            };
+            
+            // Include session ID in headers for new framework
             if (this.sessionId) {
-                url += `?session_id=${encodeURIComponent(this.sessionId)}`;
+                headers['Mcp-Session-Id'] = this.sessionId;
             }
             
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(notification)
             });
 
@@ -191,10 +200,17 @@ export class McpClient {
         };
 
         try {
-            // Build URL with session ID if available
-            let url = `${this.baseUrl}/messages`;
+            // Use /messages endpoint
+            const url = `${this.baseUrl}/messages`;
+            
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            };
+            
+            // Include session ID in headers for new framework
             if (this.sessionId) {
-                url += `?session_id=${encodeURIComponent(this.sessionId)}`;
+                headers['Mcp-Session-Id'] = this.sessionId;
             }
             
             // Create AbortController for timeout
@@ -204,10 +220,7 @@ export class McpClient {
             try {
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(request),
                     signal: controller.signal
                 });
@@ -223,8 +236,8 @@ export class McpClient {
                 // Check if response has content
                 const contentLength = response.headers.get('content-length');
                 if (contentLength === '0' || response.status === 204) {
-                    // No content response - might be using legacy SSE mode
-                    throw new Error('Empty response - server might be using SSE mode');
+                    // No content response - framework should always return content
+                    throw new Error('Empty response from server');
                 }
 
                 // Extract session ID from response headers if present

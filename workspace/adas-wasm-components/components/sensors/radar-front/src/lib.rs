@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "radar-front-component",
-    path: "../../../wit/radar-front.wit",
+    path: "../../../wit/worlds/radar-front.wit",
 });
 
 use crate::exports::radar_data;

@@ -5,7 +5,6 @@ edition = "2021"
 description = "Front-facing camera ECU with AI vision processing"
 license = "Apache-2.0"
 
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]

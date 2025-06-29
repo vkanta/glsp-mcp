@@ -2,7 +2,7 @@
 
 wit_bindgen::generate!({
     world: "ultrasonic-component",
-    path: "../../../wit/ultrasonic.wit",
+    path: "../../../wit/worlds/ultrasonic.wit",
 });
 
 use crate::exports::ultrasonic_data;
