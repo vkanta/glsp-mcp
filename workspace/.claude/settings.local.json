@@ -32,7 +32,8 @@
       "Bash(scripts/clean-all.sh:*)",
       "Bash(scripts/reorganize-components.sh:*)",
       "Bash(cp:*)",
-      "Bash(rustup target:*)"
+      "Bash(rustup target:*)",
+      "Bash(wit-bindgen:*)"
     ],
     "deny": []
   }

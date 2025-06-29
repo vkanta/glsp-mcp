@@ -30,7 +30,8 @@
       "Bash(ls:*)",
       "Bash(rg:*)",
       "Bash(rg:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebFetch(domain:docs.rs)"
     ],
     "deny": []
   }

@@ -8,7 +8,20 @@
       "Bash(do)",
       "Bash(sed:*)",
       "Bash(echo:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(mv:*)",
+      "Bash(cargo:*)",
+      "Bash(rg:*)",
+      "Bash(/Users/r/git/glsp-rust/workspace/adas-wasm-components/wit-bindgen-source/target/debug/wit-bindgen scaffold --output components/sensors/camera-front/src --name camera_front wit/adas-components/camera-front.wit)",
+      "Bash(wit-bindgen:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(ln:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(chmod:*)",
+      "Bash(./restore-wit.sh:*)"
     ],
     "deny": []
   }
