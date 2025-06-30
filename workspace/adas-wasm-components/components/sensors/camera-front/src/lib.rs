@@ -2,18 +2,20 @@
 wit_bindgen::generate!({
     world: "sensor-component",
     path: "wit/",
-    with: {
-        "adas:common-types/types": generate,
-        "adas:control/sensor-control": generate,
-        "adas:data/sensor-data": generate,
-        "adas:diagnostics/health-monitoring": generate,
-        "adas:diagnostics/performance-monitoring": generate,
-        "adas:orchestration/execution-control": generate,
-        "adas:orchestration/resource-management": generate,
-    },
+    generate_all,
 });
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 struct Component;
+
+// Helper function for timestamps
+fn get_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
 impl exports::adas::control::sensor_control::Guest for Component {
     fn initialize(
@@ -41,11 +43,11 @@ impl exports::adas::control::sensor_control::Guest for Component {
     }
 
     fn get_status() -> exports::adas::control::sensor_control::SensorStatus {
-        exports::adas::control::sensor_control::SensorStatus::Ok
+        adas::common_types::types::HealthStatus::Ok
     }
 
     fn get_performance() -> exports::adas::control::sensor_control::PerformanceMetrics {
-        exports::adas::control::sensor_control::PerformanceMetrics {
+        adas::common_types::types::PerformanceMetrics {
             latency_avg_ms: 5.2,
             latency_max_ms: 8.5,
             cpu_utilization: 0.15,
@@ -65,7 +67,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
             overall_health: adas::common_types::types::HealthStatus::Ok,
             subsystem_health: vec![],
             last_diagnostic: None,
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 
@@ -83,7 +85,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
                 ],
                 overall_score: 98.5,
                 recommendations: vec![String::from("Camera operating normally")],
-                timestamp: 0,
+                timestamp: get_timestamp(),
             },
         )
     }
@@ -117,7 +119,7 @@ impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
                 gpu_utilization: 0.0,
                 gpu_memory_mb: 0,
             },
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 

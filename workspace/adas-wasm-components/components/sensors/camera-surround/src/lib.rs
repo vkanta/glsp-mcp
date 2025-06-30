@@ -3,15 +3,7 @@
 wit_bindgen::generate!({
     world: "sensor-component",
     path: "wit/",
-    with: {
-        "adas:common-types/types": generate,
-        "adas:control/sensor-control": generate,
-        "adas:data/sensor-data": generate,
-        "adas:diagnostics/health-monitoring": generate,
-        "adas:diagnostics/performance-monitoring": generate,
-        "adas:orchestration/execution-control": generate,
-        "adas:orchestration/resource-management": generate,
-    },
+    generate_all,
 });
 
 struct Component;

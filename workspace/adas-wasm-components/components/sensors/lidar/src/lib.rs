@@ -3,15 +3,7 @@
 wit_bindgen::generate!({
     world: "sensor-component",
     path: "wit/",
-    with: {
-        "adas:common-types/types": generate,
-        "adas:control/sensor-control": generate,
-        "adas:data/sensor-data": generate,
-        "adas:diagnostics/health-monitoring": generate,
-        "adas:diagnostics/performance-monitoring": generate,
-        "adas:orchestration/execution-control": generate,
-        "adas:orchestration/resource-management": generate,
-    },
+    generate_all,
 });
 
 struct Component;
@@ -19,6 +11,14 @@ struct Component;
 // LiDAR state
 static mut LIDAR_ACTIVE: bool = false;
 static mut SCAN_RATE: u32 = 10; // Hz
+
+// Helper functions
+fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
 // Implement standardized sensor control interface
 impl exports::adas::control::sensor_control::Guest for Component {
@@ -113,7 +113,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
             },
             subsystem_health: vec![],
             last_diagnostic: None,
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 
@@ -137,7 +137,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
                 ],
                 overall_score: 99.0,
                 recommendations: vec![String::from("LiDAR operating normally")],
-                timestamp: 0,
+                timestamp: get_timestamp(),
             },
         )
     }
@@ -185,7 +185,7 @@ impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
                 gpu_utilization: 0.0,
                 gpu_memory_mb: 0,
             },
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 
