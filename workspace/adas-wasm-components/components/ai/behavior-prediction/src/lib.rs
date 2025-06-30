@@ -3,24 +3,24 @@
 wit_bindgen::generate!({
     world: "ai-component",
     path: "wit/",
-    with: {
-        "adas:common-types/types": generate,
-        "adas:control/ai-control": generate,
-        "adas:data/sensor-data": generate,
-        "adas:data/perception-data": generate,
-        "adas:data/planning-data": generate,
-        "adas:diagnostics/health-monitoring": generate,
-        "adas:diagnostics/performance-monitoring": generate,
-        "adas:orchestration/execution-control": generate,
-        "adas:orchestration/resource-management": generate,
-    },
+    generate_all,
 });
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 struct Component;
 
 // AI state
 static mut MODEL_LOADED: bool = false;
 static mut INFERENCE_ACTIVE: bool = false;
+
+// Helper function for timestamps
+fn get_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
 // Implement standardized AI control interface
 impl exports::adas::control::ai_control::Guest for Component {
@@ -100,7 +100,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
             },
             subsystem_health: vec![],
             last_diagnostic: None,
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 
@@ -124,7 +124,7 @@ impl exports::adas::diagnostics::health_monitoring::Guest for Component {
                 ],
                 overall_score: 95.0,
                 recommendations: vec![String::from("Behavior prediction AI operating normally")],
-                timestamp: 0,
+                timestamp: get_timestamp(),
             },
         )
     }
@@ -172,7 +172,7 @@ impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
                 gpu_utilization: 0.8, // AI inference on GPU
                 gpu_memory_mb: 256,
             },
-            timestamp: 0,
+            timestamp: get_timestamp(),
         }
     }
 

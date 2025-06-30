@@ -3,15 +3,7 @@
 wit_bindgen::generate!({
     world: "vehicle-component",
     path: "wit/",
-    with: {
-        "adas:common-types/types": generate,
-        "adas:control/vehicle-control": generate,
-        "adas:data/planning-data": generate,
-        "adas:diagnostics/health-monitoring": generate,
-        "adas:diagnostics/performance-monitoring": generate,
-        "adas:orchestration/execution-control": generate,
-        "adas:orchestration/resource-management": generate,
-    },
+    generate_all,
 });
 
 use std::collections::VecDeque;
