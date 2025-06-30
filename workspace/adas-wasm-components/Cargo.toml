@@ -29,6 +29,9 @@ members = [
     # Input Layer
     "components/input/video-decoder",
     
+    # Integration Layer
+    "components/integration/video-ai-pipeline",
+    
     # System Layer
     "components/system/safety-monitor",
     "components/system/can-gateway", 

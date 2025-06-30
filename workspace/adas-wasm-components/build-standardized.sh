@@ -30,6 +30,10 @@ COMPONENTS=(
     "adas-safety_monitor"
     "adas-hmi_interface"
     "adas-can_gateway"
+    
+    # Video Processing Components (2)
+    "adas-video_decoder"
+    "adas-video_ai_pipeline"
 )
 
 echo "Building ${#COMPONENTS[@]} standardized components..."
@@ -69,9 +73,9 @@ done
 echo ""
 echo "🏗️ Architecture Summary:"
 echo "========================"
-echo "  🔧 sensor-component:  6 components"
+echo "  🔧 sensor-component:  7 components (includes video-decoder)"
 echo "  🤖 ai-component:      2 components" 
 echo "  🎯 control-component: 2 components"
-echo "  🛡️  system-component:  3 components"
+echo "  🛡️  system-component:  4 components (includes video-ai-pipeline)"
 echo ""
 echo "✨ Total: ${#COMPONENTS[@]} standardized components successfully built!"
