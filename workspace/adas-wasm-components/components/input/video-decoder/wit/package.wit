@@ -1,2 +1,1 @@
-/// ADAS System Component Package
-package adas:system-component;
+package adas:sensor-component@0.1.0;
