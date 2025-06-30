@@ -10,6 +10,9 @@ export interface DiagramModel {
     revision: number;
     root: ModelElement;
     elements: Record<string, ModelElement>;
+    name?: string;
+    title?: string;
+    metadata?: DiagramMetadata;
 }
 
 export interface ModelElement {

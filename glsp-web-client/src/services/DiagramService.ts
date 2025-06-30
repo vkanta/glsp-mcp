@@ -21,6 +21,11 @@ export class DiagramService {
         return this.currentDiagramId;
     }
 
+    public getCurrentDiagram(): DiagramModel | undefined {
+        if (!this.currentDiagramId) return undefined;
+        return this.diagramState.getDiagram(this.currentDiagramId);
+    }
+
     public setCurrentDiagramId(id: string | undefined): void {
         this.currentDiagramId = id;
     }
@@ -41,7 +46,7 @@ export class DiagramService {
                 
                 // Update status manager with current diagram info
                 // The diagram object uses different property names - check for various possibilities
-                const diagramName = diagram.name || diagram.title || diagram.metadata?.name || 'Unnamed Diagram';
+                const diagramName = diagram.name || diagram.title || 'Unnamed Diagram';
                 console.log('DiagramService: Setting current diagram to:', diagramId, diagramName);
                 statusManager.setCurrentDiagram(diagramId, diagramName);
                 
