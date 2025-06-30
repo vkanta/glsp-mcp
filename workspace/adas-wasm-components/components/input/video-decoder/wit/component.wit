@@ -1,17 +1,17 @@
-/// ADAS System Component World - Standardized world for system management components
-
-/// System components handle monitoring, safety, communication, and coordination
-world system-component {
-    /// System control and resource management
+/// Standardized Sensor Component World  
+/// All sensor components (camera, radar, lidar, ultrasonic) use this world
+world sensor-component {
+    /// Import orchestration for FEO compliance and resource management
     import adas:orchestration/execution-control;
     import adas:orchestration/resource-management;
     
-    /// Import all data types for monitoring
+    /// Import data types for creating sensor data structures
     import adas:data/sensor-data;
-    import adas:data/perception-data;
-    import adas:data/planning-data;
+    import adas:common-types/types;
     
-    /// Export diagnostics and monitoring
+    /// Export standardized sensor interfaces
+    export adas:control/sensor-control;
+    export adas:data/sensor-data;
     export adas:diagnostics/health-monitoring;
     export adas:diagnostics/performance-monitoring;
 }
