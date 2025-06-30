@@ -34,16 +34,16 @@ export class SelectDialog extends BaseDialog {
 
     constructor(config: SelectDialogConfig, events: DialogEvents = {}) {
         const defaultConfig: SelectDialogConfig = {
-            title: 'Select Option',
-            message: 'Please choose an option:',
-            options: [],
-            defaultSelection: -1,
-            allowMultiple: false,
-            searchable: false,
-            required: true,
-            width: 500,
-            height: 400,
-            ...config
+            ...config,
+            title: config.title || 'Select Option',
+            message: config.message || 'Please choose an option:',
+            options: config.options || [],
+            defaultSelection: config.defaultSelection ?? -1,
+            allowMultiple: config.allowMultiple || false,
+            searchable: config.searchable || false,
+            required: config.required !== false,
+            width: config.width || 500,
+            height: config.height || 400
         };
 
         // Store config statically so createDialogContent can access it

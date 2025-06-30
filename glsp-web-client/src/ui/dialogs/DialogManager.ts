@@ -118,7 +118,7 @@ export class DialogManager {
         const { dialog } = queueItem;
 
         // Handle dialog close
-        dialog.onClose(() => {
+        dialog.setOnCloseCallback(() => {
             if (this.activeDialog === queueItem) {
                 this.closeActiveDialog({ confirmed: false, cancelled: true });
             }
@@ -132,12 +132,12 @@ export class DialogManager {
         };
 
         // Add escape listener when dialog becomes active
-        dialog.onShow(() => {
+        dialog.setOnShowCallback(() => {
             document.addEventListener('keydown', handleEscape);
         });
 
         // Remove escape listener when dialog closes
-        dialog.onClose(() => {
+        dialog.setOnCloseCallback(() => {
             document.removeEventListener('keydown', handleEscape);
         });
     }

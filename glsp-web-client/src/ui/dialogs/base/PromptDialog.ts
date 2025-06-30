@@ -21,9 +21,9 @@ export interface PromptDialogConfig extends DialogConfig {
 export class PromptDialog extends BaseDialog {
     private static currentPromptConfig: PromptDialogConfig;
     private promptConfig: PromptDialogConfig;
-    private inputElement!: HTMLInputElement;
-    private errorElement!: HTMLElement;
-    private messageElement!: HTMLElement;
+    protected inputElement!: HTMLInputElement;
+    protected errorElement!: HTMLElement;
+    protected messageElement!: HTMLElement;
 
     constructor(config: PromptDialogConfig = {}, events: DialogEvents = {}) {
         const defaultConfig: PromptDialogConfig = {
@@ -147,7 +147,7 @@ export class PromptDialog extends BaseDialog {
         }, 0);
     }
 
-    private validateInput(): boolean {
+    protected validateInput(): boolean {
         if (!this.inputElement) return true;
 
         const value = this.inputElement.value;
@@ -183,7 +183,7 @@ export class PromptDialog extends BaseDialog {
         return isValid;
     }
 
-    private showValidationError(message: string): void {
+    protected showValidationError(message: string): void {
         if (!this.errorElement) return;
 
         if (message) {
@@ -196,7 +196,7 @@ export class PromptDialog extends BaseDialog {
         }
     }
 
-    private updatePrimaryButton(): void {
+    protected updatePrimaryButton(): void {
         const primaryBtn = this.element.querySelector('.primary-btn') as HTMLButtonElement;
         if (primaryBtn) {
             primaryBtn.disabled = !this.validate();
@@ -216,9 +216,9 @@ export class PromptDialog extends BaseDialog {
         };
     }
 
-    protected handleConfirm(): void {
+    protected handleConfirm(value?: any): void {
         if (this.validate()) {
-            super.handleConfirm(this.inputElement.value);
+            super.handleConfirm(value || this.inputElement.value);
         }
     }
 

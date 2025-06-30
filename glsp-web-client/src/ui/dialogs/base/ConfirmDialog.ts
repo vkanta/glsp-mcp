@@ -23,17 +23,17 @@ export class ConfirmDialog extends BaseDialog {
 
     constructor(config: ConfirmDialogConfig, events: DialogEvents = {}) {
         const defaultConfig: ConfirmDialogConfig = {
-            title: 'Confirm Action',
-            message: 'Are you sure?',
-            confirmText: 'Yes',
-            cancelText: 'No',
-            variant: 'default',
-            showIcon: true,
-            width: 450,
-            height: 220,
-            primaryButtonText: config.confirmText || 'Yes',
-            secondaryButtonText: config.cancelText || 'No',
-            ...config
+            ...config,
+            title: config.title || 'Confirm Action',
+            message: config.message || 'Are you sure?',
+            confirmText: config.confirmText || 'Yes',
+            cancelText: config.cancelText || 'No',
+            variant: config.variant || 'default',
+            showIcon: config.showIcon !== false,
+            width: config.width || 450,
+            height: config.height || 220,
+            primaryButtonText: config.confirmText || config.primaryButtonText || 'Yes',
+            secondaryButtonText: config.cancelText || config.secondaryButtonText || 'No'
         };
 
         // Set icon based on variant if not provided

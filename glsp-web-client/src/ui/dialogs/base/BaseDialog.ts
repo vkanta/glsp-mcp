@@ -367,11 +367,11 @@ export abstract class BaseDialog extends FloatingPanel {
         }
     }
 
-    public onShow(callback: () => void): void {
+    public setOnShowCallback(callback: () => void): void {
         this.dialogEvents.onShow = callback;
     }
 
-    public onClose(callback: () => void): void {
+    public setOnCloseCallback(callback: () => void): void {
         this.dialogEvents.onClose = callback;
     }
 
@@ -510,13 +510,14 @@ export abstract class BaseDialog extends FloatingPanel {
     // Validate dialog input - to be implemented by specific dialog types
     public abstract validate(): boolean;
 
-    // Override FloatingPanel's bringToFront to maintain dialog z-index
-    protected bringToFront(): void {
-        // Dialogs should always stay at very high z-index, don't use FloatingPanel logic
+    // Note: Dialogs maintain their own z-index based on dialog manager
+    // The dialog manager handles z-index for dialogs
+    public ensureDialogZIndex(): void {
+        // Dialogs should always stay at very high z-index
         this.element.style.zIndex = '100000';
         this.element.style.position = 'fixed';
         this.element.style.isolation = 'isolate';
-        console.log('🐛 Dialog bringToFront called, maintaining z-index:', this.element.style.zIndex);
+        console.log('🐛 Dialog ensureDialogZIndex called, maintaining z-index:', this.element.style.zIndex);
     }
 
     // Debug helper - call from console

@@ -24,18 +24,18 @@ export class AlertDialog extends BaseDialog {
 
     constructor(config: AlertDialogConfig, events: DialogEvents = {}) {
         const defaultConfig: AlertDialogConfig = {
-            title: 'Information',
-            message: 'Alert message',
-            variant: 'info',
-            showIcon: true,
-            buttonText: 'OK',
-            copyable: false,
-            expandable: false,
-            width: 450,
-            height: 200,
-            showFooter: true,
-            secondaryButtonText: undefined, // No secondary button for alerts
-            ...config
+            ...config,
+            title: config.title || 'Information',
+            message: config.message || 'Alert message',
+            variant: config.variant || 'info',
+            showIcon: config.showIcon !== false,
+            buttonText: config.buttonText || 'OK',
+            copyable: config.copyable || false,
+            expandable: config.expandable || false,
+            width: config.width || 450,
+            height: config.height || 200,
+            showFooter: config.showFooter !== false,
+            secondaryButtonText: undefined // No secondary button for alerts
         };
 
         // Set primaryButtonText after merging config
