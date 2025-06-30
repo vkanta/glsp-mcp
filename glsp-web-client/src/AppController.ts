@@ -344,10 +344,10 @@ export class AppController {
                     this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
                     
                     // Refresh WASM component interfaces if this is a WASM diagram
-                    if (diagramType === 'wasm-component' && this.wasmComponentManager) {
+                    if (diagramType === 'wasm-component' && this.wasmRuntimeManager) {
                         console.log('AppController: Refreshing WASM component interfaces...');
                         try {
-                            await this.wasmComponentManager.refreshComponentInterfaces();
+                            await this.wasmRuntimeManager.refreshComponentInterfaces();
                         } catch (error) {
                             console.error('Failed to refresh component interfaces:', error);
                         }
@@ -558,11 +558,11 @@ export class AppController {
             const hasUnsavedChanges = this.diagramService.hasUnsavedChanges();
             
             let confirmMessage = 'This diagram and all its content will be permanently removed.';
-            let confirmTitle = `Delete "${diagramName}"?`;
+            let _confirmTitle = `Delete "${diagramName}"?`;
             
             // Enhanced warning for current diagram
             if (isCurrentDiagram) {
-                confirmTitle = `⚠️ Delete Current Diagram "${diagramName}"?`;
+                _confirmTitle = `⚠️ Delete Current Diagram "${diagramName}"?`;
                 confirmMessage = `You are about to delete the diagram you are currently working on.\n\n`;
                 
                 if (hasUnsavedChanges) {

@@ -78,11 +78,16 @@ export class McpService {
     async readResource(uri: string): Promise<any> {
         const result = await this.mcpClient.readResource(uri);
         console.log('McpService: Raw resource result for', uri, ':', result);
-        // The MCP client returns { contents: [{ text: "...", uri: "...", mime_type: "..." }] }
-        if (result.contents && result.contents.length > 0) {
-            return result.contents[0]; // Return the first content item
+        
+        // Handle both direct ResourceContent and wrapped response formats
+        const wrappedResult = result as any;
+        if (wrappedResult.contents && Array.isArray(wrappedResult.contents) && wrappedResult.contents.length > 0) {
+            // MCP server is returning wrapped format
+            return wrappedResult.contents[0];
         }
-        return result; // Fallback for different format
+        
+        // Direct ResourceContent format
+        return result;
     }
 
     async getDiagramModel(diagramId: string): Promise<any> {
