@@ -1,0 +1,4 @@
+# Workspace-level WIT dependencies
+
+[deps."wasi:nn@0.2.0-rc-2024-10-28"]
+path = "./deps/wasi-nn"

@@ -8,11 +8,14 @@ world ai-component {
     
     /// Import sensor data from sensor components
     import adas:data/sensor-data;
+    import adas:data/perception-data;
+    import adas:common-types/types;
     
     /// Import WASI-NN for neural network inference
     import wasi:nn/graph@0.2.0;
     import wasi:nn/tensor@0.2.0;
     import wasi:nn/inference@0.2.0;
+    import wasi:nn/errors@0.2.0;
     
     /// Export standardized AI interfaces
     export adas:control/ai-control;
