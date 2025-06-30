@@ -91,7 +91,7 @@ const PROCESS_NOISE_POS: f64 = 0.1; // Position process noise (m²/s⁴)
 const PROCESS_NOISE_VEL: f64 = 1.0; // Velocity process noise (m²/s²)
 const MEASUREMENT_NOISE_POS: f64 = 1.0; // Position measurement noise (m²)
 const MEASUREMENT_NOISE_VEL: f64 = 0.5; // Velocity measurement noise (m²/s²)
-const ASSOCIATION_THRESHOLD: f64 = 10.0; // Max distance for data association (m)
+const ASSOCIATION_THRESHOLD: f64 = 10.0; // Max distance for data association (m)\n\n// Enhanced sensor-specific measurement noise parameters\nconst CAMERA_NOISE_POS: f64 = 2.0;   // Camera less accurate in distance\nconst RADAR_NOISE_POS: f64 = 0.5;    // RADAR very accurate in distance\nconst RADAR_NOISE_VEL: f64 = 0.2;    // RADAR excellent for velocity\nconst LIDAR_NOISE_POS: f64 = 0.1;    // LIDAR most accurate for position\nconst AI_DETECTION_CONFIDENCE_FACTOR: f64 = 0.8;  // AI detection reliability\n\n// Multi-sensor fusion parameters\nconst MIN_SENSOR_AGREEMENT: usize = 2;  // Minimum sensors to confirm object\nconst TRACK_TIMEOUT_MS: u64 = 3000;     // Remove tracks after 3 seconds\nconst HIGH_CONFIDENCE_THRESHOLD: f32 = 0.85;
 
 // Input streams from various sensors
 static mut CAMERA_STREAM: Option<crate::camera_data::CameraStream> = None;
@@ -214,11 +214,13 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
             }
         }
 
-        // Get AI detections
+        // Get AI detections (from video processing + WASI-NN)
         if let Some(ref detection) = DETECTION_STREAM {
             if let Ok(results) = detection.get_detections() {
-                // Convert detections to camera detections for fusion
+                // AI detections get higher confidence weighting when fused with camera
                 for det in results.objects.iter() {
+                    let ai_weighted_confidence = det.confidence * AI_DETECTION_CONFIDENCE_FACTOR as f32;
+                    
                     state.camera_buffer.push(CameraDetection {
                         position: fusion_data::Position3d {
                             x: det.position.x,
@@ -237,11 +239,30 @@ fn collect_sensor_data(state: &mut FusionStreamState) -> Result<(), String> {
                             }
                             _ => fusion_data::ObjectType::Unknown,
                         },
-                        confidence: det.confidence,
+                        confidence: ai_weighted_confidence,
                         timestamp: results.timestamp,
                     });
                 }
+                
+                println!("Sensor Fusion: Integrated {} AI detections from video pipeline", results.objects.len());
             }
+        }
+        
+        // Enhanced LIDAR processing for precise positioning
+        // Simulate LIDAR point cloud clustering
+        let time = get_timestamp();
+        if (time % 4000) > 800 {  // LIDAR available 80% of time
+            state.lidar_buffer.clear();
+            state.lidar_buffer.push(LidarCluster {
+                position: fusion_data::Position3d {
+                    x: 48.5,  // Very precise position
+                    y: 0.2,
+                    z: 0.0,
+                },
+                size: (4.2, 1.8, 1.4),  // Vehicle dimensions
+                confidence: 0.95,  // LIDAR very reliable
+                timestamp: time,
+            });
         }
     }
     Ok(())
