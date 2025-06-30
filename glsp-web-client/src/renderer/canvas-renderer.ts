@@ -263,7 +263,7 @@ export class CanvasRenderer {
             return Math.sqrt(A * A + B * B);
         }
         
-        let param = dot / lenSq;
+        const param = dot / lenSq;
 
         let xx, yy;
 
@@ -732,9 +732,9 @@ export class CanvasRenderer {
         elements.forEach(element => {
             if (element.bounds) {
                 let elementMinX = element.bounds.x;
-                let elementMinY = element.bounds.y;
+                const elementMinY = element.bounds.y;
                 let elementMaxX = element.bounds.x + element.bounds.width;
-                let elementMaxY = element.bounds.y + element.bounds.height;
+                const elementMaxY = element.bounds.y + element.bounds.height;
                 
                 // For WASM components, account for interface connectors that extend beyond bounds
                 const nodeType = element.type || element.element_type || '';
@@ -1337,8 +1337,6 @@ export class CanvasRenderer {
         return false;
     }
 
-    private interfaceTooltip?: HTMLElement;
-
     private getInterfaceConnectorAt(position: Position): {
         element: ModelElement;
         interface: any;
@@ -1390,7 +1388,7 @@ export class CanvasRenderer {
                     const connector = {
                         element,
                         interface: portInfo.port,
-                        side: isInput ? 'left' : 'right',
+                        side: (isInput ? 'left' : 'right') as 'left' | 'right',
                         connectorPosition: { x, y }
                     };
                     console.log('getInterfaceConnectorAt: Returning connector:', connector);

@@ -119,7 +119,7 @@ export class WasmComponentRendererV2 {
         colors: any,
         isSelected: boolean,
         isHovered: boolean,
-        status: string
+        _status: string
     ): void {
         // Main body with subtle gradient
         const gradient = ctx.createLinearGradient(bounds.x, bounds.y, bounds.x, bounds.y + bounds.height);
@@ -149,7 +149,7 @@ export class WasmComponentRendererV2 {
         componentName: string,
         componentType: string,
         colors: any,
-        status: string
+        _status: string
     ): void {
         // Header background with component color
         const headerGradient = ctx.createLinearGradient(
@@ -202,7 +202,7 @@ export class WasmComponentRendererV2 {
         y: number,
         size: number,
         componentType: string,
-        colors: any
+        _colors: any
     ): void {
         // Simple geometric icon based on component type
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -326,7 +326,7 @@ export class WasmComponentRendererV2 {
         x: number,
         y: number,
         isInput: boolean,
-        colors: any
+        _colors: any
     ): void {
         ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textBaseline = 'middle';
@@ -353,7 +353,7 @@ export class WasmComponentRendererV2 {
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
         componentType: string,
-        colors: any
+        _colors: any
     ): void {
         const badgeWidth = 45;
         const badgeHeight = 16;
