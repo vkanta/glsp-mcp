@@ -150,7 +150,7 @@ export class ComponentValidator {
         }
     }
 
-    private async parseWasmModule(wasmBytes: ArrayBuffer, errors: ValidationError[], warnings: ValidationWarning[]): Promise<any> {
+    private async parseWasmModule(wasmBytes: ArrayBuffer, errors: ValidationError[], _warnings: ValidationWarning[]): Promise<any> {
         try {
             // Use WebAssembly.validate for basic validation
             const isValid = await WebAssembly.validate(wasmBytes);
@@ -279,7 +279,7 @@ export class ComponentValidator {
         }
     }
 
-    private validateTableLimits(tables: any[], errors: ValidationError[], warnings: ValidationWarning[]): void {
+    private validateTableLimits(tables: any[], errors: ValidationError[], _warnings: ValidationWarning[]): void {
         if (!this.rules.maxTableSize || !tables) return;
 
         tables.forEach((table, index) => {
@@ -352,7 +352,7 @@ export class ComponentValidator {
         }
     }
 
-    private parseCustomSections(wasmBytes: ArrayBuffer): Map<string, Uint8Array> {
+    private parseCustomSections(_wasmBytes: ArrayBuffer): Map<string, Uint8Array> {
         // Simple custom section parser
         // In a real implementation, this would properly parse the WASM binary format
         const sections = new Map<string, Uint8Array>();
@@ -378,7 +378,7 @@ export class ComponentValidator {
         return null;
     }
 
-    private extractTableInfo(imports: WebAssembly.ModuleImportDescriptor[], exports: WebAssembly.ModuleExportDescriptor[]): any[] {
+    private extractTableInfo(imports: WebAssembly.ModuleImportDescriptor[], _exports: WebAssembly.ModuleExportDescriptor[]): any[] {
         // Extract table information from imports/exports
         const tables: any[] = [];
         

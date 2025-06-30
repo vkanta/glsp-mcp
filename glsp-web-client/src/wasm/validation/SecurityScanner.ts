@@ -186,7 +186,7 @@ export class SecurityScanner {
     private async scanBinary(
         wasmBytes: ArrayBuffer,
         risks: SecurityRisk[],
-        recommendations: string[]
+        _recommendations: string[]
     ): Promise<void> {
         const bytes = new Uint8Array(wasmBytes);
         
