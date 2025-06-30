@@ -1,6 +1,6 @@
 // Note: @bytecodealliance/jco will be imported dynamically to avoid build errors
 // import { transpile } from '@bytecodealliance/jco';
-import { ComponentValidator, ValidationResult as ValidatorResult, ValidationRules } from '../validation/ComponentValidator.js';
+import { ComponentValidator, ValidationRules } from '../validation/ComponentValidator.js';
 import { SecurityScanner, SecurityScanResult } from '../validation/SecurityScanner.js';
 
 export interface ComponentMetadata {
@@ -14,7 +14,7 @@ export interface ComponentMetadata {
     hash: string;
 }
 
-export interface ValidationResult extends ValidatorResult {
+export interface TranspilerValidationResult {
     isValid: boolean;
     errors: string[];
     warnings: string[];
@@ -28,7 +28,7 @@ export interface TranspiledComponent {
     typeDefinitions: string;
     wasmCore: ArrayBuffer;
     created: Date;
-    validation?: ValidationResult;
+    validation?: TranspilerValidationResult;
 }
 
 export class WasmTranspiler {

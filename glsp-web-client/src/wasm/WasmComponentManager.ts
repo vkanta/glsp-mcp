@@ -10,8 +10,8 @@ import { WasmFileChangeEvent } from '../diagrams/wasm-file-watcher.js';
 export class WasmComponentManager implements WasmChangeListener {
     private wasmComponentPalette: WasmComponentPalette;
     protected mcpService: McpService;
-    private diagramService: DiagramService;
-    private renderer?: CanvasRenderer;
+    protected diagramService: DiagramService;
+    protected renderer?: CanvasRenderer;
     private loadedComponents: Map<string, any> = new Map(); // Track loaded WASM components
     private jcoRuntime?: any; // Will hold jco/wasi-gfx runtime
     private changeNotifier: WasmChangeNotifier;
@@ -79,7 +79,7 @@ export class WasmComponentManager implements WasmChangeListener {
         if (!currentDiagram) return;
         
         let needsUpdate = false;
-        currentDiagram.elements.forEach(element => {
+        Object.values(currentDiagram.elements).forEach(element => {
             if (element.type === 'wasm-component' && 
                 element.properties?.componentPath?.includes(componentName)) {
                 element.properties.isMissing = true;
@@ -98,7 +98,7 @@ export class WasmComponentManager implements WasmChangeListener {
         if (!currentDiagram) return;
         
         let needsUpdate = false;
-        currentDiagram.elements.forEach(element => {
+        Object.values(currentDiagram.elements).forEach(element => {
             if (element.type === 'wasm-component' && 
                 element.properties?.componentPath?.includes(componentName)) {
                 // Clear missing flag if it was set

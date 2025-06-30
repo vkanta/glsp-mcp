@@ -357,7 +357,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
             if (element.type === 'wasm-component' || element.type === 'WASM Component') {
                 const componentName = element.properties?.componentName || element.properties?.name || 'Unknown';
                 const isLoaded = this.isComponentLoaded(elementId);
-                const isTranspiled = this.registry.hasComponent(componentName as string);
+                const isTranspiled = this.registry.getComponent(componentName as string) !== null;
                 
                 wasmComponents.push({
                     elementId,
@@ -447,13 +447,13 @@ export class WasmRuntimeManager extends WasmComponentManager {
         if (!loadedComponent) throw new Error('Component not loaded');
         
         // Transpile using the transpiler
-        const transpiledResult = await this.transpiler.transpile(
-            new Uint8Array(loadedComponent.module), // Assuming module contains the WASM bytes
+        const transpiledResult = await this.transpiler.transpileComponent(
+            loadedComponent.module, // ArrayBuffer
             componentName as string
         );
         
         // Register the transpiled component
-        await this.registry.registerComponent(transpiledResult.metadata, transpiledResult.jsCode);
+        this.registry.registerComponent(transpiledResult);
         
         // Update displays
         this.refreshClientSideComponents();
