@@ -145,7 +145,7 @@ export class AIService {
     public async analyzeDiagram(diagramId: string): Promise<string> {
         try {
             const result = await this.diagramAgent.analyzeDiagram(diagramId, 'comprehensive');
-            return result.analysis || 'No analysis available';
+            return result.message || 'No analysis available';
         } catch (error) {
             console.error('Failed to analyze diagram:', error);
             return 'Analysis failed: ' + error;
@@ -155,7 +155,7 @@ export class AIService {
     public async suggestLayoutImprovements(diagramId: string): Promise<string> {
         try {
             const result = await this.diagramAgent.optimizeDiagram(diagramId, 'layout');
-            return result.suggestions || 'Layout has been optimized. No additional suggestions.';
+            return result.message || 'Layout has been optimized. No additional suggestions.';
         } catch (error) {
             console.error('Failed to suggest layout improvements:', error);
             return 'Failed to generate suggestions: ' + error;

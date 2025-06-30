@@ -166,11 +166,13 @@ export class OllamaClient {
             }
         } catch (error) {
             console.error('Ollama connection check failed:', error);
-            console.error('Error details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
-            });
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
             
             // Try alternative health check
             return await this.tryAlternativeHealthCheck();

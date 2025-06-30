@@ -1,4 +1,4 @@
-import { WasmFileChangeEvent, WasmChangeType } from '../diagrams/wasm-file-watcher.js';
+import { WasmFileChangeEvent } from '../diagrams/wasm-file-watcher.js';
 import { McpService } from './McpService.js';
 
 export interface WasmChangeListener {
@@ -88,7 +88,7 @@ export class WasmChangeNotifier {
     
     private notifyChange(eventType: string, component: any): void {
         const clientEvent: WasmFileChangeEvent = {
-            type: eventType as WasmChangeType,
+            type: eventType as 'added' | 'changed' | 'removed',
             path: component.path || '',
             component: {
                 name: component.name,
@@ -126,7 +126,7 @@ export class WasmChangeNotifier {
     private handleWasmChange(serverChange: WasmServerChange): void {
         // Convert server change format to client format
         const clientEvent: WasmFileChangeEvent = {
-            type: serverChange.event_type as WasmChangeType,
+            type: serverChange.event_type as 'added' | 'changed' | 'removed',
             path: serverChange.path,
             component: {
                 name: serverChange.component_name,
