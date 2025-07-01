@@ -1,10 +1,15 @@
 mod filesystem_watcher;
+mod security_scanner;
 mod wit_analyzer;
 
 pub use filesystem_watcher::{FileSystemWatcher, WasmChangeType, WasmComponentChange};
+pub use security_scanner::{
+    SecurityAnalysis, SecurityIssue, SecurityIssueType, SecurityRiskLevel, WasmSecurityScanner,
+};
 pub use wit_analyzer::{
-    ComponentWitAnalysis, WitAnalyzer, WitDependency, WitFunction, WitInterface, WitInterfaceType,
-    WitParam, WitType, WitTypeDefinition,
+    ComponentWitAnalysis, WitAnalyzer, WitCompatibilityReport, WitDependency, WitFunction, 
+    WitInterface, WitInterfaceType, WitParam, WitType, WitTypeDefinition, WitValidationIssue,
+    WitValidationIssueType, WitValidationSeverity,
 };
 
 use chrono::{DateTime, Utc};
@@ -44,12 +49,15 @@ pub struct WasmComponent {
     pub metadata: HashMap<String, serde_json::Value>,
     pub wit_interfaces: Option<String>, // Raw WIT content
     pub dependencies: Vec<String>,
+    pub security_analysis: Option<SecurityAnalysis>,
+    pub last_security_scan: Option<DateTime<Utc>>,
 }
 
 pub struct WasmFileWatcher {
     watch_path: PathBuf,
     components: HashMap<String, WasmComponent>,
     last_scan: DateTime<Utc>,
+    security_scanner: WasmSecurityScanner,
 }
 
 impl WasmFileWatcher {
@@ -58,6 +66,7 @@ impl WasmFileWatcher {
             watch_path,
             components: HashMap::new(),
             last_scan: Utc::now(),
+            security_scanner: WasmSecurityScanner::new(),
         }
     }
 
@@ -205,6 +214,19 @@ impl WasmFileWatcher {
                     .unwrap_or(&format!("ADAS component: {component_name}"))
                     .to_string();
 
+                // Perform security analysis
+                let security_analysis = match self.security_scanner.analyze_component(wasm_path).await {
+                    Ok(analysis) => {
+                        println!("✅ Security analysis completed for {}: {:?} risk", 
+                                component_name, analysis.overall_risk);
+                        Some(analysis)
+                    }
+                    Err(e) => {
+                        println!("⚠️  Security analysis failed for {}: {}", component_name, e);
+                        None
+                    }
+                };
+
                 Ok(WasmComponent {
                     name: component_name,
                     path: wasm_path.to_string_lossy().to_string(),
@@ -216,6 +238,8 @@ impl WasmFileWatcher {
                     metadata,
                     wit_interfaces: wit_content,
                     dependencies,
+                    security_analysis,
+                    last_security_scan: Some(Utc::now()),
                 })
             }
             Err(e) => {
@@ -286,6 +310,8 @@ impl WasmFileWatcher {
                     metadata: HashMap::new(),
                     wit_interfaces: None,
                     dependencies: Vec::new(),
+                    security_analysis: None,
+                    last_security_scan: None,
                 })
             }
         }
@@ -586,6 +612,29 @@ impl WasmFileWatcher {
         false
     }
 
+    /// Get security analysis for a specific component
+    pub fn get_security_analysis(&self, component_name: &str) -> Option<&SecurityAnalysis> {
+        self.components.get(component_name)
+            .and_then(|comp| comp.security_analysis.as_ref())
+    }
+
+    /// Get security risk summary for all components
+    pub fn get_security_summary(&self) -> HashMap<SecurityRiskLevel, usize> {
+        let mut summary = HashMap::new();
+        summary.insert(SecurityRiskLevel::Low, 0);
+        summary.insert(SecurityRiskLevel::Medium, 0);
+        summary.insert(SecurityRiskLevel::High, 0);
+        summary.insert(SecurityRiskLevel::Critical, 0);
+
+        for component in self.components.values() {
+            if let Some(analysis) = &component.security_analysis {
+                *summary.entry(analysis.overall_risk.clone()).or_insert(0) += 1;
+            }
+        }
+
+        summary
+    }
+
     /// Display comprehensive statistics after component scan
     async fn display_scan_statistics(&self) {
         let total_components = self.components.len();
@@ -601,6 +650,11 @@ impl WasmFileWatcher {
         let mut interface_types = std::collections::HashMap::new();
         let mut dependency_count = 0;
 
+        // Security statistics
+        let mut components_with_security_analysis = 0;
+        let security_summary = self.get_security_summary();
+        let mut total_security_issues = 0;
+
         for component in self.components.values() {
             if !component.file_exists {
                 continue;
@@ -611,6 +665,11 @@ impl WasmFileWatcher {
 
             if component.wit_interfaces.is_some() {
                 components_with_wit += 1;
+            }
+
+            if let Some(security_analysis) = &component.security_analysis {
+                components_with_security_analysis += 1;
+                total_security_issues += security_analysis.issues.len();
             }
 
             for interface in &component.interfaces {
@@ -764,6 +823,42 @@ impl WasmFileWatcher {
                 let interface_count = component.interfaces.len();
                 let dep_count = component.dependencies.len();
                 println!("   {rank}. {name} - {interface_count} interfaces, {dep_count} deps {wit_status}");
+            }
+            println!();
+        }
+
+        // Security Analysis Summary
+        if components_with_security_analysis > 0 {
+            println!("🔒 Security Analysis Summary:");
+            let security_coverage = if available_components > 0 {
+                (components_with_security_analysis as f64 / available_components as f64) * 100.0
+            } else {
+                0.0
+            };
+            println!("   Security Coverage: {components_with_security_analysis}/{available_components} ({security_coverage:.1}%)");
+            println!("   Total Security Issues: {total_security_issues}");
+            
+            for (risk_level, count) in &security_summary {
+                if *count > 0 {
+                    let icon = match risk_level {
+                        SecurityRiskLevel::Critical => "🔴",
+                        SecurityRiskLevel::High => "🟠", 
+                        SecurityRiskLevel::Medium => "🟡",
+                        SecurityRiskLevel::Low => "🟢",
+                    };
+                    println!("   {icon} {:?}: {count} components", risk_level);
+                }
+            }
+            
+            // Security recommendations
+            let critical_count = security_summary.get(&SecurityRiskLevel::Critical).unwrap_or(&0);
+            let high_count = security_summary.get(&SecurityRiskLevel::High).unwrap_or(&0);
+            
+            if *critical_count > 0 {
+                println!("   ⚠️  URGENT: {critical_count} components have critical security issues!");
+            }
+            if *high_count > 0 {
+                println!("   ⚠️  WARNING: {high_count} components have high-risk security issues");
             }
             println!();
         }

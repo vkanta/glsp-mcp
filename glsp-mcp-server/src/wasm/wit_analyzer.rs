@@ -97,6 +97,48 @@ pub struct WitVariantCase {
     pub payload: Option<WitType>,
 }
 
+/// WIT validation issue severity levels
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum WitValidationSeverity {
+    Info,
+    Warning,
+    Error,
+    Critical,
+}
+
+/// WIT validation issue types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WitValidationIssueType {
+    MissingInterface { expected: String },
+    IncompatibleType { interface: String, expected: String, found: String },
+    CircularDependency { cycle: Vec<String> },
+    UndefinedType { type_name: String, location: String },
+    InterfaceContract { interface: String, issue: String },
+    InvalidSignature { function: String, issue: String },
+    ResourceConstraint { resource: String, constraint: String },
+}
+
+/// Individual WIT validation issue
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WitValidationIssue {
+    pub issue_type: WitValidationIssueType,
+    pub severity: WitValidationSeverity,
+    pub message: String,
+    pub suggestion: Option<String>,
+    pub location: Option<String>,
+}
+
+/// Compatibility assessment between components
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WitCompatibilityReport {
+    pub is_compatible: bool,
+    pub compatibility_score: f64, // 0.0 to 1.0
+    pub missing_imports: Vec<String>,
+    pub incompatible_exports: Vec<String>,
+    pub type_mismatches: Vec<(String, String)>,
+    pub suggestions: Vec<String>,
+}
+
 /// Complete WIT analysis result for a component
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentWitAnalysis {
@@ -107,6 +149,9 @@ pub struct ComponentWitAnalysis {
     pub types: Vec<WitType>,
     pub dependencies: Vec<WitDependency>,
     pub raw_wit: Option<String>,
+    pub validation_results: Vec<WitValidationIssue>,
+    pub compatibility_report: Option<WitCompatibilityReport>,
+    pub analysis_timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 /// Dependency information
@@ -184,6 +229,9 @@ impl WitAnalyzer {
             types: vec![],
             dependencies: vec![],
             raw_wit: Some("// Core WebAssembly module - no WIT interfaces available".to_string()),
+            validation_results: vec![],
+            compatibility_report: None,
+            analysis_timestamp: chrono::Utc::now(),
         })
     }
 
@@ -257,6 +305,12 @@ impl WitAnalyzer {
         // Generate raw WIT content
         let raw_wit = Self::generate_wit_text(resolve, world_id)?;
 
+        // Perform validation on the analysis
+        let mut validation_results = Vec::new();
+        Self::validate_interfaces(&imports, &exports, &mut validation_results).await;
+        Self::validate_type_consistency(&all_types, &mut validation_results).await;
+        Self::validate_dependencies(&dependencies, &mut validation_results).await;
+
         Ok(ComponentWitAnalysis {
             component_name,
             world_name: Some(world.name.clone()),
@@ -265,6 +319,9 @@ impl WitAnalyzer {
             types: all_types,
             dependencies,
             raw_wit: Some(raw_wit),
+            validation_results,
+            compatibility_report: None, // Will be generated when comparing with other components
+            analysis_timestamp: chrono::Utc::now(),
         })
     }
 
@@ -304,6 +361,11 @@ impl WitAnalyzer {
         let package_types = Self::extract_types_from_package(resolve, package).await?;
         all_types.extend(package_types);
 
+        // Perform validation on the package analysis
+        let mut validation_results = Vec::new();
+        Self::validate_interfaces(&[], &exports, &mut validation_results).await;
+        Self::validate_type_consistency(&all_types, &mut validation_results).await;
+
         Ok(ComponentWitAnalysis {
             component_name,
             world_name: None,
@@ -312,6 +374,9 @@ impl WitAnalyzer {
             types: all_types,
             dependencies: vec![],
             raw_wit: None,
+            validation_results,
+            compatibility_report: None,
+            analysis_timestamp: chrono::Utc::now(),
         })
     }
 
@@ -681,6 +746,254 @@ impl WitAnalyzer {
 
         println!("=====================================");
         Ok(())
+    }
+
+    /// Validate interface contracts and compatibility
+    async fn validate_interfaces(
+        imports: &[WitInterface],
+        exports: &[WitInterface],
+        validation_results: &mut Vec<WitValidationIssue>,
+    ) {
+        // Check for interface naming conflicts
+        let mut interface_names = std::collections::HashSet::new();
+        
+        for interface in imports.iter().chain(exports.iter()) {
+            if !interface_names.insert(&interface.name) {
+                validation_results.push(WitValidationIssue {
+                    issue_type: WitValidationIssueType::InterfaceContract {
+                        interface: interface.name.clone(),
+                        issue: "Duplicate interface name".to_string(),
+                    },
+                    severity: WitValidationSeverity::Error,
+                    message: format!("Interface '{}' is defined multiple times", interface.name),
+                    suggestion: Some("Rename one of the conflicting interfaces".to_string()),
+                    location: Some(format!("Interface: {}", interface.name)),
+                });
+            }
+        }
+
+        // Validate function signatures in interfaces
+        for interface in imports.iter().chain(exports.iter()) {
+            for function in &interface.functions {
+                // Check for functions without return types (might be intentional)
+                if function.results.is_empty() && function.name.contains("get") {
+                    validation_results.push(WitValidationIssue {
+                        issue_type: WitValidationIssueType::InvalidSignature {
+                            function: function.name.clone(),
+                            issue: "Getter function has no return value".to_string(),
+                        },
+                        severity: WitValidationSeverity::Warning,
+                        message: format!("Function '{}' appears to be a getter but has no return value", function.name),
+                        suggestion: Some("Consider adding a return type if this function should return data".to_string()),
+                        location: Some(format!("Interface: {}, Function: {}", interface.name, function.name)),
+                    });
+                }
+            }
+        }
+
+        // Check for balanced import/export interfaces for ADAS components
+        if imports.is_empty() && !exports.is_empty() {
+            validation_results.push(WitValidationIssue {
+                issue_type: WitValidationIssueType::InterfaceContract {
+                    interface: "component".to_string(),
+                    issue: "No imports defined".to_string(),
+                },
+                severity: WitValidationSeverity::Warning,
+                message: "Component has exports but no imports, which may indicate isolation".to_string(),
+                suggestion: Some("Consider if this component needs input interfaces".to_string()),
+                location: Some("Component structure".to_string()),
+            });
+        }
+    }
+
+    /// Validate type consistency and definitions
+    async fn validate_type_consistency(
+        types: &[WitType],
+        validation_results: &mut Vec<WitValidationIssue>,
+    ) {
+        let mut type_names = std::collections::HashSet::new();
+        
+        for wit_type in types {
+            // Check for duplicate type names
+            if !type_names.insert(&wit_type.name) {
+                validation_results.push(WitValidationIssue {
+                    issue_type: WitValidationIssueType::UndefinedType {
+                        type_name: wit_type.name.clone(),
+                        location: "Type definitions".to_string(),
+                    },
+                    severity: WitValidationSeverity::Error,
+                    message: format!("Type '{}' is defined multiple times", wit_type.name),
+                    suggestion: Some("Rename or merge duplicate type definitions".to_string()),
+                    location: Some(format!("Type: {}", wit_type.name)),
+                });
+            }
+
+            // Validate specific type definitions
+            match &wit_type.type_def {
+                WitTypeDefinition::Record { fields } => {
+                    if fields.is_empty() {
+                        validation_results.push(WitValidationIssue {
+                            issue_type: WitValidationIssueType::InvalidSignature {
+                                function: wit_type.name.clone(),
+                                issue: "Empty record type".to_string(),
+                            },
+                            severity: WitValidationSeverity::Warning,
+                            message: format!("Record type '{}' has no fields", wit_type.name),
+                            suggestion: Some("Consider if this empty record is intentional".to_string()),
+                            location: Some(format!("Type: {}", wit_type.name)),
+                        });
+                    }
+                }
+                WitTypeDefinition::Variant { cases } => {
+                    if cases.is_empty() {
+                        validation_results.push(WitValidationIssue {
+                            issue_type: WitValidationIssueType::InvalidSignature {
+                                function: wit_type.name.clone(),
+                                issue: "Empty variant type".to_string(),
+                            },
+                            severity: WitValidationSeverity::Error,
+                            message: format!("Variant type '{}' has no cases", wit_type.name),
+                            suggestion: Some("Add at least one variant case".to_string()),
+                            location: Some(format!("Type: {}", wit_type.name)),
+                        });
+                    }
+                }
+                WitTypeDefinition::Enum { cases } => {
+                    if cases.is_empty() {
+                        validation_results.push(WitValidationIssue {
+                            issue_type: WitValidationIssueType::InvalidSignature {
+                                function: wit_type.name.clone(),
+                                issue: "Empty enum type".to_string(),
+                            },
+                            severity: WitValidationSeverity::Error,
+                            message: format!("Enum type '{}' has no cases", wit_type.name),
+                            suggestion: Some("Add at least one enum value".to_string()),
+                            location: Some(format!("Type: {}", wit_type.name)),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Validate dependency relationships
+    async fn validate_dependencies(
+        dependencies: &[WitDependency],
+        validation_results: &mut Vec<WitValidationIssue>,
+    ) {
+        // Check for circular dependencies (simplified check)
+        let mut dependency_graph = std::collections::HashMap::new();
+        
+        for dep in dependencies {
+            dependency_graph.insert(&dep.package, &dep.interfaces);
+        }
+
+        // Check for excessive dependencies
+        if dependencies.len() > 10 {
+            validation_results.push(WitValidationIssue {
+                issue_type: WitValidationIssueType::ResourceConstraint {
+                    resource: "dependencies".to_string(),
+                    constraint: format!("Too many dependencies: {}", dependencies.len()),
+                },
+                severity: WitValidationSeverity::Warning,
+                message: format!("Component has {} dependencies, which may impact performance", dependencies.len()),
+                suggestion: Some("Consider consolidating or reducing dependencies".to_string()),
+                location: Some("Dependency list".to_string()),
+            });
+        }
+
+        // Check for missing standard ADAS dependencies for automotive components
+        let adas_standard_deps = ["wasi:io", "wasi:filesystem", "adas:sensors"];
+        let has_adas_marker = dependencies.iter().any(|dep| dep.package.contains("adas"));
+        
+        if has_adas_marker {
+            for expected_dep in &adas_standard_deps {
+                if !dependencies.iter().any(|dep| dep.package.contains(expected_dep)) {
+                    validation_results.push(WitValidationIssue {
+                        issue_type: WitValidationIssueType::MissingInterface {
+                            expected: expected_dep.to_string(),
+                        },
+                        severity: WitValidationSeverity::Info,
+                        message: format!("ADAS component might benefit from '{}' interface", expected_dep),
+                        suggestion: Some(format!("Consider adding {} dependency if needed", expected_dep)),
+                        location: Some("Dependency analysis".to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    /// Generate compatibility report between two components
+    pub async fn analyze_compatibility(
+        component_a: &ComponentWitAnalysis,
+        component_b: &ComponentWitAnalysis,
+    ) -> Result<WitCompatibilityReport> {
+        let mut missing_imports = Vec::new();
+        let mut incompatible_exports = Vec::new();
+        let mut type_mismatches = Vec::new();
+        let mut suggestions = Vec::new();
+
+        // Check if component A's exports satisfy component B's imports
+        for import in &component_b.imports {
+            let mut found_compatible = false;
+            
+            for export in &component_a.exports {
+                if import.name == export.name {
+                    found_compatible = true;
+                    
+                    // Check function compatibility
+                    for import_func in &import.functions {
+                        if let Some(export_func) = export.functions.iter().find(|f| f.name == import_func.name) {
+                            // Simple signature check
+                            if import_func.params.len() != export_func.params.len() ||
+                               import_func.results.len() != export_func.results.len() {
+                                type_mismatches.push((
+                                    format!("{}::{}", import.name, import_func.name),
+                                    "Parameter or return type count mismatch".to_string(),
+                                ));
+                            }
+                        } else {
+                            incompatible_exports.push(format!("{}::{}", import.name, import_func.name));
+                        }
+                    }
+                    break;
+                }
+            }
+            
+            if !found_compatible {
+                missing_imports.push(import.name.clone());
+            }
+        }
+
+        // Generate suggestions
+        if !missing_imports.is_empty() {
+            suggestions.push("Some required imports are not satisfied by the other component".to_string());
+        }
+        
+        if !type_mismatches.is_empty() {
+            suggestions.push("Type signatures need to be aligned between components".to_string());
+        }
+
+        // Calculate compatibility score
+        let total_imports = component_b.imports.len();
+        let satisfied_imports = total_imports - missing_imports.len();
+        let compatibility_score = if total_imports > 0 {
+            satisfied_imports as f64 / total_imports as f64
+        } else {
+            1.0 // No imports to satisfy
+        };
+
+        let is_compatible = missing_imports.is_empty() && type_mismatches.is_empty();
+
+        Ok(WitCompatibilityReport {
+            is_compatible,
+            compatibility_score,
+            missing_imports,
+            incompatible_exports,
+            type_mismatches,
+            suggestions,
+        })
     }
 }
 

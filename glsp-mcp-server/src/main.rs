@@ -1,4 +1,4 @@
-//! Main entry point for GLSP MCP Server using the PulseEngine MCP framework 0.2.0
+//! Main entry point for GLSP MCP Server using the PulseEngine MCP framework 0.3.0
 
 use clap::Parser;
 use glsp_mcp_server::{GlspBackend, GlspConfig};
@@ -68,14 +68,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     use pulseengine_mcp_transport::TransportConfig;
     server_config.transport_config = match config.transport.as_str() {
         "http" => TransportConfig::http(config.port),
+        "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
         "websocket" => TransportConfig::websocket(config.port),
         "stdio" => TransportConfig::stdio(),
         _ => {
             eprintln!(
-                "Unknown transport type: {}, defaulting to stdio",
+                "Unknown transport type: {}, defaulting to HTTP streaming",
                 config.transport
             );
-            TransportConfig::stdio()
+            TransportConfig::streamable_http(config.port)
         }
     };
 

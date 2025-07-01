@@ -30,8 +30,8 @@ pub struct GlspConfig {
     #[clap(short, long, default_value = "3000")]
     pub port: u16,
 
-    /// Transport type: 'stdio' or 'http' (default: http)
-    #[clap(long, default_value = "http")]
+    /// Transport type: 'stdio', 'http', or 'http-streaming' (default: http-streaming)
+    #[clap(long, default_value = "http-streaming")]
     pub transport: String,
 
     /// Force create directories if they don't exist
@@ -55,7 +55,7 @@ impl Default for GlspConfig {
             wasm_path: "../workspace/adas-wasm-components".to_string(),
             diagrams_path: "../workspace/diagrams".to_string(),
             port: 3000,
-            transport: "http".to_string(),
+            transport: "http-streaming".to_string(),
             force: false,
             server_name: "GLSP MCP Server".to_string(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),

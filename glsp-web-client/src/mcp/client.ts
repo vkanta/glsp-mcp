@@ -1,11 +1,12 @@
 /**
  * MCP HTTP Client for GLSP
- * Implements Model Context Protocol over HTTP with JSON-RPC
+ * Implements Model Context Protocol over HTTP with JSON-RPC and streaming
  * 
- * Updated for PulseEngine MCP Framework:
+ * Updated for PulseEngine MCP Framework 0.3.0:
  * - Using /messages endpoint for compatibility
  * - Session ID sent in headers (Mcp-Session-Id) instead of query params
- * - Compatible with the new framework's HTTP streaming transport
+ * - HTTP streaming support for real-time updates
+ * - Compatible with streamable_http transport
  */
 
 export interface JsonRpcRequest {
@@ -119,6 +120,9 @@ export class McpClient {
     private connectionListeners: ((connected: boolean) => void)[] = [];
     private sessionId: string | null = null;
     private notificationListeners: Map<string, ((notification: any) => void)[]> = new Map();
+    private streamingController?: AbortController;
+    private streamingActive: boolean = false;
+    private streamListeners: Map<string, ((data: any) => void)[]> = new Map();
 
     constructor(baseUrl: string = 'http://127.0.0.1:3000') {
         this.baseUrl = baseUrl;
@@ -323,6 +327,7 @@ export class McpClient {
 
     public disconnect(): void {
         this.stopPing();
+        this.stopStreaming();
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = undefined;
@@ -452,5 +457,160 @@ export class McpClient {
                 }
             });
         }
+    }
+
+    /// HTTP Streaming Support for MCP 0.3.0
+    
+    public addStreamListener(streamType: string, listener: (data: any) => void): void {
+        if (!this.streamListeners.has(streamType)) {
+            this.streamListeners.set(streamType, []);
+        }
+        this.streamListeners.get(streamType)!.push(listener);
+        
+        // Start streaming if not already active
+        if (!this.streamingActive) {
+            this.startStreaming();
+        }
+    }
+    
+    public removeStreamListener(streamType: string, listener: (data: any) => void): void {
+        const listeners = this.streamListeners.get(streamType);
+        if (listeners) {
+            const index = listeners.indexOf(listener);
+            if (index > -1) {
+                listeners.splice(index, 1);
+            }
+            // Clean up empty listener arrays
+            if (listeners.length === 0) {
+                this.streamListeners.delete(streamType);
+            }
+        }
+        
+        // Stop streaming if no more listeners
+        if (this.streamListeners.size === 0) {
+            this.stopStreaming();
+        }
+    }
+
+    private async startStreaming(): Promise<void> {
+        if (this.streamingActive) {
+            return;
+        }
+
+        console.log('McpClient: Starting HTTP streaming...');
+        this.streamingController = new AbortController();
+        this.streamingActive = true;
+
+        try {
+            const url = `${this.baseUrl}/stream`;
+            
+            const headers: Record<string, string> = {
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+            };
+            
+            if (this.sessionId) {
+                headers['Mcp-Session-Id'] = this.sessionId;
+            }
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers,
+                signal: this.streamingController.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP streaming failed: ${response.status}`);
+            }
+
+            if (!response.body) {
+                throw new Error('No response body for streaming');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (this.streamingActive) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    console.log('HTTP stream ended');
+                    break;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                this.processStreamChunk(chunk);
+            }
+
+        } catch (error: any) {
+            if (error.name !== 'AbortError') {
+                console.error('HTTP streaming error:', error);
+                this.notifyConnectionChange(false);
+                
+                // Attempt to reconnect streaming
+                setTimeout(() => {
+                    if (this.streamListeners.size > 0) {
+                        this.startStreaming();
+                    }
+                }, 5000);
+            }
+        } finally {
+            this.streamingActive = false;
+        }
+    }
+
+    private stopStreaming(): void {
+        if (this.streamingController) {
+            this.streamingController.abort();
+            this.streamingController = undefined;
+        }
+        this.streamingActive = false;
+        console.log('McpClient: HTTP streaming stopped');
+    }
+
+    private processStreamChunk(chunk: string): void {
+        // Process Server-Sent Events style chunks
+        const lines = chunk.split('\n');
+        let eventType = '';
+        let eventData = '';
+
+        for (const line of lines) {
+            if (line.startsWith('event:')) {
+                eventType = line.substring(6).trim();
+            } else if (line.startsWith('data:')) {
+                eventData += line.substring(5).trim() + '\n';
+            } else if (line.trim() === '') {
+                // End of event, process it
+                if (eventType && eventData) {
+                    this.handleStreamEvent(eventType, eventData.trim());
+                }
+                eventType = '';
+                eventData = '';
+            }
+        }
+    }
+
+    private handleStreamEvent(eventType: string, data: string): void {
+        try {
+            const parsedData = JSON.parse(data);
+            console.log(`McpClient: Received stream event '${eventType}':`, parsedData);
+            
+            const listeners = this.streamListeners.get(eventType);
+            if (listeners) {
+                listeners.forEach(listener => {
+                    try {
+                        listener(parsedData);
+                    } catch (error) {
+                        console.error('Error in stream listener:', error);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Failed to parse stream data:', error, 'Raw data:', data);
+        }
+    }
+
+    public isStreaming(): boolean {
+        return this.streamingActive;
     }
 }

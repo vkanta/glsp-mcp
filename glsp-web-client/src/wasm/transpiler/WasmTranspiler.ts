@@ -1,7 +1,8 @@
 // Note: @bytecodealliance/jco will be imported dynamically to avoid build errors
 // import { transpile } from '@bytecodealliance/jco';
-import { ComponentValidator, ValidationRules } from '../validation/ComponentValidator.js';
-import { SecurityScanner, SecurityScanResult } from '../validation/SecurityScanner.js';
+// Note: Validation moved to backend services via ValidationService
+// import { ComponentValidator, ValidationRules } from '../validation/ComponentValidator.js';
+// import { SecurityScanner, SecurityScanResult } from '../validation/SecurityScanner.js';
 
 export interface ComponentMetadata {
     name: string;
@@ -106,62 +107,19 @@ export class WasmTranspiler {
         }
     }
 
-    async validateComponent(wasmBytes: ArrayBuffer, metadata?: ComponentMetadata): Promise<ValidationResult> {
-        try {
-            // Run comprehensive validation
-            const validatorResult = await this.validator.validateComponent(wasmBytes, metadata);
-            
-            // Parse WASM module for security scanning
-            let securityScan: SecurityScanResult | undefined;
-            
-            try {
-                const module = await WebAssembly.compile(wasmBytes);
-                const imports = WebAssembly.Module.imports(module);
-                const exports = WebAssembly.Module.exports(module);
-                
-                // Run security scan
-                securityScan = await this.securityScanner.scanComponent(wasmBytes, imports, exports);
-                
-                // Add security risks to validation warnings/errors
-                securityScan.risks.forEach(risk => {
-                    if (risk.type === 'high') {
-                        validatorResult.errors.push({
-                            code: 'SECURITY_RISK_HIGH',
-                            message: `${risk.category}: ${risk.description}`,
-                            severity: 'error'
-                        });
-                    } else if (risk.type === 'medium') {
-                        validatorResult.warnings.push({
-                            code: 'SECURITY_RISK_MEDIUM',
-                            message: `${risk.category}: ${risk.description}`,
-                            severity: 'warning'
-                        });
-                    }
-                });
-            } catch (error) {
-                console.warn('Security scan failed:', error);
-                // Don't fail validation if security scan fails
-            }
-            
-            // Convert to legacy format for compatibility
-            const result: ValidationResult = {
-                valid: validatorResult.valid,
-                isValid: validatorResult.valid,
-                errors: validatorResult.errors.map(e => e.message),
-                warnings: validatorResult.warnings.map(w => w.message),
-                metadata: validatorResult.metadata,
-                securityScan
-            };
-            
-            return result;
-        } catch (error) {
-            return {
-                valid: false,
-                isValid: false,
-                errors: [`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`],
-                warnings: []
-            };
-        }
+    async validateComponent(wasmBytes: ArrayBuffer, metadata?: ComponentMetadata): Promise<any> {
+        // NOTE: Validation is now handled by backend services via ValidationService
+        // This method is kept for compatibility but returns a stub response
+        console.log('WasmTranspiler: Validation requests are now handled by backend services');
+        
+        return {
+            valid: true,
+            isValid: true,
+            errors: [],
+            warnings: ['Validation is now handled by backend services'],
+            metadata: metadata || null,
+            securityScan: null
+        };
     }
 
     async extractMetadata(wasmBytes: ArrayBuffer, providedName?: string): Promise<ComponentMetadata> {
