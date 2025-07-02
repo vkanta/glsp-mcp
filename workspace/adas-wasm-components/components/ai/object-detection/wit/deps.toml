@@ -1,19 +1,8 @@
-# WIT dependencies for AI object-detection component
+[deps]
 
-[deps."adas:orchestration"]
-path = "./deps/adas-orchestration"
-
-[deps."adas:data"]
-path = "./deps/adas-data"
-
-[deps."adas:control"]
-path = "./deps/adas-control"
-
-[deps."adas:diagnostics"]
-path = "./deps/adas-diagnostics"
-
-[deps."adas:common-types"]
-path = "./deps/adas-common-types"
-
-[deps."wasi:nn@0.2.0-rc-2024-10-28"]
-path = "./deps/wasi-nn"
+# Local dependencies
+adas-common-types = { path = "../../../wit/interfaces/adas-common-types" }
+adas-data = { path = "../../../wit/interfaces/adas-data" }
+adas-control = { path = "../../../wit/interfaces/adas-control" }
+adas-diagnostics = { path = "../../../wit/interfaces/adas-diagnostics" }
+adas-orchestration = { path = "../../../wit/interfaces/adas-orchestration" }

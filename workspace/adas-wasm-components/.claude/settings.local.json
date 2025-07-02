@@ -21,7 +21,9 @@
       "Bash(cp:*)",
       "Bash(rm:*)",
       "Bash(chmod:*)",
-      "Bash(./restore-wit.sh:*)"
+      "Bash(./restore-wit.sh:*)",
+      "Bash(rustc:*)",
+      "Bash(./run-live-demo)"
     ],
     "deny": []
   }

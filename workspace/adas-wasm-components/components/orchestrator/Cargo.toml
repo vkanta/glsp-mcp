@@ -1,24 +1,24 @@
 [package]
-name = "adas-behavior_prediction_ai"
+name = "adas-orchestrator"
 version = "0.1.0"
 edition = "2021"
-description = "Social-LSTM behavior prediction AI using WASI-NN"
+description = "ADAS Orchestrator - Coordinates data flow between components"
 license = "Apache-2.0"
-
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "adas:behavior-prediction"
+package = "adas:orchestrator"
 
 [dependencies]
 wit-bindgen = "0.33"
-ndarray = "0.15"
-lazy_static = "1.4"
-bytemuck = "1.13"
+tokio = { version = "1.0", features = ["full"] }
+crossbeam-channel = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+log = "0.4"
+lazy_static = "1.4"
 
 # Configuration for building WASM components
 [profile.release]

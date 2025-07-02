@@ -1,623 +1,510 @@
-// Object Detection AI - YOLOv5n ONNX model for vehicle/pedestrian detection
-// Uses WASI-NN for neural network inference
+// Object detection AI component with WASI-NN integration
+use ndarray::Array4;
+use std::sync::Mutex;
 
+// Generate bindings using generate_all pattern
 wit_bindgen::generate!({
     world: "ai-component",
     path: "wit/",
     generate_all,
 });
 
-use std::time::{SystemTime, UNIX_EPOCH};
-// TODO: Re-enable once WASI-NN dependencies are resolved
-// use wasi::nn::graph::{Graph, GraphBuilder, GraphEncoding};
-// use wasi::nn::tensor::{Tensor, TensorType};
-// use wasi::nn::inference::GraphExecutionContext;
+// Use the generated bindings
+use crate::exports::adas::control::ai_control::{
+    Guest as AiControlGuest, AiConfig, AiStatus, ModelType,
+};
+use crate::exports::adas::diagnostics::health_monitoring::{
+    Guest as HealthGuest, HealthReport, HealthStatus, SubsystemHealth, 
+    DiagnosticResult, TestExecution, TestResult,
+};
+use crate::exports::adas::diagnostics::performance_monitoring::{
+    Guest as PerformanceGuest, ExtendedPerformance, ResourceUsage, Metric,
+};
+
+// Import common types
+use crate::adas::common_types::types::{
+    Timestamp, PerformanceMetrics,
+};
+
+// Import WASI-NN types from generated bindings
+use crate::wasi::nn::graph::{Graph, GraphEncoding, ExecutionTarget, GraphBuilder};
+use crate::wasi::nn::tensor::{Tensor, TensorType};
+use crate::wasi::nn::inference::NamedTensor;
+
+// Static data - embedded test video and model
+static VIDEO_DATA: &[u8] = include_bytes!("../data/test_video_320x200.h264");
+static ONNX_MODEL: &[u8] = include_bytes!("../models/yolov5n.onnx");
+
+// Global state for model and processing
+static mut MODEL_LOADED: bool = false;
+static mut WASI_NN_READY: bool = false;
+static mut MODEL_GRAPH: Option<Graph> = None;
+static mut CURRENT_CONFIG: Option<AiConfig> = None;
+static mut INFERENCE_ACTIVE: bool = false;
+
+// Storage for last detections
+static mut LAST_DETECTION_COUNT: u32 = 0;
+static mut LAST_INFERENCE_TIME_MS: f32 = 0.0;
+
+// Thread-safe metrics storage
+lazy_static::lazy_static! {
+    static ref PERFORMANCE_METRICS: Mutex<PerformanceMetrics> = Mutex::new(PerformanceMetrics {
+        latency_avg_ms: 0.0,
+        latency_max_ms: 0.0,
+        cpu_utilization: 0.0,
+        memory_usage_mb: 0,
+        throughput_hz: 0.0,
+        error_rate: 0.0,
+    });
+    
+    static ref EXTENDED_PERFORMANCE: Mutex<ExtendedPerformance> = Mutex::new(ExtendedPerformance {
+        base_metrics: PerformanceMetrics {
+            latency_avg_ms: 0.0,
+            latency_max_ms: 0.0,
+            cpu_utilization: 0.0,
+            memory_usage_mb: 0,
+            throughput_hz: 0.0,
+            error_rate: 0.0,
+        },
+        component_specific: Vec::new(),
+        resource_usage: ResourceUsage {
+            cpu_cores_used: 1.0,
+            memory_allocated_mb: 128,
+            memory_peak_mb: 256,
+            disk_io_mb: 0.0,
+            network_io_mb: 0.0,
+            gpu_utilization: 0.75,
+            gpu_memory_mb: 512,
+        },
+        timestamp: 0,
+    });
+    
+    static ref HEALTH_REPORT: Mutex<HealthReport> = Mutex::new(HealthReport {
+        component_id: "adas-object-detection".to_string(),
+        overall_health: HealthStatus::Ok,
+        subsystem_health: Vec::new(),
+        last_diagnostic: None,
+        timestamp: 0,
+    });
+}
+
+// COCO class names for YOLOv5
+const COCO_CLASSES: &[&str] = &[
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
+    "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
+    "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
+    "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
+    "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
+    "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
+    "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
+    "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
+    "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+    "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
+    "toothbrush",
+];
 
 struct Component;
 
-// Embedded YOLOv5n ONNX model (3.8MB)
-static YOLOV5N_MODEL: &[u8] = include_bytes!("../../../../models/yolov5n.onnx");
-
-// AI state with WASI-NN graph (placeholders until dependencies resolved)
-// static mut MODEL_GRAPH: Option<Graph> = None;
-// static mut EXECUTION_CONTEXT: Option<GraphExecutionContext> = None;
-static mut MODEL_LOADED: bool = false;
-static mut INFERENCE_ACTIVE: bool = false;
-static mut WASI_NN_READY: bool = false;
-
-// YOLOv5n model parameters
-const INPUT_WIDTH: u32 = 640;
-const INPUT_HEIGHT: u32 = 640;
-const INPUT_CHANNELS: u32 = 3;
-const NUM_CLASSES: u32 = 80;  // COCO classes
-
-// Video frame parameters (from embedded video)
-const VIDEO_WIDTH: u32 = 320;
-const VIDEO_HEIGHT: u32 = 200;
-
-// YOLO preprocessing parameters
-const YOLO_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
-const YOLO_STD: [f32; 3] = [0.229, 0.224, 0.225];
-const CONFIDENCE_THRESHOLD: f32 = 0.5;
-const NMS_THRESHOLD: f32 = 0.45;
-
-// Helper functions
-fn get_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
-}
-
-// Preprocess video frame for YOLO input
-fn preprocess_video_frame(frame_data: &[u8]) -> Result<Vec<f32>, String> {
-    let frame_size = (VIDEO_WIDTH * VIDEO_HEIGHT * 3) as usize;
-    if frame_data.len() < frame_size {
-        return Err(format!("Frame data too small: {} < {}", frame_data.len(), frame_size));
-    }
-    
-    // Convert RGB bytes to normalized float32 tensor
-    let mut preprocessed = Vec::with_capacity((INPUT_WIDTH * INPUT_HEIGHT * INPUT_CHANNELS) as usize);
-    
-    // Resize from 320x200 to 640x640 with padding/letterboxing
-    let scale = (INPUT_WIDTH as f32 / VIDEO_WIDTH as f32).min(INPUT_HEIGHT as f32 / VIDEO_HEIGHT as f32);
-    let scaled_width = (VIDEO_WIDTH as f32 * scale) as u32;
-    let scaled_height = (VIDEO_HEIGHT as f32 * scale) as u32;
-    let pad_x = (INPUT_WIDTH - scaled_width) / 2;
-    let pad_y = (INPUT_HEIGHT - scaled_height) / 2;
-    
-    // Create YOLO input tensor with letterboxing
-    for c in 0..3 {
-        for y in 0..INPUT_HEIGHT {
-            for x in 0..INPUT_WIDTH {
-                let pixel_value = if x >= pad_x && x < pad_x + scaled_width && 
-                                    y >= pad_y && y < pad_y + scaled_height {
-                    // Scale back to original video coordinates
-                    let orig_x = ((x - pad_x) as f32 / scale) as u32;
-                    let orig_y = ((y - pad_y) as f32 / scale) as u32;
+impl AiControlGuest for Component {
+    fn load_model(config: AiConfig) -> Result<(), String> {
+        unsafe {
+            CURRENT_CONFIG = Some(config.clone());
+            
+            // Initialize WASI-NN
+            let model_bytes = match config.model_type {
+                ModelType::Detection => ONNX_MODEL,
+                _ => return Err("Unsupported model type".to_string()),
+            };
+            
+            // Load model through WASI-NN
+            let builders: Vec<GraphBuilder> = vec![model_bytes.to_vec()];
+            let encoding = GraphEncoding::Onnx;
+            let target = ExecutionTarget::Cpu;
+            
+            match wasi::nn::graph::load(&builders, encoding, target) {
+                Ok(graph) => {
+                    MODEL_GRAPH = Some(graph);
+                    MODEL_LOADED = true;
+                    WASI_NN_READY = true;
                     
-                    if orig_x < VIDEO_WIDTH && orig_y < VIDEO_HEIGHT {
-                        let idx = ((orig_y * VIDEO_WIDTH + orig_x) * 3 + c) as usize;
-                        frame_data[idx] as f32 / 255.0
-                    } else {
-                        0.5  // Gray padding
-                    }
-                } else {
-                    0.5  // Gray padding
-                };
-                
-                // Apply ImageNet normalization
-                let normalized = (pixel_value - YOLO_MEAN[c as usize]) / YOLO_STD[c as usize];
-                preprocessed.push(normalized);
+                    // Update health status
+                    let mut health = HEALTH_REPORT.lock().unwrap();
+                    health.overall_health = HealthStatus::Ok;
+                    health.subsystem_health = vec![
+                        SubsystemHealth {
+                            subsystem_name: "wasi-nn".to_string(),
+                            status: HealthStatus::Ok,
+                            details: "Model loaded successfully".to_string(),
+                        },
+                        SubsystemHealth {
+                            subsystem_name: "model".to_string(),
+                            status: HealthStatus::Ok,
+                            details: format!("YOLOv5n loaded, confidence threshold: {}", config.confidence_threshold),
+                        }
+                    ];
+                    
+                    Ok(())
+                }
+                Err(e) => {
+                    let mut health = HEALTH_REPORT.lock().unwrap();
+                    health.overall_health = HealthStatus::Error;
+                    health.subsystem_health.push(SubsystemHealth {
+                        subsystem_name: "wasi-nn".to_string(),
+                        status: HealthStatus::Error,
+                        details: format!("Failed to load model: {:?}", e),
+                    });
+                    Err(format!("WASI-NN model load failed: {:?}", e))
+                }
             }
         }
     }
     
-    Ok(preprocessed)
-}
-
-// WASI-NN inference function with video preprocessing
-fn run_object_detection_inference(image_data: &[u8]) -> Result<Vec<exports::adas::data::perception_data::PerceivedObject>, String> {
-    unsafe {
-        if !INFERENCE_ACTIVE {
-            return Err("Inference not active".to_string());
-        }
-        
-        println!("Object Detection: Processing {} bytes of video frame", image_data.len());
-        
-        // Preprocess video frame for YOLO
-        let preprocessed_tensor = preprocess_video_frame(image_data)?;
-        
-        // TODO: Real WASI-NN inference
-        // let input_tensor = Tensor::new(&[1, 3, 640, 640], TensorType::F32, tensor_data);
-        // let outputs = context.compute(input_tensor)?;
-        // let detections = parse_yolo_outputs(outputs)?;
-        
-        // For now, simulate realistic video-based detections
-        generate_video_based_detections(&preprocessed_tensor)
-    }
-}
-
-// COCO class to ADAS object type mapping
-fn map_coco_to_adas_type(coco_class: u32) -> adas::common_types::types::ObjectType {
-    match coco_class {
-        0 => adas::common_types::types::ObjectType::Pedestrian,  // person
-        1 => adas::common_types::types::ObjectType::Bicycle,     // bicycle
-        2 => adas::common_types::types::ObjectType::Car,         // car
-        3 => adas::common_types::types::ObjectType::Motorcycle,  // motorcycle
-        5 => adas::common_types::types::ObjectType::Bus,         // bus
-        7 => adas::common_types::types::ObjectType::Truck,       // truck
-        9..=10 => adas::common_types::types::ObjectType::TrafficLight, // traffic light/stop sign
-        _ => adas::common_types::types::ObjectType::Unknown,
-    }
-}
-
-// Generate video-based detection results (simulating YOLO output)
-fn generate_video_based_detections(preprocessed_tensor: &[f32]) -> Result<Vec<exports::adas::data::perception_data::PerceivedObject>, String> {
-    // Analyze preprocessed tensor for basic scene understanding
-    let avg_brightness = preprocessed_tensor.iter().take(1000).map(|&x| x).sum::<f32>() / 1000.0;
-    
-    let mut detected_objects = Vec::new();
-    let timestamp = get_timestamp();
-    
-    // Simulate detection based on video analysis
-    // CarND dataset typically contains highway/urban driving scenarios
-    
-    // Main vehicle ahead (common in driving videos)
-    if avg_brightness > -0.2 {  // Daytime scene
-        detected_objects.push(exports::adas::data::perception_data::PerceivedObject {
-            object_id: 1,
-            object_type: adas::common_types::types::ObjectType::Car,
-            position: adas::common_types::types::Position3d {
-                x: 25.0 + (avg_brightness * 10.0),  // Vary position based on scene
-                y: 0.0,
-                z: 0.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            velocity: adas::common_types::types::Velocity3d {
-                vx: 15.0,  // Moving away
-                vy: 0.0,
-                vz: 0.0,
-                speed: 15.0,
-            },
-            acceleration: adas::common_types::types::Acceleration3d {
-                ax: -0.5,
-                ay: 0.0,
-                az: 0.0,
-                magnitude: 0.5,
-            },
-            bounding_box: adas::common_types::types::BoundingBox3d {
-                center: adas::common_types::types::Position3d {
-                    x: 25.0,
-                    y: 0.0,
-                    z: 0.0,
-                    coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-                },
-                dimensions: adas::common_types::types::Dimensions3d {
-                    length: 4.2,
-                    width: 1.8,
-                    height: 1.4,
-                },
-                orientation: adas::common_types::types::Quaternion {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    w: 1.0,
-                },
-            },
-            confidence: 0.87,
-            tracking_state: exports::adas::data::perception_data::TrackingState::Stable,
-            timestamp,
-        });
-    }
-    
-    // Lane markers/signs (common in highway scenes)
-    if avg_brightness > -0.1 {
-        detected_objects.push(exports::adas::data::perception_data::PerceivedObject {
-            object_id: 2,
-            object_type: adas::common_types::types::ObjectType::TrafficSign,
-            position: adas::common_types::types::Position3d {
-                x: 12.0,
-                y: 3.5,
-                z: 2.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            velocity: adas::common_types::types::Velocity3d {
-                vx: 0.0,
-                vy: 0.0,
-                vz: 0.0,
-                speed: 0.0,
-            },
-            acceleration: adas::common_types::types::Acceleration3d {
-                ax: 0.0,
-                ay: 0.0,
-                az: 0.0,
-                magnitude: 0.0,
-            },
-            bounding_box: adas::common_types::types::BoundingBox3d {
-                center: adas::common_types::types::Position3d {
-                    x: 12.0,
-                    y: 3.5,
-                    z: 2.0,
-                    coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-                },
-                dimensions: adas::common_types::types::Dimensions3d {
-                    length: 0.3,
-                    width: 0.8,
-                    height: 1.2,
-                },
-                orientation: adas::common_types::types::Quaternion {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    w: 1.0,
-                },
-            },
-            confidence: 0.72,
-            tracking_state: exports::adas::data::perception_data::TrackingState::Stable,
-            timestamp,
-        });
-    }
-    
-    // Occasional pedestrian or cyclist (urban scenarios)
-    if avg_brightness > 0.1 && (timestamp % 3000) < 1000 {  // Appear periodically
-        detected_objects.push(exports::adas::data::perception_data::PerceivedObject {
-            object_id: 3,
-            object_type: adas::common_types::types::ObjectType::Pedestrian,
-            position: adas::common_types::types::Position3d {
-                x: 8.0,
-                y: 4.0,
-                z: 0.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            velocity: adas::common_types::types::Velocity3d {
-                vx: 1.3,
-                vy: 0.2,
-                vz: 0.0,
-                speed: 1.32,
-            },
-            acceleration: adas::common_types::types::Acceleration3d {
-                ax: 0.0,
-                ay: 0.0,
-                az: 0.0,
-                magnitude: 0.0,
-            },
-            bounding_box: adas::common_types::types::BoundingBox3d {
-                center: adas::common_types::types::Position3d {
-                    x: 8.0,
-                    y: 4.0,
-                    z: 0.0,
-                    coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-                },
-                dimensions: adas::common_types::types::Dimensions3d {
-                    length: 0.6,
-                    width: 0.4,
-                    height: 1.7,
-                },
-                orientation: adas::common_types::types::Quaternion {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    w: 1.0,
-                },
-            },
-            confidence: 0.79,
-            tracking_state: exports::adas::data::perception_data::TrackingState::New,
-            timestamp,
-        });
-    }
-    
-    Ok(detected_objects)
-}
-
-// Legacy mock detection function (kept for compatibility)
-fn generate_mock_detections() -> Result<Vec<exports::adas::data::perception_data::PerceivedObject>, String> {
-    let mut detected_objects = Vec::new();
-    
-    // Mock detected objects for demonstration (will be replaced with real YOLO output parsing)
-    detected_objects.push(exports::adas::data::perception_data::PerceivedObject {
-        object_id: 1,
-        object_type: adas::common_types::types::ObjectType::Car,
-        position: adas::common_types::types::Position3d {
-            x: 10.0,
-            y: 0.0,
-            z: 0.0,
-            coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-        },
-        velocity: adas::common_types::types::Velocity3d {
-            vx: 0.0,
-            vy: 0.0,
-            vz: 0.0,
-            speed: 0.0,
-        },
-        acceleration: adas::common_types::types::Acceleration3d {
-            ax: 0.0,
-            ay: 0.0,
-            az: 0.0,
-            magnitude: 0.0,
-        },
-        bounding_box: adas::common_types::types::BoundingBox3d {
-            center: adas::common_types::types::Position3d {
-                x: 10.0,
-                y: 0.0,
-                z: 0.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            dimensions: adas::common_types::types::Dimensions3d {
-                length: 4.5,
-                width: 1.8,
-                height: 1.5,
-            },
-            orientation: adas::common_types::types::Quaternion {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 1.0,
-            },
-        },
-        confidence: 0.85,
-        tracking_state: exports::adas::data::perception_data::TrackingState::New,
-        timestamp: get_timestamp(),
-    });
-    
-    // Add a pedestrian detection
-    detected_objects.push(exports::adas::data::perception_data::PerceivedObject {
-        object_id: 2,
-        object_type: adas::common_types::types::ObjectType::Pedestrian,
-        position: adas::common_types::types::Position3d {
-            x: 5.0,
-            y: 2.0,
-            z: 0.0,
-            coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-        },
-        velocity: adas::common_types::types::Velocity3d {
-            vx: 1.2,
-            vy: 0.0,
-            vz: 0.0,
-            speed: 1.2,
-        },
-        acceleration: adas::common_types::types::Acceleration3d {
-            ax: 0.0,
-            ay: 0.0,
-            az: 0.0,
-            magnitude: 0.0,
-        },
-        bounding_box: adas::common_types::types::BoundingBox3d {
-            center: adas::common_types::types::Position3d {
-                x: 5.0,
-                y: 2.0,
-                z: 0.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            dimensions: adas::common_types::types::Dimensions3d {
-                length: 0.6,
-                width: 0.4,
-                height: 1.8,
-            },
-            orientation: adas::common_types::types::Quaternion {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 1.0,
-            },
-        },
-        confidence: 0.92,
-        tracking_state: exports::adas::data::perception_data::TrackingState::Stable,
-        timestamp: get_timestamp(),
-    });
-    
-    Ok(detected_objects)
-}
-
-// Process video frame and generate real-time detections
-pub fn process_video_frame(frame_data: &[u8], frame_number: u32) -> Result<exports::adas::data::perception_data::SceneModel, String> {\n    println!(\"Object Detection: Processing video frame #{}\", frame_number);\n    \n    let detected_objects = run_object_detection_inference(frame_data)?;\n    \n    Ok(exports::adas::data::perception_data::SceneModel {\n        objects: detected_objects,\n        ego_state: exports::adas::data::perception_data::EgoVehicleState {\n            position: adas::common_types::types::Position3d {\n                x: 0.0,\n                y: 0.0,\n                z: 0.0,\n                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,\n            },\n            velocity: adas::common_types::types::Velocity3d {\n                vx: 20.0,  // Simulated ego velocity from video\n                vy: 0.0,\n                vz: 0.0,\n                speed: 20.0,\n            },\n            acceleration: adas::common_types::types::Acceleration3d {\n                ax: 0.0,\n                ay: 0.0,\n                az: 0.0,\n                magnitude: 0.0,\n            },\n            heading: 0.0,\n            yaw_rate: 0.0,\n        },\n        timestamp: get_timestamp(),\n        confidence: 0.88,\n    })\n}\n\n// Process sensor data and generate perception data (legacy interface)\npub fn process_camera_data(sensor_data: &adas::data::sensor_data::CameraData) -> Result<exports::adas::data::perception_data::SceneModel, String> {\n    let detected_objects = run_object_detection_inference(&sensor_data.image_data)?;
-    
-    Ok(exports::adas::data::perception_data::SceneModel {
-        objects: detected_objects,
-        ego_state: exports::adas::data::perception_data::EgoVehicleState {
-            position: adas::common_types::types::Position3d {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                coordinate_frame: adas::common_types::types::CoordinateFrame::Local,
-            },
-            velocity: adas::common_types::types::Velocity3d {
-                vx: 0.0,
-                vy: 0.0,
-                vz: 0.0,
-                speed: 0.0,
-            },
-            acceleration: adas::common_types::types::Acceleration3d {
-                ax: 0.0,
-                ay: 0.0,
-                az: 0.0,
-                magnitude: 0.0,
-            },
-            heading: 0.0,
-            yaw_rate: 0.0,
-        },
-        timestamp: sensor_data.timestamp,
-        confidence: 0.90,
-    })
-}
-
-// Implement standardized AI control interface
-impl exports::adas::control::ai_control::Guest for Component {
-    fn load_model(config: exports::adas::control::ai_control::AiConfig) -> Result<(), String> {
-        unsafe {
-            println!("Object Detection: Loading YOLOv5n model ({} bytes) - WASI-NN integration pending", YOLOV5N_MODEL.len());
-            
-            // TODO: Implement WASI-NN model loading once dependencies are resolved
-            // let graph_builder = GraphBuilder::new(GraphEncoding::Onnx, target);
-            // MODEL_GRAPH = Some(graph_builder.build_from_bytes(YOLOV5N_MODEL)?);
-            
-            MODEL_LOADED = true;
-            WASI_NN_READY = false; // Will be true once WASI-NN is properly integrated
-            println!("Object Detection: YOLOv5n model loaded - ready for WASI-NN integration");
-            Ok(())
-        }
-    }
-
     fn start_inference() -> Result<(), String> {
         unsafe {
             if !MODEL_LOADED {
                 return Err("Model not loaded".to_string());
             }
             
-            // TODO: Initialize WASI-NN execution context once dependencies are resolved
-            // EXECUTION_CONTEXT = Some(MODEL_GRAPH.as_ref().unwrap().init_execution_context()?);
-            
             INFERENCE_ACTIVE = true;
-            println!("Object Detection: Inference started - WASI-NN integration pending");
+            
+            // Start processing video frames
+            process_video_stream()?;
+            
             Ok(())
         }
     }
-
+    
     fn stop_inference() -> Result<(), String> {
         unsafe {
-            // EXECUTION_CONTEXT = None;
             INFERENCE_ACTIVE = false;
-            println!("Object Detection: Inference stopped");
+            Ok(())
         }
-        Ok(())
     }
-
-    fn update_config(_config: exports::adas::control::ai_control::AiConfig) -> Result<(), String> {
-        println!("Object Detection: Configuration updated");
-        Ok(())
-    }
-
-    fn get_status() -> exports::adas::control::ai_control::AiStatus {
+    
+    fn update_config(config: AiConfig) -> Result<(), String> {
         unsafe {
-            if INFERENCE_ACTIVE {
-                adas::common_types::types::HealthStatus::Ok
+            CURRENT_CONFIG = Some(config);
+            Ok(())
+        }
+    }
+    
+    fn get_status() -> AiStatus {
+        unsafe {
+            if MODEL_LOADED && INFERENCE_ACTIVE {
+                HealthStatus::Ok
             } else if MODEL_LOADED {
-                adas::common_types::types::HealthStatus::Degraded
+                HealthStatus::Degraded
             } else {
-                adas::common_types::types::HealthStatus::Offline
+                HealthStatus::Offline
             }
         }
     }
-
-    fn get_performance() -> exports::adas::control::ai_control::PerformanceMetrics {
-        adas::common_types::types::PerformanceMetrics {
-            latency_avg_ms: 30.0,
-            latency_max_ms: 50.0, 
-            cpu_utilization: 0.60,
-            memory_usage_mb: 512,
-            throughput_hz: 20.0,
-            error_rate: 0.01,
-        }
+    
+    fn get_performance() -> PerformanceMetrics {
+        PERFORMANCE_METRICS.lock().unwrap().clone()
     }
 }
 
-// Note: perception-data and planning-data interfaces only provide types, no trait to implement
-
-// Implement health monitoring interface
-impl exports::adas::diagnostics::health_monitoring::Guest for Component {
-    fn get_health() -> exports::adas::diagnostics::health_monitoring::HealthReport {
-        exports::adas::diagnostics::health_monitoring::HealthReport {
-            component_id: String::from("object-detection"),
-            overall_health: unsafe {
-                if INFERENCE_ACTIVE {
-                    adas::common_types::types::HealthStatus::Ok
-                } else if MODEL_LOADED {
-                    adas::common_types::types::HealthStatus::Degraded
-                } else {
-                    adas::common_types::types::HealthStatus::Offline
-                }
-            },
-            subsystem_health: vec![
-                exports::adas::diagnostics::health_monitoring::SubsystemHealth {
-                    subsystem_name: String::from("yolov5n-model"),
-                    status: unsafe {
-                        if MODEL_LOADED {
-                            adas::common_types::types::HealthStatus::Ok
-                        } else {
-                            adas::common_types::types::HealthStatus::Offline
-                        }
+impl HealthGuest for Component {
+    fn get_health() -> HealthReport {
+        HEALTH_REPORT.lock().unwrap().clone()
+    }
+    
+    fn run_diagnostic() -> Result<DiagnosticResult, String> {
+        let mut test_results = Vec::new();
+        let start_time = std::time::Instant::now();
+        
+        // Test WASI-NN availability
+        unsafe {
+            test_results.push(TestExecution {
+                test_name: "wasi-nn-availability".to_string(),
+                test_result: if WASI_NN_READY { TestResult::Passed } else { TestResult::Failed },
+                details: if WASI_NN_READY { "WASI-NN interface available".to_string() } else { "WASI-NN not initialized".to_string() },
+                execution_time_ms: start_time.elapsed().as_millis() as f32,
+            });
+            
+            // Test model loading
+            test_results.push(TestExecution {
+                test_name: "model-loaded".to_string(),
+                test_result: if MODEL_LOADED { TestResult::Passed } else { TestResult::Failed },
+                details: if MODEL_LOADED { "YOLOv5n model loaded".to_string() } else { "Model not loaded".to_string() },
+                execution_time_ms: start_time.elapsed().as_millis() as f32,
+            });
+            
+            // Test inference capability
+            if MODEL_LOADED {
+                let test_result = test_inference();
+                test_results.push(TestExecution {
+                    test_name: "inference-test".to_string(),
+                    test_result: if test_result.is_ok() { TestResult::Passed } else { TestResult::Failed },
+                    details: match test_result {
+                        Ok(_) => "Inference test passed".to_string(),
+                        Err(e) => format!("Inference test failed: {}", e),
                     },
-                    details: format!("YOLOv5n ONNX model ({}MB)", YOLOV5N_MODEL.len() / 1024 / 1024),
-                },
-            ],
-            last_diagnostic: None,
-            timestamp: get_timestamp(),
+                    execution_time_ms: start_time.elapsed().as_millis() as f32,
+                });
+            }
         }
-    }
-
-    fn run_diagnostic(
-    ) -> Result<exports::adas::diagnostics::health_monitoring::DiagnosticResult, String> {
-        Ok(
-            exports::adas::diagnostics::health_monitoring::DiagnosticResult {
-                test_results: vec![
-                    exports::adas::diagnostics::health_monitoring::TestExecution {
-                        test_name: String::from("model-integrity-check"),
-                        test_result: adas::common_types::types::TestResult::Passed,
-                        details: format!("ONNX model size: {} bytes", YOLOV5N_MODEL.len()),
-                        execution_time_ms: 1.0,
-                    },
-                ],
-                overall_score: 94.0,
-                recommendations: vec![String::from(
-                    "Object detection AI operating within specifications",
-                )],
-                timestamp: get_timestamp(),
+        
+        let overall_score = test_results.iter()
+            .filter(|t| t.test_result == TestResult::Passed)
+            .count() as f32 / test_results.len() as f32;
+        
+        let diagnostic = DiagnosticResult {
+            test_results,
+            overall_score,
+            recommendations: if overall_score < 1.0 {
+                vec!["Check WASI-NN runtime support".to_string(),
+                     "Verify model file integrity".to_string()]
+            } else {
+                vec![]
             },
-        )
+            timestamp: get_timestamp(),
+        };
+        
+        // Update last diagnostic
+        let mut health = HEALTH_REPORT.lock().unwrap();
+        health.last_diagnostic = Some(diagnostic.clone());
+        
+        Ok(diagnostic)
     }
-
-    fn get_last_diagnostic(
-    ) -> Option<exports::adas::diagnostics::health_monitoring::DiagnosticResult> {
-        None
+    
+    fn get_last_diagnostic() -> Option<DiagnosticResult> {
+        HEALTH_REPORT.lock().unwrap().last_diagnostic.clone()
     }
 }
 
-// Implement performance monitoring interface
-impl exports::adas::diagnostics::performance_monitoring::Guest for Component {
-    fn get_performance() -> exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
-        exports::adas::diagnostics::performance_monitoring::ExtendedPerformance {
-            base_metrics: adas::common_types::types::PerformanceMetrics {
-                latency_avg_ms: if unsafe { INFERENCE_ACTIVE } { 25.0 } else { 0.0 },
-                latency_max_ms: if unsafe { INFERENCE_ACTIVE } { 45.0 } else { 0.0 },
-                cpu_utilization: if unsafe { INFERENCE_ACTIVE } { 0.75 } else { 0.1 },
-                memory_usage_mb: 512,
-                throughput_hz: if unsafe { INFERENCE_ACTIVE } { 25.0 } else { 0.0 },
-                error_rate: 0.005,
-            },
-            component_specific: vec![
-                exports::adas::diagnostics::performance_monitoring::Metric {
-                    name: String::from("model_size"),
-                    value: (YOLOV5N_MODEL.len() as f64) / 1024.0 / 1024.0,
-                    unit: String::from("MB"),
-                    description: String::from("YOLOv5n ONNX model size"),
+impl PerformanceGuest for Component {
+    fn get_performance() -> ExtendedPerformance {
+        let mut perf = EXTENDED_PERFORMANCE.lock().unwrap();
+        
+        // Update component-specific metrics
+        unsafe {
+            perf.component_specific = vec![
+                Metric {
+                    name: "detection_count".to_string(),
+                    value: LAST_DETECTION_COUNT as f64,
+                    unit: "objects".to_string(),
+                    description: "Number of objects detected in last frame".to_string(),
                 },
-                exports::adas::diagnostics::performance_monitoring::Metric {
-                    name: String::from("inference_backend"),
-                    value: if unsafe { INFERENCE_ACTIVE } { 1.0 } else { 0.0 },
-                    unit: String::from("boolean"),
-                    description: String::from("WASI-NN inference backend active"),
+                Metric {
+                    name: "inference_time".to_string(),
+                    value: LAST_INFERENCE_TIME_MS as f64,
+                    unit: "ms".to_string(),
+                    description: "Time taken for model inference".to_string(),
                 },
-                exports::adas::diagnostics::performance_monitoring::Metric {
-                    name: String::from("input_resolution"),
-                    value: (INPUT_WIDTH * INPUT_HEIGHT) as f64,
-                    unit: String::from("pixels"),
-                    description: String::from("YOLOv5n input resolution"),
+                Metric {
+                    name: "model_size".to_string(),
+                    value: (ONNX_MODEL.len() / 1024 / 1024) as f64,
+                    unit: "MB".to_string(),
+                    description: "Size of the loaded ONNX model".to_string(),
                 },
-                exports::adas::diagnostics::performance_monitoring::Metric {
-                    name: String::from("video_resolution"),
-                    value: (VIDEO_WIDTH * VIDEO_HEIGHT) as f64,
-                    unit: String::from("pixels"),
-                    description: String::from("Embedded video frame resolution"),
-                },
-                exports::adas::diagnostics::performance_monitoring::Metric {
-                    name: String::from("preprocessing_enabled"),
-                    value: 1.0,
-                    unit: String::from("boolean"),
-                    description: String::from("Video frame preprocessing active"),
-                },
-            ],
-            resource_usage: exports::adas::diagnostics::performance_monitoring::ResourceUsage {
-                cpu_cores_used: 0.60,
-                memory_allocated_mb: 512,
-                memory_peak_mb: 768,
-                disk_io_mb: 0.5,
-                network_io_mb: 2.0,
-                gpu_utilization: 0.9,
-                gpu_memory_mb: 512,
-            },
-            timestamp: get_timestamp(),
+            ];
         }
+        
+        perf.timestamp = get_timestamp();
+        perf.clone()
     }
-
-    fn get_performance_history(
-        _duration_seconds: u32,
-    ) -> Vec<exports::adas::diagnostics::performance_monitoring::ExtendedPerformance> {
-        vec![] // Not implemented
+    
+    fn get_performance_history(duration_seconds: u32) -> Vec<ExtendedPerformance> {
+        // Would implement rolling buffer in production
+        vec![<Component as PerformanceGuest>::get_performance()]
     }
-
+    
     fn reset_counters() {
-        println!("Object Detection: Reset performance counters");
+        let mut metrics = PERFORMANCE_METRICS.lock().unwrap();
+        *metrics = PerformanceMetrics {
+            latency_avg_ms: 0.0,
+            latency_max_ms: 0.0,
+            cpu_utilization: 0.0,
+            memory_usage_mb: 0,
+            throughput_hz: 0.0,
+            error_rate: 0.0,
+        };
+        
+        let mut extended = EXTENDED_PERFORMANCE.lock().unwrap();
+        extended.base_metrics = metrics.clone();
     }
+}
+
+// Helper functions
+fn process_video_stream() -> Result<(), String> {
+    unsafe {
+        // Simulate processing frames from embedded video
+        let frame_data = VIDEO_DATA.chunks(320 * 200 * 3).next()
+            .ok_or("No video data")?;
+        
+        let timestamp = get_timestamp();
+        let (detection_count, inference_time) = process_frame(frame_data.to_vec(), timestamp)?;
+        
+        // Store metrics
+        LAST_DETECTION_COUNT = detection_count;
+        LAST_INFERENCE_TIME_MS = inference_time;
+        
+        Ok(())
+    }
+}
+
+fn process_frame(frame_data: Vec<u8>, _timestamp: Timestamp) -> Result<(u32, f32), String> {
+    let start_time = std::time::Instant::now();
+    
+    // Decode frame (assuming raw RGB for now)
+    let width = 320;
+    let height = 200;
+    
+    // Preprocess for YOLO (640x640)
+    let preprocessed = preprocess_frame(&frame_data, width, height)?;
+    
+    // Run inference
+    let inference_start = std::time::Instant::now();
+    let raw_detections = run_inference(preprocessed)?;
+    let inference_time = inference_start.elapsed().as_millis() as f32;
+    
+    // Post-process detections
+    let detection_count = count_detections(&raw_detections);
+    
+    // Update metrics
+    let total_time = start_time.elapsed().as_millis() as f32;
+    let mut metrics = PERFORMANCE_METRICS.lock().unwrap();
+    metrics.latency_avg_ms = total_time;
+    metrics.latency_max_ms = metrics.latency_max_ms.max(total_time);
+    metrics.throughput_hz = 1000.0 / total_time;
+    
+    let mut extended = EXTENDED_PERFORMANCE.lock().unwrap();
+    extended.base_metrics = metrics.clone();
+    
+    Ok((detection_count, inference_time))
+}
+
+fn preprocess_frame(frame_data: &[u8], width: u32, height: u32) -> Result<Array4<f32>, String> {
+    // Convert raw frame to 640x640 with letterboxing
+    let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
+    
+    // Calculate letterbox dimensions
+    let scale = (640.0 / width.max(height) as f32).min(1.0);
+    let new_width = (width as f32 * scale) as u32;
+    let new_height = (height as f32 * scale) as u32;
+    let pad_x = (640 - new_width) / 2;
+    let pad_y = (640 - new_height) / 2;
+    
+    // Simple RGB normalization
+    for y in 0..new_height {
+        for x in 0..new_width {
+            let src_x = (x as f32 / scale) as u32;
+            let src_y = (y as f32 / scale) as u32;
+            if src_x < width && src_y < height {
+                let idx = ((src_y * width + src_x) * 3) as usize;
+                if idx + 2 < frame_data.len() {
+                    let r = frame_data[idx] as f32 / 255.0;
+                    let g = frame_data[idx + 1] as f32 / 255.0;
+                    let b = frame_data[idx + 2] as f32 / 255.0;
+                    
+                    input[[0, 0, (pad_y + y) as usize, (pad_x + x) as usize]] = r;
+                    input[[0, 1, (pad_y + y) as usize, (pad_x + x) as usize]] = g;
+                    input[[0, 2, (pad_y + y) as usize, (pad_x + x) as usize]] = b;
+                }
+            }
+        }
+    }
+    
+    Ok(input)
+}
+
+fn run_inference(input: Array4<f32>) -> Result<Vec<f32>, String> {
+    unsafe {
+        if let Some(graph) = &MODEL_GRAPH {
+            // Create execution context
+            let context = match graph.init_execution_context() {
+                Ok(ctx) => ctx,
+                Err(e) => return Err(format!("Failed to create execution context: {:?}", e)),
+            };
+            
+            // Convert input to tensor
+            let input_data = input.as_slice().unwrap();
+            let dimensions = vec![1, 3, 640, 640];
+            let tensor_data = bytemuck::cast_slice(input_data).to_vec();
+            let input_tensor = Tensor::new(
+                &dimensions,
+                TensorType::Fp32,
+                &tensor_data,
+            );
+            
+            // Create named tensor for input
+            let inputs: Vec<NamedTensor> = vec![
+                ("input".to_string(), input_tensor),
+            ];
+            
+            // Run inference
+            let outputs = match context.compute(inputs) {
+                Ok(outputs) => outputs,
+                Err(e) => return Err(format!("Inference failed: {:?}", e)),
+            };
+            
+            // Extract output tensor data
+            if let Some((_name, output_tensor)) = outputs.first() {
+                // Get tensor data
+                let output_data = output_tensor.data();
+                
+                // Convert bytes back to f32
+                let output_floats: Vec<f32> = output_data
+                    .chunks_exact(4)
+                    .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                    .collect();
+                
+                Ok(output_floats)
+            } else {
+                Err("No output tensor returned".to_string())
+            }
+        } else {
+            Err("Model graph not initialized".to_string())
+        }
+    }
+}
+
+fn count_detections(raw_output: &[f32]) -> u32 {
+    let mut count = 0;
+    
+    // YOLO output format: [batch, num_detections, 85]
+    // 85 = 4 bbox coords + 1 objectness + 80 class scores
+    let num_detections = raw_output.len() / 85;
+    
+    for i in 0..num_detections {
+        let offset = i * 85;
+        let objectness = raw_output[offset + 4];
+        
+        if objectness > 0.5 {  // Confidence threshold
+            // Find best class
+            let mut best_score = 0.0;
+            for j in 0..80 {
+                let score = raw_output[offset + 5 + j];
+                if score > best_score {
+                    best_score = score;
+                }
+            }
+            
+            if best_score > 0.5 {  // Class confidence threshold
+                count += 1;
+            }
+        }
+    }
+    
+    count
+}
+
+fn test_inference() -> Result<(), String> {
+    // Run a quick inference test
+    let test_input = Array4::<f32>::zeros((1, 3, 640, 640));
+    run_inference(test_input)?;
+    Ok(())
+}
+
+fn get_timestamp() -> Timestamp {
+    // In WASM, would use a proper time source
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64
 }
 
 export!(Component);

@@ -1,22 +1,22 @@
 [package]
-name = "adas-behavior_prediction_ai"
+name = "adas-gfx-visualizer"
 version = "0.1.0"
 edition = "2021"
-description = "Social-LSTM behavior prediction AI using WASI-NN"
+description = "ADAS Graphics Visualizer using wasi-gfx for real-time video and detection overlay"
 license = "Apache-2.0"
-
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "adas:behavior-prediction"
+package = "adas:graphics-visualizer"
 
 [dependencies]
 wit-bindgen = "0.33"
-ndarray = "0.15"
-lazy_static = "1.4"
+# Note: wasi-gfx bindings would be added when available
+# wasi-gfx = "0.1.0"  # Future dependency
 bytemuck = "1.13"
+image = { version = "0.24", default-features = false, features = ["png"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 

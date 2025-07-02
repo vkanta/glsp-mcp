@@ -38,6 +38,12 @@ members = [
     "components/system/hmi-interface",
     "components/system/domain-controller",
     "components/system/feo-demo",
+    
+    # Graphics Layer
+    "components/graphics/adas-visualizer",
+    
+    # Orchestration Layer
+    "components/orchestrator",
 ]
 
 # Shared dependencies for all components

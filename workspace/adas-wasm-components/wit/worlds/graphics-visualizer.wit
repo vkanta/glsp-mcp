@@ -1,0 +1,29 @@
+// Graphics Visualizer World - Uses wasi-gfx for real-time rendering
+
+package adas:graphics-visualizer@0.1.0;
+
+world graphics-visualizer {
+    // Import wasi-gfx for graphics operations
+    import wasi:frame-buffer/frame-buffer;
+    import wasi:surface/surface;
+    import wasi:graphics-context/graphics-context;
+    // Note: When wasi-gfx is fully available, we'd import:
+    // import wasi:webgpu/webgpu;
+    
+    // Import ADAS data interfaces
+    import adas:data/data-flow;
+    import adas:common-types/types;
+    
+    // Import standard interfaces
+    import adas:diagnostics/health-monitoring;
+    import adas:diagnostics/performance-monitoring;
+    import adas:control/system-control;
+    
+    // Export graphics visualization interface
+    export adas:graphics/graphics-visualizer;
+    
+    // Export standard component interfaces
+    export adas:diagnostics/health-monitoring;
+    export adas:diagnostics/performance-monitoring;
+    export adas:control/system-control;
+}
