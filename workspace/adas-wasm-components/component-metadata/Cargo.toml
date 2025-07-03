@@ -1,0 +1,27 @@
+[package]
+name = "component-metadata"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Used in the actual component code
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Optional dependencies for build feature
+toml = { version = "0.8", optional = true }
+chrono = { version = "0.4", optional = true }
+
+[build-dependencies]
+# Used in build.rs
+wasm-encoder = "0.218"
+wasm-metadata = "0.218"
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4"
+
+[lib]
+name = "component_metadata"
+
+[features]
+default = []
+build = ["toml", "chrono"]

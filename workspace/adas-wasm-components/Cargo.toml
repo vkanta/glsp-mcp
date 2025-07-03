@@ -5,6 +5,9 @@ resolver = "2"
 # Fixed Execution Order (FEO) automotive components
 
 members = [
+    # Metadata support
+    "component-metadata",
+    
     # Sensor Layer
     "components/sensors/camera-front",
     "components/sensors/camera-surround", 
