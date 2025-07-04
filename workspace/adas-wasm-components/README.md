@@ -19,10 +19,21 @@ This project implements a **production-ready ADAS system** using WebAssembly com
 
 ## 🚀 Quick Start
 
+### Prerequisites - WASI Preview 2 Only
+
+```bash
+# Install WASI Preview 2 target (Preview 1 is obsolete)
+rustup target add wasm32-wasip2
+
+# Verify only Preview 2 is installed
+rustup target list | grep wasi
+# Should show ONLY: wasm32-wasip2 (installed)
+```
+
 ### Build Components
 
 ```bash
-# Build all WASM components
+# Build all WASM components with Preview 2
 ./build.sh
 
 # Components are output to target/wasm32-wasip2/debug/
