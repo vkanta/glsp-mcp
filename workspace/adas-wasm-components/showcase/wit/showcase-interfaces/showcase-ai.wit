@@ -1,0 +1,214 @@
+/// Showcase AI Interfaces - Production AI processing demonstration
+package showcase:ai;
+
+interface object-processor {
+    use adas:common-types/types.{
+        timestamp, 
+        performance-metrics,
+        bounding-box2d,
+        object-type
+    };
+    use adas:data/sensor-data.{camera-frame};
+    use adas:data/perception-data.{perceived-object, scene-model};
+    use adas:control/ai-control.{ai-config, model-type, inference-backend};
+    
+    /// Production AI processing configuration
+    record ai-processing-config {
+        model-config: production-model-config,
+        inference-params: inference-parameters,
+        automotive-constraints: automotive-ai-constraints,
+        quality-assurance: qa-parameters,
+    }
+    
+    /// Production model configuration for automotive use
+    record production-model-config {
+        model-path: string,                    // Path to ONNX model
+        model-type: model-type,                // Detection, classification, etc.
+        model-version: string,                 // Version for traceability
+        inference-backend: inference-backend,  // CPU, GPU, NPU
+        batch-size: u32,                      // Inference batch size
+        input-resolution: resolution,          // Expected input size
+        output-classes: list<string>,          // Class names for objects
+    }
+    
+    record resolution {
+        width: u32,
+        height: u32,
+        channels: u32,
+    }
+    
+    /// Inference parameters for production systems
+    record inference-parameters {
+        confidence-threshold: f32,             // Minimum detection confidence
+        nms-threshold: f32,                   // Non-maximum suppression
+        max-detections: u32,                  // Maximum objects per frame
+        preprocessing-enabled: bool,           // Image preprocessing
+        postprocessing-enabled: bool,         // Result postprocessing
+    }
+    
+    /// Automotive AI constraints for safety compliance
+    record automotive-ai-constraints {
+        max-inference-time-ms: u32,           // Real-time constraint
+        memory-limit-mb: u32,                 // Memory budget
+        cpu-utilization-limit: f32,          // CPU usage limit (0.0-1.0)
+        safety-monitoring: safety-monitoring-config,
+        deterministic-execution: bool,         // Deterministic inference
+    }
+    
+    record safety-monitoring-config {
+        enable-watchdog: bool,
+        watchdog-timeout-ms: u32,
+        confidence-monitoring: bool,
+        min-confidence-threshold: f32,
+        anomaly-detection: bool,
+    }
+    
+    /// Quality assurance parameters for automotive AI
+    record qa-parameters {
+        validation-dataset: string,
+        target-accuracy: f32,
+        target-precision: f32,
+        target-recall: f32,
+        false-positive-rate-limit: f32,
+        performance-benchmarks: performance-benchmarks,
+    }
+    
+    record performance-benchmarks {
+        target-fps: f32,
+        max-latency-ms: f32,
+        memory-efficiency-target: f32,
+        energy-efficiency_target: f32,
+    }
+    
+    /// Configure AI processing with automotive parameters
+    configure-processor: func(config: ai-processing-config) -> result<_, string>;
+    
+    /// Process single frame with full automotive pipeline
+    process-frame: func(frame: camera-frame) -> result<ai-processing-result, string>;
+    
+    /// Process frame batch for efficiency
+    process-frame-batch: func(frames: list<camera-frame>) -> result<list<ai-processing-result>, string>;
+    
+    /// Get AI processor status and health
+    get-processor-status: func() -> ai-processor-status;
+    
+    /// Get detailed performance metrics
+    get-performance-metrics: func() -> ai-performance-metrics;
+    
+    /// Validate AI model against automotive requirements
+    validate-model: func() -> result<model-validation-result, string>;
+    
+    /// AI processing result with automotive metadata
+    record ai-processing-result {
+        // Core detection results
+        detected-objects: list<perceived-object>,
+        scene-understanding: scene-model,
+        
+        // Processing metadata
+        inference-time-ms: f32,
+        preprocessing-time-ms: f32,
+        postprocessing-time-ms: f32,
+        total-processing-time-ms: f32,
+        
+        // Quality metrics
+        confidence-scores: list<f32>,
+        detection-quality: detection-quality-metrics,
+        
+        // Automotive compliance
+        safety-checks_passed: bool,
+        timing-compliance: bool,
+        timestamp: timestamp,
+    }
+    
+    record detection-quality-metrics {
+        average-confidence: f32,
+        detection-count: u32,
+        tracking-stability: f32,
+        occlusion_handling: f32,
+        false_positive_estimate: f32,
+    }
+    
+    /// AI processor status for automotive systems
+    record ai-processor-status {
+        processor-state: processor-state,
+        model-loaded: bool,
+        model-version: string,
+        memory_usage_mb: u32,
+        cpu_utilization: f32,
+        gpu_utilization: f32,
+        safety_status: safety-status,
+        last_update: timestamp,
+    }
+    
+    enum processor-state {
+        uninitialized,
+        initializing,
+        ready,
+        processing,
+        degraded,
+        error,
+        safety-stopped,
+    }
+    
+    enum safety-status {
+        safe,
+        warning,
+        degraded,
+        unsafe,
+        emergency-stop,
+    }
+    
+    /// Detailed AI performance metrics
+    record ai-performance-metrics {
+        base-metrics: performance-metrics,
+        inference-metrics: inference-metrics,
+        automotive-metrics: automotive-performance-metrics,
+    }
+    
+    record inference-metrics {
+        inferences-per-second: f32,
+        average-inference-time-ms: f32,
+        worst-case-inference-time-ms: f32,
+        model-accuracy: f32,
+        batch-efficiency: f32,
+    }
+    
+    record automotive-performance-metrics {
+        real-time-compliance: f32,        // Percentage of deadlines met
+        safety-violations: u32,
+        false-positive-rate: f32,
+        false-negative-rate: f32,
+        system-reliability: f32,
+    }
+    
+    /// Model validation result for automotive compliance
+    record model-validation-result {
+        validation-passed: bool,
+        accuracy-metrics: accuracy-metrics,
+        performance-validation: performance-validation,
+        safety-validation: safety-validation,
+        compliance-report: string,
+    }
+    
+    record accuracy-metrics {
+        overall-accuracy: f32,
+        precision-per-class: list<f32>,
+        recall-per-class: list<f32>,
+        f1-score-per-class: list<f32>,
+        confusion-matrix: list<list<u32>>,
+    }
+    
+    record performance-validation {
+        meets-timing-requirements: bool,
+        meets-memory-requirements: bool,
+        meets-power-requirements: bool,
+        stress-test_passed: bool,
+    }
+    
+    record safety-validation {
+        meets-asil-requirements: bool,
+        hazard-analysis_complete: bool,
+        failure-mode-analysis_complete: bool,
+        safety-mechanisms_verified: bool,
+    }
+}

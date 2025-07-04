@@ -1,0 +1,58 @@
+/// Production-Grade Showcase Orchestrator World
+/// Main demo controller demonstrating full automotive system integration
+package showcase:orchestrator;
+
+world showcase-orchestrator {
+    // ============ IMPORTS ============
+    // Connect to all 4 showcase components with production interfaces
+    import showcase:video/playback-control;        // Video decoder control
+    import showcase:ai/object-processor;           // AI processing control
+    import showcase:graphics/display-control;      // Graphics visualization control
+    
+    // Full automotive interfaces for production-grade demonstration
+    import adas:data/sensor-data;
+    import adas:data/perception-data;
+    import adas:data/prediction-data;
+    import adas:data/planning-data;
+    
+    // Production component control interfaces
+    import adas:control/sensor-control;
+    import adas:control/ai-control;
+    import adas:control/vehicle-control;
+    
+    // Automotive system orchestration
+    import adas:orchestration/execution-control;
+    import adas:orchestration/resource-management;
+    import adas:orchestration/data-flow;
+    
+    // Complete automotive diagnostic system
+    import adas:diagnostics/health-monitoring;
+    import adas:diagnostics/performance-monitoring;
+    
+    // Common automotive types
+    import adas:common-types/types;
+    import adas:common-types/sensor-fusion;
+    
+    // Web interface capabilities for interactive showcase
+    import wasi:http/types@0.2.0;
+    import wasi:http/outgoing-handler@0.2.0;
+    import wasi:sockets/tcp@0.2.0;
+    import wasi:sockets/udp@0.2.0;
+    
+    // System interfaces for automotive timing and compliance
+    import wasi:clocks/wall-clock@0.2.0;
+    import wasi:clocks/monotonic-clock@0.2.0;
+    import wasi:io/poll@0.2.0;
+    
+    // ============ EXPORTS ============
+    // Main showcase demo interface (production automotive demonstration)
+    export showcase:demo/demo-controller;
+    
+    // HTTP server for interactive web dashboard
+    export wasi:http/incoming-handler@0.2.0;
+    
+    // Production automotive system interfaces (for external integration)
+    export adas:orchestration/execution-control;
+    export adas:diagnostics/health-monitoring;
+    export adas:diagnostics/performance-monitoring;
+}

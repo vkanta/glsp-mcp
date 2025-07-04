@@ -1,0 +1,32 @@
+[package]
+name = "showcase-demo-orchestrator"
+version = "0.1.0"
+edition = "2021"
+description = "Production-grade demo orchestrator for automotive ADAS showcase"
+license = "Apache-2.0"
+
+[[bin]]
+name = "demo-orchestrator"
+path = "src/main.rs"
+
+[dependencies]
+wit-bindgen = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { version = "1.0", features = ["full"] }
+wasmtime = { version = "24.0", features = ["component-model", "async"] }
+wasmtime-wasi = "24.0"
+clap = { version = "4.0", features = ["derive"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+
+# Showcase profile for demo optimization
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -1,0 +1,335 @@
+/// Showcase Graphics Interfaces - Production visualization demonstration
+package showcase:graphics;
+
+interface display-control {
+    use adas:common-types/types.{
+        timestamp,
+        performance-metrics,
+        bounding-box2d,
+        position2d
+    };
+    use adas:data/sensor-data.{camera-frame};
+    use adas:data/perception-data.{perceived-object};
+    
+    /// Production graphics configuration for automotive displays
+    record graphics-display-config {
+        display-parameters: display-parameters,
+        overlay-configuration: overlay-configuration,
+        automotive-hmi: automotive-hmi-config,
+        performance-settings: graphics-performance-settings,
+    }
+    
+    /// Display parameters for automotive screens
+    record display-parameters {
+        resolution: display-resolution,
+        refresh-rate-hz: f32,
+        color-depth: u32,
+        brightness-nits: u32,
+        contrast-ratio: f32,
+        viewing-angle: viewing-angle,
+        ambient-light-adaptation: bool,
+    }
+    
+    record display-resolution {
+        width: u32,
+        height: u32,
+        pixel-density-ppi: u32,
+    }
+    
+    record viewing-angle {
+        horizontal-degrees: f32,
+        vertical-degrees: f32,
+    }
+    
+    /// Overlay configuration for ADAS visualization
+    record overlay-configuration {
+        bounding-box-style: bounding-box-style,
+        confidence-display: confidence-display-config,
+        trajectory-display: trajectory-display-config,
+        metrics-overlay: metrics-overlay-config,
+        safety-indicators: safety-indicator-config,
+    }
+    
+    record bounding-box-style {
+        enabled: bool,
+        line-thickness: u32,
+        color-scheme: color-scheme,
+        transparency: f32,
+        corner-radius: u32,
+        object-labeling: bool,
+    }
+    
+    enum color-scheme {
+        automotive-standard,     // Standard automotive colors
+        high-contrast,          // High visibility
+        colorblind-friendly,    // Accessibility
+        night-vision,           // Low light conditions
+        custom,                 // User-defined
+    }
+    
+    record confidence-display-config {
+        show-confidence: bool,
+        confidence-bar: bool,
+        confidence-text: bool,
+        confidence-color-coding: bool,
+        threshold-indicator: bool,
+    }
+    
+    record trajectory-display-config {
+        show-predicted-paths: bool,
+        prediction-horizon-seconds: f32,
+        path-uncertainty: bool,
+        collision-warnings: bool,
+        safe-zones: bool,
+    }
+    
+    record metrics-overlay-config {
+        show-fps: bool,
+        show-latency: bool,
+        show-detection-count: bool,
+        show-system-health: bool,
+        show-safety-status: bool,
+        position: overlay-position,
+        transparency: f32,
+    }
+    
+    enum overlay-position {
+        top-left,
+        top-right,
+        bottom-left,
+        bottom-right,
+        center,
+        custom,
+    }
+    
+    record safety-indicator-config {
+        emergency-warnings: bool,
+        system-status: bool,
+        compliance-indicators: bool,
+        driver-alerts: bool,
+        color_coding: safety-color-scheme,
+    }
+    
+    enum safety-color-scheme {
+        iso-standard,           // ISO 26262 standard colors
+        automotive-oem,         // OEM-specific colors
+        accessibility,          // High contrast for accessibility
+    }
+    
+    /// Automotive HMI configuration
+    record automotive-hmi-config {
+        driver-distraction-limits: distraction-limits,
+        display-zones: display-zone-config,
+        interaction-modes: interaction-mode-config,
+        accessibility: accessibility-config,
+    }
+    
+    record distraction-limits {
+        max-glance-duration-ms: u32,
+        max-visual-complexity: f32,
+        animation-restrictions: bool,
+        critical-info-only: bool,
+    }
+    
+    record display-zone-config {
+        primary-zone: display-zone,      // Critical safety info
+        secondary-zone: display-zone,    // Additional context
+        peripheral-zone: display-zone,   // Background info
+    }
+    
+    record display-zone {
+        area: bounding-box2d,
+        priority: display-priority,
+        update-frequency-hz: f32,
+        visibility-requirements: visibility-requirements,
+    }
+    
+    enum display-priority {
+        critical,               // Safety-critical information
+        important,              // Important but not critical
+        informational,          // Nice-to-have information
+        background,             // Background context
+    }
+    
+    record visibility-requirements {
+        min-contrast-ratio: f32,
+        min-font-size-pt: u32,
+        max-information-density: f32,
+        legibility-distance-m: f32,
+    }
+    
+    record interaction-mode-config {
+        touch-enabled: bool,
+        gesture-enabled: bool,
+        voice-enabled: bool,
+        eye-tracking-enabled: bool,
+        physical-controls: bool,
+    }
+    
+    record accessibility-config {
+        high-contrast-mode: bool,
+        large-text-mode: bool,
+        color-blind-support: bool,
+        screen-reader_support: bool,
+        simplified-interface: bool,
+    }
+    
+    /// Graphics performance settings for automotive requirements
+    record graphics-performance-settings {
+        target-framerate: f32,
+        vsync-enabled: bool,
+        hardware-acceleration: bool,
+        memory-budget-mb: u32,
+        power-optimization: power-optimization-level,
+        thermal-management: bool,
+    }
+    
+    enum power-optimization-level {
+        maximum-performance,    // High power, best quality
+        balanced,              // Balance of power and quality
+        power-saving,          // Optimize for battery life
+        eco-mode,              // Minimum power consumption
+    }
+    
+    /// Configure graphics display system
+    configure-display: func(config: graphics-display-config) -> result<_, string>;
+    
+    /// Render frame with overlays and automotive compliance
+    render-frame: func(
+        frame: camera-frame,
+        detected-objects: list<perceived-object>,
+        metrics: automotive-metrics
+    ) -> result<rendered-frame, string>;
+    
+    /// Update overlay settings in real-time
+    update-overlay-config: func(config: overlay-configuration) -> result<_, string>;
+    
+    /// Toggle specific overlay elements
+    toggle-overlay: func(overlay-type: overlay-type, enabled: bool) -> result<_, string>;
+    
+    /// Get current display status
+    get-display-status: func() -> display-status;
+    
+    /// Get graphics performance metrics
+    get-graphics-metrics: func() -> graphics-performance-metrics;
+    
+    /// Automotive metrics for display overlay
+    record automotive-metrics {
+        performance: performance-metrics,
+        safety-status: safety-status,
+        detection-count: u32,
+        processing-fps: f32,
+        system-health: system-health,
+        timestamp: timestamp,
+    }
+    
+    enum overlay-type {
+        bounding-boxes,
+        confidence-scores,
+        object-ids,
+        trajectories,
+        metrics,
+        safety-indicators,
+        system-status,
+    }
+    
+    /// Rendered frame with automotive metadata
+    record rendered-frame {
+        image-data: list<u8>,
+        format: image-format,
+        resolution: display-resolution,
+        rendering-time-ms: f32,
+        overlay-count: u32,
+        compliance-verified: bool,
+        timestamp: timestamp,
+    }
+    
+    enum image-format {
+        rgb24,
+        rgba32,
+        yuv420,
+        jpeg,
+        png,
+    }
+    
+    /// Display system status
+    record display-status {
+        display-active: bool,
+        current-config: graphics-display-config,
+        frame-count: u64,
+        dropped-frames: u32,
+        average-fps: f32,
+        thermal-status: thermal-status,
+        power-consumption-w: f32,
+    }
+    
+    enum thermal-status {
+        normal,
+        warm,
+        hot,
+        critical,
+        thermal-throttling,
+    }
+    
+    enum safety-status {
+        safe,
+        warning,
+        caution,
+        critical,
+        emergency,
+    }
+    
+    enum system-health {
+        healthy,
+        degraded,
+        warning,
+        critical,
+        offline,
+    }
+    
+    /// Graphics performance metrics for automotive systems
+    record graphics-performance-metrics {
+        rendering-performance: rendering-performance,
+        memory-usage: memory-usage,
+        power-metrics: power-metrics,
+        thermal-metrics: thermal-metrics,
+        compliance-metrics: compliance-metrics,
+    }
+    
+    record rendering-performance {
+        current-fps: f32,
+        target-fps: f32,
+        frame-time-ms: f32,
+        gpu-utilization: f32,
+        render-queue-depth: u32,
+    }
+    
+    record memory-usage {
+        total-allocated-mb: u32,
+        gpu-memory-mb: u32,
+        texture-memory-mb: u32,
+        buffer-memory-mb: u32,
+        peak-usage-mb: u32,
+    }
+    
+    record power-metrics {
+        current-consumption-w: f32,
+        average-consumption-w: f32,
+        peak-consumption-w: f32,
+        efficiency-fps-per-watt: f32,
+    }
+    
+    record thermal-metrics {
+        gpu-temperature-c: f32,
+        cpu-temperature-c: f32,
+        ambient-temperature-c: f32,
+        thermal-throttling-active: bool,
+    }
+    
+    record compliance-metrics {
+        meets-timing-requirements: bool,
+        meets-quality-requirements: bool,
+        meets-safety-requirements: bool,
+        accessibility-compliance: bool,
+    }
+}

@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+
+# ADAS WebAssembly Components Showcase
+# Streamlined 4-component demo for maximum impact
+
+members = [
+    "components/video-decoder",
+    "components/object-detection", 
+    "components/pipeline",
+    "components/visualizer",
+    "demo-orchestrator",
+]
+
+# Shared dependencies for showcase components
+[workspace.dependencies]
+wit-bindgen = "0.33"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Showcase profile optimized for demo performance
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1
+debug = true
+strip = false
+
+[workspace.metadata]
+name = "ADAS WebAssembly Showcase"
+version = "0.1.0"
+description = "Streamlined ADAS demo with video processing, AI detection, and real-time visualization"
+showcase_components = 4
+demo_duration = "30 seconds"
+memory_target = "600MB"
+features = [
+    "Real-time video processing",
+    "YOLOv5n object detection", 
+    "WebAssembly security",
+    "Interactive dashboard",
+    "Performance metrics",
+]

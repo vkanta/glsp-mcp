@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADAS Production Showcase - Real-Time Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 10px;
+            padding: 10px;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 300;
+            color: #00ff88;
+        }
+        
+        .system-status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-ok { background: #00ff88; }
+        .status-warning { background: #ff8800; }
+        .status-critical { background: #ff0044; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-view {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .panel h3 {
+            margin-bottom: 10px;
+            color: #00ff88;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .scene-view {
+            height: 400px;
+            background: #000;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .scene-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 2px solid #00ff88;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        
+        .detected-object {
+            position: absolute;
+            border: 2px solid;
+            border-radius: 4px;
+            min-width: 40px;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            backdrop-filter: blur(2px);
+        }
+        
+        .object-car { border-color: #0080ff; background: rgba(0, 128, 255, 0.2); }
+        .object-pedestrian { border-color: #ff0000; background: rgba(255, 0, 0, 0.3); }
+        .object-truck { border-color: #ff8000; background: rgba(255, 128, 0, 0.2); }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+        
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: #ccc;
+            margin-top: 2px;
+        }
+        
+        .component-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .component {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .component-name {
+            font-weight: 500;
+        }
+        
+        .component-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .alert-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .alert {
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            border-left: 3px solid;
+        }
+        
+        .alert-info {
+            background: rgba(0, 123, 255, 0.2);
+            border-color: #007bff;
+        }
+        
+        .alert-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border-color: #ffc107;
+        }
+        
+        .alert-critical {
+            background: rgba(220, 53, 69, 0.2);
+            border-color: #dc3545;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00cc66);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .pipeline-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+        
+        .flow-component {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            position: relative;
+        }
+        
+        .flow-component.active {
+            background: rgba(0, 255, 136, 0.3);
+            border: 1px solid #00ff88;
+        }
+        
+        .flow-arrow {
+            color: #00ff88;
+            font-size: 14px;
+        }
+        
+        .latency-display {
+            font-size: 10px;
+            color: #ccc;
+            margin-top: 2px;
+        }
+        
+        .safety-gauge {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 10px auto;
+        }
+        
+        .gauge-bg {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                from 0deg,
+                #ff0000 0deg 60deg,
+                #ff8800 60deg 120deg,
+                #00ff88 120deg 360deg
+            );
+            position: relative;
+        }
+        
+        .gauge-inner {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        .gauge-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .gauge-label {
+            font-size: 10px;
+            color: #ccc;
+        }
+        
+        .threat-indicators {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .threat-indicator {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            background: rgba(255, 0, 68, 0.3);
+            border: 1px solid #ff0044;
+        }
+        
+        .websocket-status {
+            font-size: 10px;
+            color: #ccc;
+            margin-top: 5px;
+        }
+        
+        .connected {
+            color: #00ff88;
+        }
+        
+        .disconnected {
+            color: #ff0044;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="header">
+            <h1>🚗 ADAS Production Showcase</h1>
+            <div class="system-status">
+                <div class="status-indicator">
+                    <div class="status-dot status-ok" id="pipeline-status"></div>
+                    <span>Pipeline</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot status-ok" id="ai-status"></div>
+                    <span>AI Systems</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot status-ok" id="safety-status"></div>
+                    <span>Safety</span>
+                </div>
+                <div class="websocket-status" id="ws-status">Connecting...</div>
+            </div>
+        </header>
+        
+        <main class="main-view">
+            <div class="scene-view" id="scene-view">
+                <div class="scene-overlay"></div>
+                <!-- Detected objects will be dynamically added here -->
+            </div>
+            
+            <div class="pipeline-flow">
+                <div class="flow-component" id="flow-video">
+                    <div>📹 Video Decoder</div>
+                    <div class="latency-display" id="video-latency">2.5ms</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-component" id="flow-ai">
+                    <div>🧠 AI Detection</div>
+                    <div class="latency-display" id="ai-latency">25.0ms</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-component" id="flow-pipeline">
+                    <div>⚙️ Data Pipeline</div>
+                    <div class="latency-display" id="pipeline-latency">8.0ms</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-component" id="flow-viz">
+                    <div>📊 Visualizer</div>
+                    <div class="latency-display" id="viz-latency">12.0ms</div>
+                </div>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-value" id="total-latency">47.5</div>
+                    <div class="metric-label">Total Latency (ms)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="fps-counter">22</div>
+                    <div class="metric-label">Processing FPS</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="objects-detected">3</div>
+                    <div class="metric-label">Objects Detected</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="cycle-count">0</div>
+                    <div class="metric-label">Demo Cycles</div>
+                </div>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="demo-progress" style="width: 0%"></div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn btn-success" onclick="sendCommand('start')">▶️ Start</button>
+                <button class="btn btn-warning" onclick="sendCommand('pause')">⏸️ Pause</button>
+                <button class="btn btn-danger" onclick="sendCommand('stop')">⏹️ Stop</button>
+                <button class="btn btn-primary" onclick="sendCommand('cycle')">🔄 Cycle</button>
+                <button class="btn btn-primary" onclick="sendCommand('reset')">🔄 Reset</button>
+            </div>
+        </main>
+        
+        <aside class="sidebar">
+            <div class="panel">
+                <h3>Safety Assessment</h3>
+                <div class="safety-gauge">
+                    <div class="gauge-bg">
+                        <div class="gauge-inner">
+                            <div class="gauge-value" id="safety-score">95</div>
+                            <div class="gauge-label">Safety Score</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="threat-indicators" id="threat-indicators">
+                    <!-- Threat indicators will be added dynamically -->
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>Component Health</h3>
+                <div class="component-list" id="component-list">
+                    <!-- Components will be populated dynamically -->
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>System Alerts</h3>
+                <div class="alert-list" id="alert-list">
+                    <!-- Alerts will be populated dynamically -->
+                </div>
+            </div>
+        </aside>
+    </div>
+    
+    <script>
+        class DashboardController {
+            constructor() {
+                this.websocket = null;
+                this.reconnectInterval = 2000;
+                this.lastData = null;
+                this.init();
+            }
+            
+            init() {
+                this.connectWebSocket();
+                this.updatePipelineAnimation();
+            }
+            
+            connectWebSocket() {
+                const wsUrl = `ws://${window.location.host}/ws`;
+                
+                try {
+                    this.websocket = new WebSocket(wsUrl);
+                    
+                    this.websocket.onopen = () => {
+                        console.log('WebSocket connected');
+                        document.getElementById('ws-status').textContent = 'Connected';
+                        document.getElementById('ws-status').className = 'websocket-status connected';
+                    };
+                    
+                    this.websocket.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.updateDashboard(data);
+                            this.lastData = data;
+                        } catch (e) {
+                            console.error('Failed to parse WebSocket data:', e);
+                        }
+                    };
+                    
+                    this.websocket.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        document.getElementById('ws-status').textContent = 'Disconnected';
+                        document.getElementById('ws-status').className = 'websocket-status disconnected';
+                        
+                        // Attempt to reconnect
+                        setTimeout(() => this.connectWebSocket(), this.reconnectInterval);
+                    };
+                    
+                    this.websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                    };
+                } catch (e) {
+                    console.error('Failed to create WebSocket:', e);
+                    setTimeout(() => this.connectWebSocket(), this.reconnectInterval);
+                }
+            }
+            
+            updateDashboard(data) {
+                this.updateMetrics(data.demo_state);
+                this.updateComponents(data.component_health, data.component_metrics);
+                this.updateAlerts(data.alerts);
+                this.updateSystemStatus(data.system_overview);
+                this.updateSceneView(data.demo_state);
+            }
+            
+            updateMetrics(demoState) {
+                document.getElementById('total-latency').textContent = demoState.pipeline_latency_ms.toFixed(1);
+                document.getElementById('fps-counter').textContent = Math.round(1000 / demoState.pipeline_latency_ms);
+                document.getElementById('objects-detected').textContent = demoState.detected_objects;
+                document.getElementById('cycle-count').textContent = demoState.cycle_count;
+                document.getElementById('safety-score').textContent = Math.round(demoState.safety_score);
+                
+                // Update progress bar
+                const progressPercent = (demoState.demo_progress * 100).toFixed(1);
+                document.getElementById('demo-progress').style.width = progressPercent + '%';
+                
+                // Update threat indicators
+                const threatContainer = document.getElementById('threat-indicators');
+                threatContainer.innerHTML = '';
+                demoState.active_interventions.forEach(intervention => {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'threat-indicator';
+                    indicator.textContent = intervention;
+                    threatContainer.appendChild(indicator);
+                });
+            }
+            
+            updateComponents(health, metrics) {
+                const componentList = document.getElementById('component-list');
+                componentList.innerHTML = '';
+                
+                Object.keys(health).forEach(componentName => {
+                    const healthData = health[componentName];
+                    const metricsData = metrics[componentName] || {};
+                    
+                    const component = document.createElement('div');
+                    component.className = 'component';
+                    
+                    component.innerHTML = `
+                        <div class="component-name">${componentName}</div>
+                        <div class="component-status">
+                            <div class="status-dot ${
+                                healthData.status === 'OK' ? 'status-ok' :
+                                healthData.status === 'WARNING' ? 'status-warning' : 'status-critical'
+                            }"></div>
+                            <span>${healthData.status}</span>
+                        </div>
+                    `;
+                    
+                    componentList.appendChild(component);
+                });
+                
+                // Update individual component latencies
+                if (metrics['video-decoder']) {
+                    document.getElementById('video-latency').textContent = 
+                        metrics['video-decoder'].latency_avg_ms.toFixed(1) + 'ms';
+                }
+                if (metrics['object-detection']) {
+                    document.getElementById('ai-latency').textContent = 
+                        metrics['object-detection'].latency_avg_ms.toFixed(1) + 'ms';
+                }
+                if (metrics['pipeline']) {
+                    document.getElementById('pipeline-latency').textContent = 
+                        metrics['pipeline'].latency_avg_ms.toFixed(1) + 'ms';
+                }
+                if (metrics['visualizer']) {
+                    document.getElementById('viz-latency').textContent = 
+                        metrics['visualizer'].latency_avg_ms.toFixed(1) + 'ms';
+                }
+            }
+            
+            updateAlerts(alerts) {
+                const alertList = document.getElementById('alert-list');
+                alertList.innerHTML = '';
+                
+                // Show last 10 alerts
+                alerts.slice(-10).reverse().forEach(alert => {
+                    const alertElement = document.createElement('div');
+                    alertElement.className = `alert alert-${alert.level.toLowerCase()}`;
+                    
+                    const time = new Date(alert.timestamp / 1000).toLocaleTimeString();
+                    alertElement.innerHTML = `
+                        <div><strong>[${alert.component}]</strong> ${alert.message}</div>
+                        <div style="font-size: 9px; color: #aaa; margin-top: 2px;">${time}</div>
+                    `;
+                    
+                    alertList.appendChild(alertElement);
+                });
+            }
+            
+            updateSystemStatus(overview) {
+                // Update status indicators based on system health
+                const pipelineStatus = document.getElementById('pipeline-status');
+                const aiStatus = document.getElementById('ai-status');
+                const safetyStatus = document.getElementById('safety-status');
+                
+                const healthClass = overview.overall_health > 90 ? 'status-ok' :
+                                   overview.overall_health > 70 ? 'status-warning' : 'status-critical';
+                
+                [pipelineStatus, aiStatus, safetyStatus].forEach(element => {
+                    element.className = `status-dot ${healthClass}`;
+                });
+            }
+            
+            updateSceneView(demoState) {
+                const sceneView = document.getElementById('scene-view');
+                
+                // Clear existing objects
+                const existingObjects = sceneView.querySelectorAll('.detected-object');
+                existingObjects.forEach(obj => obj.remove());
+                
+                // Simulate detected objects based on demo state
+                const objectCount = demoState.detected_objects;
+                for (let i = 0; i < objectCount; i++) {
+                    const object = document.createElement('div');
+                    object.className = 'detected-object';
+                    
+                    // Simulate different object types
+                    const types = ['car', 'pedestrian', 'truck'];
+                    const type = types[i % types.length];
+                    object.classList.add(`object-${type}`);
+                    
+                    // Position objects pseudo-randomly but consistently
+                    const x = 50 + (i * 73) % 200; // Pseudo-random X
+                    const y = 100 + (i * 47) % 150; // Pseudo-random Y
+                    
+                    object.style.left = x + 'px';
+                    object.style.top = y + 'px';
+                    object.textContent = type.toUpperCase();
+                    
+                    sceneView.appendChild(object);
+                }
+            }
+            
+            updatePipelineAnimation() {
+                // Animate pipeline flow components
+                const components = ['flow-video', 'flow-ai', 'flow-pipeline', 'flow-viz'];
+                let currentIndex = 0;
+                
+                setInterval(() => {
+                    // Remove active class from all
+                    components.forEach(id => {
+                        const element = document.getElementById(id);
+                        if (element) element.classList.remove('active');
+                    });
+                    
+                    // Add active class to current
+                    const currentElement = document.getElementById(components[currentIndex]);
+                    if (currentElement) currentElement.classList.add('active');
+                    
+                    currentIndex = (currentIndex + 1) % components.length;
+                }, 800); // Change every 800ms
+            }
+        }
+        
+        // Control functions
+        function sendCommand(command) {
+            fetch('/api/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ command: command })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Command response:', data);
+            })
+            .catch(error => {
+                console.error('Command error:', error);
+            });
+        }
+        
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.dashboard = new DashboardController();
+        });
+    </script>
+</body>
+</html>

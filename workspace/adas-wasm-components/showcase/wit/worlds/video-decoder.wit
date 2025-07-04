@@ -1,0 +1,39 @@
+/// Production-Grade Video Decoder Component World
+/// Demonstrates real automotive sensor simulation capabilities
+package showcase:video-decoder;
+
+world video-decoder {
+    // ============ IMPORTS ============
+    // Standard orchestration imports for automotive FEO compliance
+    import adas:orchestration/execution-control;
+    import adas:orchestration/resource-management;
+    import adas:orchestration/data-flow;
+    
+    // Full automotive type system
+    import adas:common-types/types;
+    import adas:common-types/sensor-fusion;
+    
+    // File system access for embedded automotive test data
+    import wasi:filesystem/types@0.2.0;
+    import wasi:filesystem/preopens@0.2.0;
+    
+    // System interfaces for automotive timing compliance
+    import wasi:clocks/wall-clock@0.2.0;
+    import wasi:clocks/monotonic-clock@0.2.0;
+    
+    // ============ EXPORTS ============
+    // Full production sensor control interface (ISO 26262 compliant)
+    export adas:control/sensor-control;
+    
+    // Production sensor data interface with automotive metadata
+    export adas:data/sensor-data;
+    
+    // Automotive-grade health monitoring (ASIL-B compliance)
+    export adas:diagnostics/health-monitoring;
+    
+    // Real-time performance monitoring for automotive systems
+    export adas:diagnostics/performance-monitoring;
+    
+    // Showcase-specific video control for demo interaction
+    export showcase:video/playback-control;
+}
