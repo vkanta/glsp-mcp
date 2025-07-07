@@ -31,7 +31,7 @@ export class DiagramNameDialog extends PromptDialog {
             required: true,
             minLength: 1,
             maxLength: 100,
-            pattern: /^[a-zA-Z0-9\s\-_\.()]+$/,
+            pattern: /^[a-zA-Z0-9\s\-_.()]+$/,
             validationMessage: 'Name can only contain letters, numbers, spaces, and common punctuation',
             width: 500,
             height: config.showTypeInfo ? 280 : 220,
@@ -172,6 +172,7 @@ export class DiagramNameDialog extends PromptDialog {
             suggestions.push(
                 `${typeWord} Design`,
                 `${typeWord} ${timestamp}`,
+                `${typeWord} ${timeString}`,
                 `My ${typeWord}`,
                 `New ${typeWord}`,
                 `${typeWord} v1.0`
@@ -260,7 +261,6 @@ export class DiagramNameDialog extends PromptDialog {
     private static generateDefaultName(diagramType?: DiagramTypeConfig): string {
         const now = new Date();
         const date = now.toISOString().slice(0, 10);
-        const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         if (diagramType) {
             const typeWord = diagramType.label.split(' ')[0];

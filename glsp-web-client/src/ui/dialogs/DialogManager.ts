@@ -5,7 +5,7 @@
 
 import { BaseDialog } from './base/BaseDialog.js';
 
-export interface DialogResult<T = any> {
+export interface DialogResult<T = unknown> {
     confirmed: boolean;
     value?: T;
     cancelled?: boolean;
@@ -39,7 +39,7 @@ export class DialogManager {
     /**
      * Show a dialog and return a promise that resolves with the result
      */
-    public async showDialog<T = any>(dialog: BaseDialog): Promise<DialogResult<T>> {
+    public async showDialog<T = unknown>(dialog: BaseDialog): Promise<DialogResult<T>> {
         return new Promise((resolve, reject) => {
             const dialogId = `dialog-${this.nextDialogId++}`;
             
@@ -179,7 +179,7 @@ export class DialogManager {
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             z-index: ${this.baseZIndex - 1};
-            backdrop-filter: blur(2px);
+            /* backdrop-filter: blur(2px); */ /* Removed to prevent dialog blur issues */
             animation: fadeIn 0.2s ease-out;
         `;
 

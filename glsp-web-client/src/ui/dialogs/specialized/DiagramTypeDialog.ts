@@ -3,7 +3,7 @@
  * Professional diagram type selection with icons and descriptions
  */
 
-import { SelectDialog, SelectDialogConfig, SelectOption } from '../base/SelectDialog.js';
+import { SelectDialog, SelectDialogConfig } from '../base/SelectDialog.js';
 import { DialogEvents } from '../base/BaseDialog.js';
 import { DiagramTypeConfig } from '../../../diagrams/diagram-type-registry.js';
 
@@ -23,7 +23,7 @@ export class DiagramTypeDialog extends SelectDialog {
         }
         
         // Convert diagram types to select options
-        const options = config.diagramTypes.map((type, index) => ({
+        const options = config.diagramTypes.map((type, _index) => ({
             value: type.type,
             label: type.label,
             description: config.showDescriptions !== false ? type.description : undefined,
@@ -32,7 +32,7 @@ export class DiagramTypeDialog extends SelectDialog {
         }));
 
         // Extract properties that shouldn't be overridden
-        const { diagramTypes, showDescriptions, showCategoryHeaders, ...otherConfig } = config;
+        const { diagramTypes: _diagramTypes, showDescriptions: _showDescriptions, showCategoryHeaders: _showCategoryHeaders, ...otherConfig } = config;
         
         const selectConfig: SelectDialogConfig = {
             title: 'Create New Diagram',
@@ -133,7 +133,7 @@ export class DiagramTypeDialog extends SelectDialog {
     private enhanceOptionStyling(): void {
         const options = this.element.querySelectorAll('.select-option') as NodeListOf<HTMLElement>;
         
-        options.forEach((option, index) => {
+        options.forEach((option, _index) => {
             // Enhanced styling for diagram type options
             option.style.cssText += `
                 padding: 16px;
@@ -272,15 +272,6 @@ export class DiagramTypeDialog extends SelectDialog {
 
         const selectedValue = selectedOptions[0].value;
         return this.typeConfig.diagramTypes.find(type => type.type === selectedValue) || null;
-    }
-
-    // Override to provide type-specific result
-    public getResult() {
-        const selectedType = this.getSelectedDiagramType();
-        return {
-            confirmed: true,
-            value: selectedType
-        };
     }
 
     // Static factory method

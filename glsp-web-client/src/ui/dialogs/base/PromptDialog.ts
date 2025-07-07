@@ -216,7 +216,7 @@ export class PromptDialog extends BaseDialog {
         };
     }
 
-    protected handleConfirm(value?: any): void {
+    protected handleConfirm(value?: string): void {
         if (this.validate()) {
             super.handleConfirm(value || this.inputElement.value);
         }

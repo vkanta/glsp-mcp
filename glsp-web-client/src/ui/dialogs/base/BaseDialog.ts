@@ -18,7 +18,7 @@ export interface DialogConfig extends Partial<FloatingPanelConfig> {
 }
 
 export interface DialogEvents extends FloatingPanelEvents {
-    onConfirm?: (value?: any) => void;
+    onConfirm?: (value?: unknown) => void;
     onCancel?: () => void;
     onShow?: () => void;
     onClose?: () => void;
@@ -30,6 +30,7 @@ export abstract class BaseDialog extends FloatingPanel {
     protected dialogEvents: DialogEvents;
     protected backdrop?: HTMLElement;
     protected footerElement?: HTMLElement;
+    protected flexboxContainer?: HTMLElement;
     protected isShown: boolean = false;
 
     constructor(config: DialogConfig = {}, events: DialogEvents = {}) {
@@ -91,7 +92,8 @@ export abstract class BaseDialog extends FloatingPanel {
         // Add dialog-specific CSS classes
         this.element.classList.add('base-dialog');
         
-        // Add CSS animations if not already present
+        // DISABLED: CSS animations with transforms can cause blur in dialog content
+        // Simple opacity-only animations are safer for text rendering
         if (!document.querySelector('#dialog-animations')) {
             const style = document.createElement('style');
             style.id = 'dialog-animations';
@@ -113,28 +115,51 @@ export abstract class BaseDialog extends FloatingPanel {
                         opacity: 0;
                     }
                 }
-                
-                @keyframes slideIn {
-                    from {
-                        transform: translateY(-20px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
-                }
             `;
             document.head.appendChild(style);
         }
         
-        // Set dialog-specific styles
+        // SIMPLE DIRECT RENDERING: No transforms, no GPU tricks
         this.element.style.cssText += `
             border-radius: var(--radius-md, 10px);
-            box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.5));
             border: 2px solid var(--border-bright, #3D444D);
             background: var(--bg-primary, #0A0E1A);
-            animation: slideIn 0.3s ease-out;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            /* Universal anti-blur text rendering (2024-2025 research) */
+            text-rendering: auto;
+            -webkit-font-smoothing: subpixel-antialiased;
+            -moz-osx-font-smoothing: auto;
+            font-smooth: never;
+            /* Transform elimination (proven anti-blur) */
+            transform: none !important;
+            -webkit-transform: none !important;
+            
+            /* GPU control - prevent blur from hardware acceleration */
+            will-change: auto;
+            backface-visibility: visible;
+            -webkit-backface-visibility: visible;
+            perspective: none;
+            -webkit-perspective: none;
+            transform-style: flat;
+            -webkit-transform-style: flat;
+            
+            /* Filter elimination */
+            filter: none;
+            -webkit-filter: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            
+            /* Isolation and containment (2024-2025 best practice) */
+            isolation: isolate;
+            contain: layout style;
+            
+            /* Sharp rendering */
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         `;
 
         // Style the header
@@ -148,7 +173,7 @@ export abstract class BaseDialog extends FloatingPanel {
             `;
         }
 
-        // Style the content area
+        // Style the content area - CPU RENDERING approach to avoid blur
         const contentArea = this.element.querySelector('.dialog-content') as HTMLElement;
         if (contentArea) {
             contentArea.style.cssText = `
@@ -157,6 +182,25 @@ export abstract class BaseDialog extends FloatingPanel {
                 overflow-y: auto;
                 color: var(--text-primary, #E6EDF3);
                 background: var(--bg-secondary, #151B2C);
+                /* Universal anti-blur content rendering */
+                text-rendering: auto;
+                -webkit-font-smoothing: subpixel-antialiased;
+                -moz-osx-font-smoothing: auto;
+                font-smooth: never;
+                
+                /* No transforms or GPU acceleration */
+                transform: none;
+                -webkit-transform: none;
+                will-change: auto;
+                backface-visibility: visible;
+                perspective: none;
+                
+                /* Sharp image rendering */
+                image-rendering: crisp-edges;
+                image-rendering: -webkit-optimize-contrast;
+                
+                /* Containment */
+                contain: layout style;
             `;
         }
     }
@@ -242,8 +286,9 @@ export abstract class BaseDialog extends FloatingPanel {
                 color: white;
             `;
             button.addEventListener('mouseenter', () => {
-                button.style.transform = 'translateY(-1px)';
+                // Use box-shadow only for hover effect to avoid transform blur
                 button.style.boxShadow = '0 4px 12px rgba(74, 158, 255, 0.4)';
+                button.style.backgroundColor = 'linear-gradient(90deg, #5AAEFF, #4A9EFF)';
             });
         } else {
             specificStyle = `
@@ -258,11 +303,12 @@ export abstract class BaseDialog extends FloatingPanel {
         }
 
         button.addEventListener('mouseleave', () => {
-            button.style.transform = '';
             button.style.boxShadow = '';
             if (!className.includes('primary')) {
                 button.style.backgroundColor = 'var(--bg-primary, #0F1419)';
                 button.style.color = 'var(--text-secondary, #A0A9BA)';
+            } else {
+                button.style.backgroundColor = '';
             }
         });
 
@@ -284,16 +330,23 @@ export abstract class BaseDialog extends FloatingPanel {
             this.createBackdrop();
         }
 
-        // CRITICAL: Remove dialog from current parent and append to body to escape stacking context
-        if (this.element.parentNode && this.element.parentNode !== document.body) {
-            console.log('🐛 Moving dialog from', this.element.parentNode, 'to document.body');
-            this.element.parentNode.removeChild(this.element);
+        // Check if we need centering
+        if (this.config.initialPosition.x === -1 && this.config.initialPosition.y === -1) {
+            // ALWAYS use flexbox centering (2024-2025 best practice for blur prevention)
+            console.log('🔧 Using universal flexbox centering for blur prevention');
+            this.centerDialogWithFlexbox();
+        } else {
+            // Manual positioning: Append directly to body with fixed positioning
+            if (this.element.parentNode) {
+                this.element.parentNode.removeChild(this.element);
+            }
+            
+            // Set fixed positioning BEFORE appending to body
+            this.element.style.position = 'fixed';
+            this.element.style.zIndex = '100000';
+            
+            document.body.appendChild(this.element);
         }
-        document.body.appendChild(this.element);
-
-        // Set very high z-index to ensure it's above backdrop
-        this.element.style.zIndex = '100000';
-        this.element.style.position = 'fixed';
 
         console.log('🐛 Dialog after positioning:', {
             zIndex: this.element.style.zIndex,
@@ -302,24 +355,95 @@ export abstract class BaseDialog extends FloatingPanel {
             computedStyles: window.getComputedStyle(this.element)
         });
 
-        // Center the dialog if position is -1, -1
-        if (this.config.initialPosition.x === -1 && this.config.initialPosition.y === -1) {
-            this.centerDialog();
-        }
-
-        // Show the panel
-        super.show();
+        // Show the panel (but prevent it from moving the element)
+        this.element.style.display = 'block';
+        
+        // Manually handle z-index like bringToFront does
+        const allPanels = document.querySelectorAll('.floating-panel');
+        const maxZ = Math.max(...Array.from(allPanels).map(panel => {
+            const z = parseInt(window.getComputedStyle(panel).zIndex) || 0;
+            return isNaN(z) ? 0 : z;
+        }));
+        this.element.style.zIndex = (maxZ + 1).toString();
+        
+        // Skip super.show() to prevent moving element back to body
         this.isShown = true;
 
-        // Debug final state
+        // Debug final state and actively search for blur sources
         setTimeout(() => {
+            const computedStyle = window.getComputedStyle(this.element);
+            
+            // Check all possible blur sources
+            const possibleBlurSources = {
+                filter: computedStyle.filter,
+                backdropFilter: computedStyle.backdropFilter,
+                transform: computedStyle.transform,
+                transformStyle: computedStyle.transformStyle,
+                perspective: computedStyle.perspective,
+                willChange: computedStyle.willChange,
+                isolation: computedStyle.isolation,
+                mixBlendMode: computedStyle.mixBlendMode,
+                opacity: computedStyle.opacity
+            };
+
             console.log('🐛 Final dialog state:', {
                 element: this.element,
                 backdrop: this.backdrop,
-                computedFilter: window.getComputedStyle(this.element).filter,
-                computedBackdropFilter: window.getComputedStyle(this.element).backdropFilter,
                 allStyles: this.element.style.cssText,
+                computedStyles: possibleBlurSources,
                 boundingRect: this.element.getBoundingClientRect()
+            });
+
+            // AGGRESSIVE PARENT CHAIN BLUR CLEANUP (2024-2025 approach)
+            let parent = this.element.parentElement;
+            let parentLevel = 0;
+            const blurSources = ['filter', 'backdrop-filter', 'transform', 'will-change', 'perspective'];
+            
+            while (parent && parentLevel < 15) {
+                const parentStyle = window.getComputedStyle(parent);
+                const parentElement = parent as HTMLElement;
+                
+                // Check for blur-causing properties
+                const issues = [];
+                if (parentStyle.filter !== 'none') issues.push(`filter: ${parentStyle.filter}`);
+                if (parentStyle.backdropFilter !== 'none') issues.push(`backdrop-filter: ${parentStyle.backdropFilter}`);
+                if (parentStyle.transform !== 'none' && parentStyle.transform !== 'matrix(1, 0, 0, 1, 0, 0)') {
+                    issues.push(`transform: ${parentStyle.transform}`);
+                }
+                if (parentStyle.willChange !== 'auto') issues.push(`will-change: ${parentStyle.willChange}`);
+                if (parentStyle.perspective !== 'none') issues.push(`perspective: ${parentStyle.perspective}`);
+                
+                if (issues.length > 0) {
+                    console.log(`🔧 NEUTRALIZING BLUR SOURCE IN PARENT ${parentLevel}:`, {
+                        element: parent,
+                        tagName: parent.tagName,
+                        className: parent.className,
+                        issues: issues
+                    });
+                    
+                    // Aggressively neutralize blur sources (if safe to do so)
+                    if (!parentElement.classList.contains('main-container') && 
+                        !parentElement.classList.contains('canvas-container') &&
+                        parentElement.tagName !== 'BODY' &&
+                        parentElement.tagName !== 'HTML') {
+                        
+                        parentElement.style.setProperty('filter', 'none', 'important');
+                        parentElement.style.setProperty('backdrop-filter', 'none', 'important');
+                        parentElement.style.setProperty('will-change', 'auto', 'important');
+                        parentElement.style.setProperty('perspective', 'none', 'important');
+                        console.log(`🔧 Applied fixes to parent ${parentLevel}`);
+                    }
+                }
+                
+                parent = parent.parentElement;
+                parentLevel++;
+            }
+            
+            // Also check browser zoom level
+            console.log('🐛 Browser state:', {
+                devicePixelRatio: window.devicePixelRatio,
+                zoom: Math.round(window.devicePixelRatio * 100) + '%',
+                pageZoom: document.documentElement.style.zoom || '100%'
             });
         }, 100);
 
@@ -351,11 +475,29 @@ export abstract class BaseDialog extends FloatingPanel {
             this.dialogEvents.onClose();
         }
 
-        // Clean up: remove dialog from DOM after animation
+        // Clean up: remove dialog and flexbox container from DOM after animation
         setTimeout(() => {
             if (this.element && this.element.parentNode) {
-                console.log('🐛 Removing dialog from DOM');
-                this.element.parentNode.removeChild(this.element);
+                console.log('🔧 Removing dialog from DOM');
+                
+                // Check if dialog is in a flexbox container
+                if (this.flexboxContainer && this.flexboxContainer.parentNode) {
+                    console.log('🔧 Removing stored flexbox container');
+                    this.flexboxContainer.parentNode.removeChild(this.flexboxContainer);
+                    this.flexboxContainer = undefined;
+                } else {
+                    const parent = this.element.parentNode as HTMLElement;
+                    if (parent && parent.classList.contains('dialog-flexbox-container')) {
+                        console.log('🔧 Removing detected flexbox container');
+                        // Remove the entire flexbox container
+                        if (parent.parentNode) {
+                            parent.parentNode.removeChild(parent);
+                        }
+                    } else {
+                        // Remove just the dialog element
+                        parent.removeChild(this.element);
+                    }
+                }
             }
         }, 300); // Wait for animations to complete
     }
@@ -405,28 +547,23 @@ export abstract class BaseDialog extends FloatingPanel {
     }
 
     private blurPageContent(): void {
-        // Find all direct children of body that aren't dialogs or backdrops
-        const bodyChildren = Array.from(document.body.children);
-        console.log('🐛 Body children found:', bodyChildren.length);
+        // Disabled blur effect to prevent dialog content from appearing blurred
+        // The backdrop provides sufficient visual separation
+        console.log('🐛 Blur effect disabled - using backdrop only');
+        return;
         
-        bodyChildren.forEach(child => {
-            const element = child as HTMLElement;
-            console.log('🐛 Checking element:', element.tagName, element.className);
-            
-            // Skip dialog elements and backdrops
-            if (!element.classList.contains('base-dialog') && 
-                !element.classList.contains('dialog-backdrop') &&
-                !element.classList.contains('floating-panel')) {
-                
-                console.log('🐛 Applying blur to:', element.tagName, element.className);
-                // Apply blur to page content
-                element.style.filter = 'blur(4px)';
-                element.style.transition = 'filter 0.2s ease-out';
-                element.setAttribute('data-dialog-blurred', 'true');
-            } else {
-                console.log('🐛 Skipping element (dialog/backdrop/panel):', element.tagName, element.className);
-            }
-        });
+        // Original blur code commented out:
+        // const bodyChildren = Array.from(document.body.children);
+        // bodyChildren.forEach(child => {
+        //     const element = child as HTMLElement;
+        //     if (!element.classList.contains('base-dialog') && 
+        //         !element.classList.contains('dialog-backdrop') &&
+        //         !element.classList.contains('floating-panel')) {
+        //         element.style.filter = 'blur(4px)';
+        //         element.style.transition = 'filter 0.2s ease-out';
+        //         element.setAttribute('data-dialog-blurred', 'true');
+        //     }
+        // });
     }
 
     private unblurPageContent(): void {
@@ -470,13 +607,86 @@ export abstract class BaseDialog extends FloatingPanel {
         }, 200);
     }
 
-    protected centerDialog(): void {
-        const rect = this.element.getBoundingClientRect();
-        const x = (window.innerWidth - rect.width) / 2;
-        const y = (window.innerHeight - rect.height) / 2;
+    protected centerDialogWithFlexbox(): void {
+        // 2024-2025 ANTI-BLUR: Clean up any existing containers first
+        const existingContainers = document.querySelectorAll('.dialog-flexbox-container');
+        existingContainers.forEach(container => {
+            if (container.parentNode && container.children.length === 0) {
+                container.parentNode.removeChild(container);
+                console.log('🔧 Cleaned up empty flexbox container');
+            }
+        });
+
+        // Create new flexbox container with comprehensive blur prevention
+        const container = document.createElement('div');
+        container.className = 'dialog-flexbox-container';
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100001;
+            pointer-events: none;
+            
+            /* Anti-blur properties for container */
+            transform: none;
+            -webkit-transform: none;
+            filter: none;
+            -webkit-filter: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            will-change: auto;
+            backface-visibility: visible;
+            perspective: none;
+            isolation: isolate;
+            contain: layout;
+        `;
         
-        this.element.style.left = `${Math.max(20, x)}px`;
-        this.element.style.top = `${Math.max(20, y)}px`;
+        // Reset dialog positioning to work within flexbox
+        this.element.style.position = 'relative';
+        this.element.style.left = 'auto';
+        this.element.style.top = 'auto';
+        this.element.style.zIndex = 'auto';
+        this.element.style.pointerEvents = 'auto';
+        
+        // CRITICAL: Ensure dialog is properly moved into container
+        if (this.element.parentNode) {
+            this.element.parentNode.removeChild(this.element);
+        }
+        
+        // Add dialog to container FIRST, then container to body
+        container.appendChild(this.element);
+        document.body.appendChild(container);
+        
+        // Store reference for cleanup
+        this.flexboxContainer = container;
+        
+        // Verify the dialog is properly nested
+        setTimeout(() => {
+            if (this.element.parentNode === container) {
+                console.log('🔧 Dialog successfully placed in flexbox container');
+            } else {
+                console.error('🚨 Dialog not properly nested in flexbox container!');
+            }
+        }, 10);
+        
+        console.log('🔧 Using enhanced flexbox centering for blur prevention');
+    }
+
+    protected centerDialog(): void {
+        // FALLBACK: Use pixel centering for manual positioning
+        const x = Math.max(20, (window.innerWidth - this.element.offsetWidth) / 2);
+        const y = Math.max(20, (window.innerHeight - this.element.offsetHeight) / 2);
+        
+        // Use integer pixel values to prevent subpixel rendering
+        this.element.style.left = `${Math.round(x)}px`;
+        this.element.style.top = `${Math.round(y)}px`;
     }
 
     protected focusFirst(): void {
@@ -492,7 +702,7 @@ export abstract class BaseDialog extends FloatingPanel {
         }
     }
 
-    protected handleConfirm(value?: any): void {
+    protected handleConfirm(value?: unknown): void {
         if (this.dialogEvents.onConfirm) {
             this.dialogEvents.onConfirm(value);
         }
@@ -518,6 +728,35 @@ export abstract class BaseDialog extends FloatingPanel {
         this.element.style.position = 'fixed';
         this.element.style.isolation = 'isolate';
         console.log('🐛 Dialog ensureDialogZIndex called, maintaining z-index:', this.element.style.zIndex);
+    }
+
+    // Force sharp rendering - call this if experiencing blur
+    public forceSharpRendering(): void {
+        // Apply anti-blur styles
+        this.element.style.textRendering = 'optimizeLegibility';
+        this.element.style.webkitFontSmoothing = 'antialiased';
+        this.element.style.mozOsxFontSmoothing = 'grayscale';
+        // Don't use transform as it can cause blur
+        this.element.style.transform = 'none';
+        this.element.style.backfaceVisibility = 'hidden';
+        this.element.style.webkitBackfaceVisibility = 'hidden';
+        this.element.style.perspective = '1000';
+        this.element.style.webkitPerspective = '1000';
+        
+        // Round position to nearest pixel
+        const rect = this.element.getBoundingClientRect();
+        this.element.style.left = `${Math.round(rect.left)}px`;
+        this.element.style.top = `${Math.round(rect.top)}px`;
+        
+        // Apply to all child elements
+        this.element.querySelectorAll('*').forEach(el => {
+            const element = el as HTMLElement;
+            element.style.textRendering = 'optimizeLegibility';
+            element.style.webkitFontSmoothing = 'antialiased';
+            element.style.transform = 'none';
+        });
+        
+        console.log('🔧 Applied sharp rendering fixes to dialog');
     }
 
     // Debug helper - call from console
