@@ -4,18 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# PulseEngine MCP Framework dependencies from crates.io (0.3.0)
-pulseengine-mcp-protocol = "0.3.0"
-pulseengine-mcp-transport = "0.3.0"
-pulseengine-mcp-server = "0.3.0"
+# PulseEngine MCP Framework dependencies from crates.io (0.4.2)
+pulseengine-mcp-protocol = "0.4.2"
+pulseengine-mcp-transport = "0.4.2"
+pulseengine-mcp-server = "0.4.2"
 
 # CLI framework for enhanced developer experience
-pulseengine-mcp-cli = "0.3.0"
-pulseengine-mcp-cli-derive = "0.3.0"
+pulseengine-mcp-cli = "0.4.2"
+pulseengine-mcp-cli-derive = "0.4.2"
 
 # Enhanced capabilities for production readiness
-pulseengine-mcp-logging = "0.3.0"
-pulseengine-mcp-monitoring = "0.3.0"
+pulseengine-mcp-logging = "0.4.2"
+pulseengine-mcp-monitoring = "0.4.2"
 
 # Workspace dependencies
 serde = { workspace = true }
