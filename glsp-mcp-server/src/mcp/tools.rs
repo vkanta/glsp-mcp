@@ -1,16 +1,47 @@
 use crate::mcp::protocol::{CallToolParams, CallToolResult, TextContent, Tool};
 use crate::model::{DiagramModel, Edge, ElementType, Node, Position};
 use crate::selection::SelectionMode;
-use crate::wasm::{WasmComponent, WasmFileWatcher};
+use crate::wasm::{WasmComponent, WasmFileWatcher, WasmComponentChange};
+use crate::database::{BoxedDatasetManager, SensorQuery};
+use crate::database::dataset::{DatasetManager, SensorSelector};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tracing::info;
 
+/// Core MCP tools interface for diagram and WASM component operations
+///
+/// Provides the primary interface for AI agents to interact with diagrams and
+/// WASM components through the Model Context Protocol. Manages in-memory diagram
+/// models, WASM component monitoring, and optional database integration.
+///
+/// # Capabilities
+///
+/// - **Diagram Operations**: Create, modify, delete diagram elements
+/// - **WASM Management**: Monitor and execute WebAssembly components
+/// - **Layout Operations**: Apply automatic layout algorithms
+/// - **Validation**: Check diagram consistency and validity
+/// - **Export**: Generate various output formats
+/// - **Database Integration**: Optional sensor data queries
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use glsp_mcp_server::DiagramTools;
+///
+/// let tools = DiagramTools::new();
+/// let available_tools = tools.get_available_tools();
+/// println!("Available MCP tools: {}", available_tools.len());
+/// ```
 pub struct DiagramTools {
     models: HashMap<String, DiagramModel>,
     wasm_watcher: WasmFileWatcher,
+    dataset_manager: Option<Arc<Mutex<BoxedDatasetManager>>>,
 }
 
 impl Default for DiagramTools {
@@ -24,16 +55,27 @@ impl DiagramTools {
         // Default WASM watch path - can be configured via CLI args
         let wasm_path = std::env::args()
             .find(|arg| arg.starts_with("--wasm-path="))
-            .map(|arg| PathBuf::from(arg.strip_prefix("--wasm-path=").unwrap()))
+            .and_then(|arg| arg.strip_prefix("--wasm-path=").map(PathBuf::from))
             .or_else(|| std::env::var("WASM_WATCH_PATH").ok().map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from("../workspace/adas-wasm-components"));
 
-        println!("WASM watch path: {wasm_path:?}");
+        info!("WASM watch path: {wasm_path:?}");
+
+        // Initialize with execution engine (max 3 concurrent executions)
+        let wasm_watcher = WasmFileWatcher::new(wasm_path)
+            .with_execution_engine(3)
+            .expect("Failed to initialize WASM execution engine");
 
         Self {
             models: HashMap::new(),
-            wasm_watcher: WasmFileWatcher::new(wasm_path),
+            wasm_watcher,
+            dataset_manager: None,
         }
+    }
+    
+    pub fn with_dataset_manager(mut self, dataset_manager: Arc<Mutex<BoxedDatasetManager>>) -> Self {
+        self.dataset_manager = Some(dataset_manager);
+        self
     }
 
     pub fn get_available_tools(&self) -> Vec<Tool> {
@@ -419,6 +461,376 @@ impl DiagramTools {
                     "required": ["diagramId", "componentName", "position"]
                 }),
             },
+            Tool {
+                name: "execute_wasm_component".to_string(),
+                description: Some("Execute a method on a WASM component with sandboxing".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the WASM component to execute"
+                        },
+                        "method": {
+                            "type": "string",
+                            "description": "Method name to execute",
+                            "default": "main"
+                        },
+                        "args": {
+                            "type": "object",
+                            "description": "Arguments to pass to the method",
+                            "default": {}
+                        },
+                        "timeout_ms": {
+                            "type": "number",
+                            "description": "Execution timeout in milliseconds",
+                            "default": 30000
+                        },
+                        "max_memory_mb": {
+                            "type": "number",
+                            "description": "Maximum memory limit in MB",
+                            "default": 64
+                        }
+                    },
+                    "required": ["componentName"]
+                }),
+            },
+            Tool {
+                name: "get_execution_progress".to_string(),
+                description: Some("Get progress of a WASM component execution".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "executionId": {
+                            "type": "string",
+                            "description": "ID of the execution to check"
+                        }
+                    },
+                    "required": ["executionId"]
+                }),
+            },
+            Tool {
+                name: "get_execution_result".to_string(),
+                description: Some("Get result of a completed WASM component execution".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "executionId": {
+                            "type": "string",
+                            "description": "ID of the execution to get result for"
+                        }
+                    },
+                    "required": ["executionId"]
+                }),
+            },
+            Tool {
+                name: "list_wasm_executions".to_string(),
+                description: Some("List all active and recent WASM component executions".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }),
+            },
+            Tool {
+                name: "cancel_execution".to_string(),
+                description: Some("Cancel a running WASM component execution".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "executionId": {
+                            "type": "string",
+                            "description": "ID of the execution to cancel"
+                        }
+                    },
+                    "required": ["executionId"]
+                }),
+            },
+            // Sensor Data Tools
+            Tool {
+                name: "query_sensor_data".to_string(),
+                description: Some("Query sensor data with time range and filters".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorIds": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Sensor IDs to query (empty = all sensors)"
+                        },
+                        "startTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Start time (ISO 8601 format)"
+                        },
+                        "endTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "End time (ISO 8601 format)"
+                        },
+                        "dataTypes": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "enum": ["Camera", "Radar", "Lidar", "IMU", "GPS", "CAN", "Ultrasonic", "Generic"],
+                            "description": "Filter by sensor data types"
+                        },
+                        "minQuality": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                            "description": "Minimum quality threshold (0.0-1.0)"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10000,
+                            "description": "Maximum number of readings to return"
+                        },
+                        "downsampleIntervalMs": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Downsample interval in milliseconds"
+                        }
+                    },
+                    "required": ["startTime", "endTime"]
+                }),
+            },
+            Tool {
+                name: "list_sensors".to_string(),
+                description: Some("List all available sensors in the database".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }),
+            },
+            Tool {
+                name: "get_sensor_metadata".to_string(),
+                description: Some("Get metadata for a specific sensor".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorId": {
+                            "type": "string",
+                            "description": "Sensor ID to get metadata for"
+                        }
+                    },
+                    "required": ["sensorId"]
+                }),
+            },
+            Tool {
+                name: "get_sensor_statistics".to_string(),
+                description: Some("Get statistics for a sensor including time range and quality metrics".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorId": {
+                            "type": "string",
+                            "description": "Sensor ID to get statistics for"
+                        }
+                    },
+                    "required": ["sensorId"]
+                }),
+            },
+            Tool {
+                name: "get_sensor_time_range".to_string(),
+                description: Some("Get the time range of available data for a sensor".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorId": {
+                            "type": "string",
+                            "description": "Sensor ID to get time range for (empty for global range)"
+                        }
+                    }
+                }),
+            },
+            Tool {
+                name: "list_sensor_datasets".to_string(),
+                description: Some("List available sensor datasets".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "includeMetadata": {
+                            "type": "boolean",
+                            "description": "Include dataset metadata in response",
+                            "default": true
+                        }
+                    }
+                }),
+            },
+            Tool {
+                name: "get_dataset_info".to_string(),
+                description: Some("Get detailed information about a sensor dataset".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "datasetId": {
+                            "type": "string",
+                            "description": "Dataset ID to get information for"
+                        }
+                    },
+                    "required": ["datasetId"]
+                }),
+            },
+            Tool {
+                name: "set_active_dataset".to_string(),
+                description: Some("Set the active sensor dataset for queries".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "datasetId": {
+                            "type": "string",
+                            "description": "Dataset ID to activate"
+                        }
+                    },
+                    "required": ["datasetId"]
+                }),
+            },
+            Tool {
+                name: "visualize_sensor_data".to_string(),
+                description: Some("Generate visualization of sensor data over time".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorId": {
+                            "type": "string",
+                            "description": "Sensor ID to visualize"
+                        },
+                        "startTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Start time (ISO 8601 format)"
+                        },
+                        "endTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "End time (ISO 8601 format)"
+                        },
+                        "visualizationType": {
+                            "type": "string",
+                            "enum": ["timeline", "quality", "frequency", "gaps"],
+                            "description": "Type of visualization to generate",
+                            "default": "timeline"
+                        },
+                        "width": {
+                            "type": "integer",
+                            "minimum": 100,
+                            "maximum": 2000,
+                            "description": "Width of visualization in pixels",
+                            "default": 800
+                        },
+                        "height": {
+                            "type": "integer",
+                            "minimum": 100,
+                            "maximum": 1000,
+                            "description": "Height of visualization in pixels",
+                            "default": 400
+                        }
+                    },
+                    "required": ["sensorId", "startTime", "endTime"]
+                }),
+            },
+            Tool {
+                name: "detect_sensor_gaps".to_string(),
+                description: Some("Detect gaps in sensor data".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "sensorId": {
+                            "type": "string",
+                            "description": "Sensor ID to analyze"
+                        },
+                        "startTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Start time (ISO 8601 format)"
+                        },
+                        "endTime": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "End time (ISO 8601 format)"
+                        },
+                        "maxGapMs": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Maximum gap size in milliseconds to report",
+                            "default": 1000
+                        }
+                    },
+                    "required": ["sensorId", "startTime", "endTime"]
+                }),
+            },
+            // Component upload tools
+            Tool {
+                name: "upload_wasm_component".to_string(),
+                description: Some("Upload a WASM component file to the server".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name for the component"
+                        },
+                        "wasmBase64": {
+                            "type": "string",
+                            "description": "Base64 encoded WASM file content"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Optional description of the component"
+                        },
+                        "version": {
+                            "type": "string",
+                            "description": "Component version",
+                            "default": "1.0.0"
+                        }
+                    },
+                    "required": ["componentName", "wasmBase64"]
+                }),
+            },
+            Tool {
+                name: "validate_wasm_component".to_string(),
+                description: Some("Validate a WASM component before upload".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "wasmBase64": {
+                            "type": "string",
+                            "description": "Base64 encoded WASM file content to validate"
+                        }
+                    },
+                    "required": ["wasmBase64"]
+                }),
+            },
+            Tool {
+                name: "list_uploaded_components".to_string(),
+                description: Some("List all uploaded WASM components".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "includeMetadata": {
+                            "type": "boolean",
+                            "description": "Include component metadata in response",
+                            "default": true
+                        }
+                    }
+                }),
+            },
+            Tool {
+                name: "delete_uploaded_component".to_string(),
+                description: Some("Delete an uploaded WASM component".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "componentName": {
+                            "type": "string",
+                            "description": "Name of the component to delete"
+                        }
+                    },
+                    "required": ["componentName"]
+                }),
+            },
         ]
     }
 
@@ -445,6 +857,28 @@ impl DiagramTools {
             }
             "remove_missing_component" => self.remove_missing_component(params.arguments).await,
             "load_wasm_component" => self.load_wasm_component(params.arguments).await,
+            // WASM execution tools
+            "execute_wasm_component" => self.execute_wasm_component(params.arguments).await,
+            "get_execution_progress" => self.get_execution_progress(params.arguments).await,
+            "get_execution_result" => self.get_execution_result(params.arguments).await,
+            "list_wasm_executions" => self.list_wasm_executions().await,
+            "cancel_execution" => self.cancel_execution(params.arguments).await,
+            // Sensor data tools
+            "query_sensor_data" => self.query_sensor_data(params.arguments).await,
+            "list_sensors" => self.list_sensors().await,
+            "get_sensor_metadata" => self.get_sensor_metadata(params.arguments).await,
+            "get_sensor_statistics" => self.get_sensor_statistics(params.arguments).await,
+            "get_sensor_time_range" => self.get_sensor_time_range(params.arguments).await,
+            "list_sensor_datasets" => self.list_sensor_datasets(params.arguments).await,
+            "get_dataset_info" => self.get_dataset_info(params.arguments).await,
+            "set_active_dataset" => self.set_active_dataset(params.arguments).await,
+            "visualize_sensor_data" => self.visualize_sensor_data(params.arguments).await,
+            "detect_sensor_gaps" => self.detect_sensor_gaps(params.arguments).await,
+            // Component upload tools
+            "upload_wasm_component" => self.upload_wasm_component(params.arguments).await,
+            "validate_wasm_component" => self.validate_wasm_component(params.arguments).await,
+            "list_uploaded_components" => self.list_uploaded_components(params.arguments).await,
+            "delete_uploaded_component" => self.delete_uploaded_component(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -1092,6 +1526,10 @@ impl DiagramTools {
     pub fn get_wasm_components(&self) -> Vec<&WasmComponent> {
         self.wasm_watcher.get_components()
     }
+    
+    pub async fn get_recent_wasm_changes(&self) -> Vec<WasmComponentChange> {
+        self.wasm_watcher.get_recent_changes().await
+    }
 
     pub fn get_wasm_component(&self, name: &str) -> Option<&WasmComponent> {
         self.wasm_watcher.get_component(name)
@@ -1124,13 +1562,29 @@ impl DiagramTools {
                 let available = components.iter().filter(|c| c.file_exists).count();
                 let missing = components.len() - available;
 
+                // Convert components to JSON format expected by the client
+                let components_json: Vec<_> = components.iter().map(|c| json!({
+                    "name": c.name,
+                    "path": c.path,
+                    "fileExists": c.file_exists,
+                    "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
+                    "metadata": c.metadata,
+                    "interfaces": c.interfaces
+                })).collect();
+
+                let result = json!({
+                    "components": components_json,
+                    "summary": {
+                        "total": components.len(),
+                        "available": available,
+                        "missing": missing
+                    }
+                });
+
                 Ok(CallToolResult {
                     content: vec![TextContent {
-                        content_type: "text".to_string(),
-                        text: format!(
-                            "WASM component scan completed.\nFound {} components: {} available, {} missing",
-                            components.len(), available, missing
-                        ),
+                        content_type: "application/json".to_string(),
+                        text: result.to_string(),
                     }],
                     is_error: None,
                 })
@@ -1291,6 +1745,828 @@ impl DiagramTools {
                 content_type: "text".to_string(),
                 text: format!(
                     "Loaded WASM component '{component_name}' into diagram with ID: {node_id}"
+                ),
+            }],
+            is_error: None,
+        })
+    }
+
+    // WASM execution methods
+    async fn execute_wasm_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let component_name = args["componentName"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+
+        let method = args["method"].as_str().unwrap_or("main");
+        let timeout_ms = args["timeout_ms"].as_u64().unwrap_or(30000);
+        let max_memory_mb = args["max_memory_mb"].as_u64().unwrap_or(64) as u32;
+        let method_args = args.get("args").cloned().unwrap_or(json!({}));
+
+        match self.wasm_watcher.execute_component(
+            component_name,
+            method,
+            method_args,
+            timeout_ms,
+            max_memory_mb,
+        ).await {
+            Ok(execution_id) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!(
+                        "Started execution of {}::{} with ID: {}",
+                        component_name, method, execution_id
+                    ),
+                }],
+                is_error: None,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to execute component: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+
+    async fn get_execution_progress(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let execution_id = args["executionId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing executionId"))?;
+
+        if let Some(progress) = self.wasm_watcher.get_execution_progress(execution_id) {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&progress)
+                        .unwrap_or_else(|_| "Failed to serialize progress".to_string()),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Execution {} not found", execution_id),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn get_execution_result(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let execution_id = args["executionId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing executionId"))?;
+
+        if let Some(result) = self.wasm_watcher.get_execution_result(execution_id) {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&result)
+                        .unwrap_or_else(|_| "Failed to serialize result".to_string()),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Execution {} not found or not completed", execution_id),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    async fn list_wasm_executions(&self) -> Result<CallToolResult> {
+        let executions = self.wasm_watcher.list_executions();
+        
+        if executions.is_empty() {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "No active or recent executions".to_string(),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&executions)
+                        .unwrap_or_else(|_| "Failed to serialize executions".to_string()),
+                }],
+                is_error: None,
+            })
+        }
+    }
+
+    async fn cancel_execution(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let execution_id = args["executionId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing executionId"))?;
+
+        let cancelled = self.wasm_watcher.cancel_execution(execution_id);
+        
+        if cancelled {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Cancelled execution {}", execution_id),
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Execution {} not found or could not be cancelled", execution_id),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+
+    // Sensor data tool implementations
+    async fn query_sensor_data(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+        
+        let sensor_ids: Vec<String> = args["sensorIds"]
+            .as_array()
+            .unwrap_or(&vec![])
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect();
+            
+        let start_time = args["startTime"]
+            .as_str()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
+            .ok_or_else(|| anyhow::anyhow!("Invalid or missing startTime"))?;
+            
+        let end_time = args["endTime"]
+            .as_str()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
+            .ok_or_else(|| anyhow::anyhow!("Invalid or missing endTime"))?;
+            
+        let limit = args["limit"].as_u64().map(|v| v as usize);
+        let min_quality = args["minQuality"].as_f64().map(|v| v as f32);
+        let downsample_interval_ms = args["downsampleIntervalMs"]
+            .as_u64()
+            .map(|ms| ms * 1000); // Convert to microseconds
+            
+        let query = SensorQuery {
+            sensor_ids,
+            start_time_us: start_time,
+            end_time_us: end_time,
+            limit,
+            min_quality,
+            downsample_interval_us: downsample_interval_ms.map(|v| v as i64),
+            data_types: None, // Could be extended to filter by data types
+        };
+        
+        let manager = dataset_manager.lock().await;
+        let active_dataset = manager.get_active_dataset().await?
+            .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
+        
+        match manager.query_selected_data(&active_dataset.dataset_id, &query).await {
+            Ok(readings) => {
+                let result = json!({
+                    "readingCount": readings.len(),
+                    "readings": readings.iter().take(100).collect::<Vec<_>>(), // Limit response size
+                    "truncated": readings.len() > 100
+                });
+                
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&result)?,
+                    }],
+                    is_error: None,
+                })
+            }
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to query sensor data: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn list_sensors(&self) -> Result<CallToolResult> {
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        let active_dataset = manager.get_active_dataset().await?
+            .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
+        
+        match manager.list_sensors(&active_dataset.dataset_id).await {
+            Ok(sensor_infos) => {
+                let result = json!({
+                    "sensorCount": sensor_infos.len(),
+                    "sensors": sensor_infos.iter().map(|si| &si.sensor_id).collect::<Vec<_>>()
+                });
+                
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&result)?,
+                    }],
+                    is_error: None,
+                })
+            }
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to list sensors: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn get_sensor_metadata(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let sensor_id = args["sensorId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
+            
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        let active_dataset = manager.get_active_dataset().await?
+            .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
+        
+        match manager.get_sensor_info(&active_dataset.dataset_id, sensor_id).await {
+            Ok(Some(sensor_info)) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&sensor_info.metadata)?,
+                }],
+                is_error: None,
+            }),
+            Ok(None) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("No metadata found for sensor: {}", sensor_id),
+                }],
+                is_error: Some(true),
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to get sensor metadata: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn get_sensor_statistics(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let sensor_id = args["sensorId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
+            
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        let active_dataset = manager.get_active_dataset().await?
+            .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
+        
+        match manager.get_sensor_info(&active_dataset.dataset_id, sensor_id).await {
+            Ok(Some(sensor_info)) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&sensor_info.statistics)?,
+                }],
+                is_error: None,
+            }),
+            Ok(None) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("No statistics found for sensor: {}", sensor_id),
+                }],
+                is_error: Some(true),
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to get sensor statistics: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn get_sensor_time_range(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let sensor_id = args.as_ref().and_then(|a| a["sensorId"].as_str());
+        
+        let manager = dataset_manager.lock().await;
+        let active_dataset = manager.get_active_dataset().await?
+            .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
+        
+        let result: Result<Option<crate::database::TimeRange>> = if let Some(id) = sensor_id {
+            // Get sensor-specific time range from sensor info
+            match manager.get_sensor_info(&active_dataset.dataset_id, id).await? {
+                Some(sensor_info) => Ok(Some(sensor_info.statistics.time_range)),
+                None => Ok(None)
+            }
+        } else {
+            // Get dataset's global time range
+            Ok(Some(active_dataset.time_range))
+        };
+        
+        match result {
+            Ok(Some(range)) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&range)?,
+                }],
+                is_error: None,
+            }),
+            Ok(None) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "No time range data available".to_string(),
+                }],
+                is_error: Some(true),
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to get time range: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn list_sensor_datasets(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let include_metadata = args
+            .and_then(|a| a["includeMetadata"].as_bool())
+            .unwrap_or(true);
+            
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        let datasets = manager.list_datasets().await?;
+        let active_dataset = manager.get_active_dataset().await?
+            .map(|d| d.dataset_id.clone());
+        
+        let result = if include_metadata {
+            json!({
+                "datasetCount": datasets.len(),
+                "activeDataset": active_dataset,
+                "datasets": datasets.clone()
+            })
+        } else {
+            let ids: Vec<String> = datasets.into_iter().map(|d| d.dataset_id).collect();
+            json!({
+                "datasetCount": ids.len(),
+                "activeDataset": active_dataset,
+                "datasetIds": ids
+            })
+        };
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: serde_json::to_string_pretty(&result)?,
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn get_dataset_info(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let dataset_id = args["datasetId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing datasetId"))?;
+            
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        if let Some(dataset) = manager.get_dataset(dataset_id).await? {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&dataset)?,
+                }],
+                is_error: None,
+            })
+        } else {
+            Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Dataset '{}' not found", dataset_id),
+                }],
+                is_error: Some(true),
+            })
+        }
+    }
+    
+    async fn set_active_dataset(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let dataset_id = args["datasetId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing datasetId"))?;
+            
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let mut manager = dataset_manager.lock().await;
+        match manager.set_active_dataset(dataset_id).await {
+            Ok(()) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Successfully activated dataset: {}", dataset_id),
+                }],
+                is_error: None,
+            }),
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to activate dataset: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+    
+    async fn visualize_sensor_data(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let sensor_id = args["sensorId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
+        let visualization_type = args["visualizationType"]
+            .as_str()
+            .unwrap_or("timeline");
+        let width = args["width"].as_u64().unwrap_or(800) as u32;
+        let height = args["height"].as_u64().unwrap_or(400) as u32;
+        
+        // For now, return a placeholder response
+        // In a full implementation, this would generate actual visualizations
+        let result = json!({
+            "visualizationType": visualization_type,
+            "sensorId": sensor_id,
+            "width": width,
+            "height": height,
+            "status": "Visualization generation not yet implemented",
+            "placeholder": format!("Would generate {} visualization for sensor {} at {}x{}", 
+                visualization_type, sensor_id, width, height)
+        });
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: serde_json::to_string_pretty(&result)?,
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn detect_sensor_gaps(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let sensor_id = args["sensorId"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
+            
+        let start_time = args["startTime"]
+            .as_str()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
+            .ok_or_else(|| anyhow::anyhow!("Invalid or missing startTime"))?;
+            
+        let end_time = args["endTime"]
+            .as_str()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
+            .ok_or_else(|| anyhow::anyhow!("Invalid or missing endTime"))?;
+            
+        let max_gap_ms = args["maxGapMs"].as_u64().unwrap_or(1000);
+        let max_gap_us = max_gap_ms * 1000; // Convert to microseconds
+        
+        let dataset_manager = self.dataset_manager.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
+            
+        let manager = dataset_manager.lock().await;
+        let backend = manager.backend();
+        match backend.detect_gaps(sensor_id, start_time, end_time, max_gap_us as i64).await {
+            Ok(gaps) => {
+                let result = json!({
+                    "sensorId": sensor_id,
+                    "gapCount": gaps.len(),
+                    "maxGapMs": max_gap_ms,
+                    "gaps": gaps
+                });
+                
+                Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&result)?,
+                    }],
+                    is_error: None,
+                })
+            }
+            Err(e) => Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Failed to detect sensor gaps: {}", e),
+                }],
+                is_error: Some(true),
+            }),
+        }
+    }
+
+    // Component upload tool implementations
+    async fn upload_wasm_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let component_name = args["componentName"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+        let wasm_base64 = args["wasmBase64"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing wasmBase64"))?;
+        let description = args["description"].as_str();
+        let version = args["version"].as_str().unwrap_or("1.0.0");
+        
+        // Decode base64 WASM content
+        use base64::Engine as _;
+        let wasm_bytes = base64::engine::general_purpose::STANDARD.decode(wasm_base64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode base64: {}", e))?;
+        
+        // Validate size
+        if wasm_bytes.len() > 50 * 1024 * 1024 {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "Component file too large. Maximum size is 50MB".to_string(),
+                }],
+                is_error: Some(true),
+            });
+        }
+        
+        // Save component to file system
+        let wasm_path = self.wasm_watcher.get_watch_path();
+        let component_filename = format!("{}.wasm", component_name);
+        let component_path = wasm_path.join(&component_filename);
+        
+        // Check if component already exists
+        if component_path.exists() {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Component '{}' already exists. Delete it first to re-upload.", component_name),
+                }],
+                is_error: Some(true),
+            });
+        }
+        
+        // Write WASM file
+        use std::fs;
+        fs::write(&component_path, &wasm_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to write WASM file: {}", e))?;
+        
+        // Create metadata file
+        let metadata = json!({
+            "name": component_name,
+            "version": version,
+            "description": description,
+            "uploadedAt": chrono::Utc::now().to_rfc3339(),
+            "size": wasm_bytes.len(),
+            "checksum": format!("{:x}", sha2::Sha256::digest(&wasm_bytes)),
+        });
+        
+        let metadata_path = wasm_path.join(format!("{}.json", component_name));
+        fs::write(&metadata_path, serde_json::to_string_pretty(&metadata)?)
+            .map_err(|e| anyhow::anyhow!("Failed to write metadata: {}", e))?;
+        
+        // Trigger component scan to pick up the new component
+        self.wasm_watcher.scan_components().await?;
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!(
+                    "Successfully uploaded WASM component '{}' (version: {}, size: {} bytes)",
+                    component_name, version, wasm_bytes.len()
+                ),
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn validate_wasm_component(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let wasm_base64 = args["wasmBase64"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing wasmBase64"))?;
+        
+        // Decode base64
+        use base64::Engine as _;
+        let wasm_bytes = base64::engine::general_purpose::STANDARD.decode(wasm_base64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode base64: {}", e))?;
+        
+        // Basic validation
+        let mut validation_result = json!({
+            "isValid": true,
+            "errors": [],
+            "warnings": [],
+            "metadata": {
+                "size": wasm_bytes.len(),
+                "checksum": format!("{:x}", sha2::Sha256::digest(&wasm_bytes)),
+            }
+        });
+        
+        // Check size
+        if wasm_bytes.len() > 50 * 1024 * 1024 {
+            validation_result["isValid"] = json!(false);
+            validation_result["errors"].as_array_mut().unwrap()
+                .push(json!("File size exceeds 50MB limit"));
+        }
+        
+        // Validate WASM format using wasmparser
+        use wasmparser::Validator;
+        let mut validator = Validator::new();
+        match validator.validate_all(&wasm_bytes) {
+            Ok(_) => {
+                validation_result["metadata"]["format"] = json!("Valid WebAssembly module");
+                
+                // Try to parse as component
+                use wit_component::decode;
+                match decode(&wasm_bytes) {
+                    Ok(decoded) => {
+                        validation_result["metadata"]["type"] = json!("WebAssembly Component");
+                        
+                        match decoded {
+                            wit_component::DecodedWasm::WitPackage(resolve, pkg) => {
+                                validation_result["metadata"]["packageId"] = json!(format!("{:?}", pkg));
+                                
+                                // Extract interface information
+                                let interfaces: Vec<String> = resolve.interfaces.iter()
+                                    .filter_map(|(_, iface)| iface.name.clone())
+                                    .collect();
+                                
+                                validation_result["metadata"]["interfaces"] = json!(interfaces);
+                            }
+                            wit_component::DecodedWasm::Component(resolve, world) => {
+                                validation_result["metadata"]["worldId"] = json!(format!("{:?}", world));
+                                
+                                // Extract interface information
+                                let interfaces: Vec<String> = resolve.interfaces.iter()
+                                    .filter_map(|(_, iface)| iface.name.clone())
+                                    .collect();
+                                
+                                validation_result["metadata"]["interfaces"] = json!(interfaces);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        validation_result["metadata"]["type"] = json!("WebAssembly Module");
+                        validation_result["warnings"].as_array_mut().unwrap()
+                            .push(json!("Not a WebAssembly component (missing component metadata)"));
+                    }
+                }
+            }
+            Err(e) => {
+                validation_result["isValid"] = json!(false);
+                validation_result["errors"].as_array_mut().unwrap()
+                    .push(json!(format!("Invalid WebAssembly format: {}", e)));
+            }
+        }
+        
+        // Security checks
+        if wasm_bytes.len() < 8 {
+            validation_result["warnings"].as_array_mut().unwrap()
+                .push(json!("Suspiciously small file size"));
+        }
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: serde_json::to_string_pretty(&validation_result)?,
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn list_uploaded_components(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let include_metadata = args
+            .and_then(|a| a["includeMetadata"].as_bool())
+            .unwrap_or(true);
+        
+        let wasm_path = self.wasm_watcher.get_watch_path();
+        let mut components = Vec::new();
+        
+        // Read all .json metadata files
+        use std::fs;
+        if let Ok(entries) = fs::read_dir(&wasm_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if let Ok(metadata) = serde_json::from_str::<Value>(&content) {
+                            if metadata.get("uploadedAt").is_some() {
+                                // This is an uploaded component metadata file
+                                if include_metadata {
+                                    components.push(metadata);
+                                } else {
+                                    components.push(json!({
+                                        "name": metadata["name"],
+                                        "version": metadata["version"]
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let result = json!({
+            "componentCount": components.len(),
+            "components": components
+        });
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: serde_json::to_string_pretty(&result)?,
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn delete_uploaded_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        let component_name = args["componentName"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
+        
+        let wasm_path = self.wasm_watcher.get_watch_path();
+        let component_path = wasm_path.join(format!("{}.wasm", component_name));
+        let metadata_path = wasm_path.join(format!("{}.json", component_name));
+        
+        // Check if component exists
+        if !component_path.exists() && !metadata_path.exists() {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("Component '{}' not found", component_name),
+                }],
+                is_error: Some(true),
+            });
+        }
+        
+        // Delete files
+        use std::fs;
+        let mut deleted = Vec::new();
+        
+        if component_path.exists() {
+            fs::remove_file(&component_path)
+                .map_err(|e| anyhow::anyhow!("Failed to delete WASM file: {}", e))?;
+            deleted.push("WASM file");
+        }
+        
+        if metadata_path.exists() {
+            fs::remove_file(&metadata_path)
+                .map_err(|e| anyhow::anyhow!("Failed to delete metadata file: {}", e))?;
+            deleted.push("metadata file");
+        }
+        
+        // Remove from watcher if present
+        self.wasm_watcher.remove_missing_component(component_name);
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!(
+                    "Successfully deleted component '{}' (removed: {})",
+                    component_name,
+                    deleted.join(", ")
                 ),
             }],
             is_error: None,

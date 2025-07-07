@@ -2,9 +2,10 @@
 //!
 //! This is a simplified version to get the basic structure working first.
 
+use crate::database::{DatabaseConfig, config::DatabaseBackend, factory::DatabaseManager, BoxedDatasetManager};
 use crate::model::{DiagramModel, Edge, ElementType, Node, Position};
 use crate::persistence::PersistenceManager;
-use crate::wasm::{FileSystemWatcher, WasmFileWatcher};
+use crate::wasm::{FileSystemWatcher, WasmFileWatcher, WasmExecutionEngine, WasmPipelineEngine, WasmSimulationEngine};
 use clap::Parser;
 use pulseengine_mcp_cli_derive::McpConfig;
 use pulseengine_mcp_protocol::*;
@@ -38,6 +39,30 @@ pub struct GlspConfig {
     #[clap(short, long)]
     pub force: bool,
 
+    /// Database backend type (postgresql, influxdb, redis, mock)
+    #[clap(long, default_value = "mock")]
+    pub database_backend: String,
+
+    /// Database host
+    #[clap(long, default_value = "localhost")]
+    pub database_host: String,
+
+    /// Database port
+    #[clap(long, default_value = "5432")]
+    pub database_port: u16,
+
+    /// Database name
+    #[clap(long, default_value = "glsp_sensors")]
+    pub database_name: String,
+
+    /// Database username
+    #[clap(long)]
+    pub database_user: Option<String>,
+
+    /// Enable database features for sensor data
+    #[clap(long)]
+    pub enable_database: bool,
+
     /// Server name (auto-populated)
     #[mcp(auto_populate)]
     #[clap(skip)]
@@ -57,9 +82,65 @@ impl Default for GlspConfig {
             port: 3000,
             transport: "http-streaming".to_string(),
             force: false,
+            database_backend: "mock".to_string(),
+            database_host: "localhost".to_string(),
+            database_port: 5432,
+            database_name: "glsp_sensors".to_string(),
+            database_user: None,
+            enable_database: false,
             server_name: "GLSP MCP Server".to_string(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),
         }
+    }
+}
+
+impl GlspConfig {
+    /// Convert to database configuration
+    pub fn to_database_config(&self) -> std::result::Result<DatabaseConfig, String> {
+        if !self.enable_database {
+            return Ok(DatabaseConfig::mock());
+        }
+
+        let backend = match self.database_backend.to_lowercase().as_str() {
+            "postgresql" | "postgres" => DatabaseBackend::PostgreSQL,
+            "influxdb" | "influx" => DatabaseBackend::InfluxDB,
+            "redis" => DatabaseBackend::Redis,
+            "sqlite" => DatabaseBackend::SQLite,
+            "mock" => DatabaseBackend::Mock,
+            _ => return Err(format!("Unknown database backend: {}", self.database_backend)),
+        };
+
+        let mut config = DatabaseConfig::default();
+        config.backend = backend;
+        config.connection.host = self.database_host.clone();
+        config.connection.port = self.database_port;
+        config.connection.database = self.database_name.clone();
+        config.connection.username = self.database_user.clone();
+
+        // Load password from environment if available
+        if let Ok(password) = std::env::var("GLSP_DB_PASSWORD") {
+            config.connection.password = Some(password);
+        }
+
+        Ok(config)
+    }
+
+    /// Get the base directory for diagram storage, ensuring it exists
+    pub async fn ensure_diagrams_dir(&self) -> std::result::Result<PathBuf, std::io::Error> {
+        let path = PathBuf::from(&self.diagrams_path);
+        if self.force || !path.exists() {
+            tokio::fs::create_dir_all(&path).await?;
+        }
+        Ok(path)
+    }
+
+    /// Get the base directory for WASM components, ensuring it exists
+    pub async fn ensure_wasm_dir(&self) -> std::result::Result<PathBuf, std::io::Error> {
+        let path = PathBuf::from(&self.wasm_path);
+        if self.force || !path.exists() {
+            tokio::fs::create_dir_all(&path).await?;
+        }
+        Ok(path)
     }
 }
 
@@ -98,7 +179,35 @@ impl From<GlspError> for Error {
     }
 }
 
-/// GLSP Backend implementation
+/// GLSP Backend implementation - The core server backend for AI-native diagram modeling
+///
+/// This backend provides a complete implementation of the Model Context Protocol (MCP) 
+/// for AI agents to interact with graphical diagrams and WASM components. It manages
+/// diagram persistence, WASM component execution, and real-time collaboration.
+///
+/// # Features
+///
+/// - **Diagram Management**: Create, edit, and persist graphical diagrams
+/// - **WASM Execution**: Execute WebAssembly components with security sandboxing
+/// - **File System Monitoring**: Real-time monitoring of WASM component changes
+/// - **Database Integration**: Optional sensor data storage and querying
+/// - **Pipeline Execution**: Complex data processing workflows
+/// - **Simulation Engine**: Time-driven scenario execution
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use glsp_mcp_server::{GlspBackend, GlspConfig};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = GlspConfig::parse();
+///     let backend = GlspBackend::initialize(config).await?;
+///     
+///     // Backend is now ready for MCP operations
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone)]
 pub struct GlspBackend {
     config: GlspConfig,
@@ -106,6 +215,10 @@ pub struct GlspBackend {
     wasm_watcher: std::sync::Arc<tokio::sync::Mutex<WasmFileWatcher>>,
     filesystem_watcher: std::sync::Arc<tokio::sync::RwLock<FileSystemWatcher>>,
     persistence: std::sync::Arc<PersistenceManager>,
+    database_manager: Option<std::sync::Arc<DatabaseManager>>,
+    execution_engine: Option<std::sync::Arc<WasmExecutionEngine>>,
+    pipeline_engine: Option<std::sync::Arc<WasmPipelineEngine>>,
+    simulation_engine: Option<std::sync::Arc<WasmSimulationEngine>>,
 }
 
 impl GlspBackend {
@@ -129,6 +242,110 @@ impl GlspBackend {
             GlspError::NotImplemented(format!("Failed to create storage directory: {e}"))
         })?;
 
+        // Initialize database if enabled
+        let database_manager = if config.enable_database {
+            info!("Initializing database connection...");
+            match config.to_database_config() {
+                Ok(db_config) => {
+                    match DatabaseManager::new(db_config).await {
+                        Ok(db_manager) => {
+                            // Start health monitoring
+                            db_manager.start_health_monitoring().await;
+                            Some(std::sync::Arc::new(db_manager))
+                        }
+                        Err(e) => {
+                            error!("Failed to initialize database: {}", e);
+                            info!("Continuing without database support");
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Invalid database configuration: {}", e);
+                    info!("Continuing without database support");
+                    None
+                }
+            }
+        } else {
+            info!("Database support disabled");
+            None
+        };
+
+        // Initialize WASM execution engines if database is available
+        let (execution_engine, pipeline_engine, simulation_engine) = if let Some(ref _db_manager) = database_manager {
+            // Create dataset manager using database backend
+            match config.to_database_config() {
+                Ok(db_config) => {
+                    match crate::database::DatabaseFactory::create(db_config).await {
+                        Ok(backend) => {
+                            let dataset_manager = crate::database::BoxedDatasetManager::new(backend);
+                            let dataset_manager_arc = std::sync::Arc::new(tokio::sync::Mutex::new(dataset_manager));
+                            
+                            // Create execution engine with sensor support
+                            match WasmExecutionEngine::with_dataset_manager(10, dataset_manager_arc.clone()) {
+                                Ok(exec_engine) => {
+                                    let exec_engine_arc = std::sync::Arc::new(exec_engine);
+                                    
+                                    // Create pipeline engine
+                                    let pipeline_engine = WasmPipelineEngine::new(exec_engine_arc.clone(), 5);
+                                    let pipeline_engine_arc = std::sync::Arc::new(pipeline_engine);
+                                    
+                                    // Create simulation engine with sensor support
+                                    match WasmSimulationEngine::with_sensor_support(
+                                        pipeline_engine_arc.clone(),
+                                        dataset_manager_arc.clone(),
+                                        3
+                                    ).await {
+                                        Ok(sim_engine) => {
+                                            let sim_engine_arc = std::sync::Arc::new(sim_engine);
+                                            info!("WASM execution engines initialized with sensor support");
+                                            (Some(exec_engine_arc), Some(pipeline_engine_arc), Some(sim_engine_arc))
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to create simulation engine: {}", e);
+                                            (Some(exec_engine_arc), Some(pipeline_engine_arc), None)
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to create execution engine: {}", e);
+                                    (None, None, None)
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to create dataset manager backend: {}", e);
+                            (None, None, None)
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to get database configuration: {}", e);
+                    (None, None, None)
+                }
+            }
+        } else {
+            // Create basic execution engine without sensor support
+            match WasmExecutionEngine::new(10) {
+                Ok(exec_engine) => {
+                    let exec_engine_arc = std::sync::Arc::new(exec_engine);
+                    let pipeline_engine = WasmPipelineEngine::new(exec_engine_arc.clone(), 5);
+                    let pipeline_engine_arc = std::sync::Arc::new(pipeline_engine);
+                    
+                    // Create simulation engine without sensor support
+                    let simulation_engine = WasmSimulationEngine::new(pipeline_engine_arc.clone(), 3);
+                    let simulation_engine_arc = std::sync::Arc::new(simulation_engine);
+                    
+                    info!("WASM execution engines initialized without sensor support");
+                    (Some(exec_engine_arc), Some(pipeline_engine_arc), Some(simulation_engine_arc))
+                }
+                Err(e) => {
+                    error!("Failed to create basic execution engine: {}", e);
+                    (None, None, None)
+                }
+            }
+        };
+
         // Create backend instance
         let backend = Self {
             config,
@@ -136,6 +353,10 @@ impl GlspBackend {
             wasm_watcher: std::sync::Arc::new(tokio::sync::Mutex::new(wasm_watcher)),
             filesystem_watcher: std::sync::Arc::new(tokio::sync::RwLock::new(filesystem_watcher)),
             persistence: std::sync::Arc::new(persistence),
+            database_manager,
+            execution_engine,
+            pipeline_engine,
+            simulation_engine,
         };
 
         // Load existing diagrams from disk
@@ -145,6 +366,18 @@ impl GlspBackend {
         info!("Performing initial WASM component scan...");
         {
             let mut wasm_watcher = backend.wasm_watcher.lock().await;
+            
+            // Initialize with execution engine
+            *wasm_watcher = wasm_watcher.clone()
+                .with_execution_engine(3)
+                .map_err(|e| GlspError::NotImplemented(format!("Failed to init execution engine: {e}")))?;
+            
+            // Start file watching for real-time updates
+            if let Err(e) = wasm_watcher.start_file_watching().await {
+                error!("Failed to start file watching: {}", e);
+            }
+            
+            // Perform initial scan
             if let Err(e) = wasm_watcher.scan_components().await {
                 error!("Failed to perform initial WASM component scan: {}", e);
             }
@@ -178,8 +411,74 @@ impl GlspBackend {
             )));
         }
 
+        // Check database health if enabled
+        if let Some(db_manager) = &self.database_manager {
+            if !db_manager.is_healthy().await {
+                return Err(GlspError::ToolExecution(
+                    "Database connection is unhealthy".to_string()
+                ));
+            }
+        }
+
         info!("GLSP backend health check passed");
         Ok(())
+    }
+
+    /// Get database manager if available
+    pub fn database_manager(&self) -> Option<std::sync::Arc<DatabaseManager>> {
+        self.database_manager.clone()
+    }
+
+    /// Create a dataset manager using the database backend
+    pub async fn create_dataset_manager(&self) -> std::result::Result<BoxedDatasetManager, String> {
+        if let Some(_db_manager) = &self.database_manager {
+            let db_config = self.config.to_database_config()?;
+            match crate::database::DatabaseFactory::create(db_config).await {
+                Ok(backend) => Ok(BoxedDatasetManager::new(backend)),
+                Err(e) => Err(format!("Failed to create dataset manager: {}", e)),
+            }
+        } else {
+            Err("Database not enabled".to_string())
+        }
+    }
+
+    /// Check if database features are enabled and healthy
+    pub async fn is_database_enabled(&self) -> bool {
+        if let Some(db_manager) = &self.database_manager {
+            db_manager.is_healthy().await
+        } else {
+            false
+        }
+    }
+
+    /// Get database configuration if enabled
+    pub fn get_database_config(&self) -> std::result::Result<DatabaseConfig, String> {
+        self.config.to_database_config()
+    }
+
+    /// Get execution engine for WASM components
+    pub fn execution_engine(&self) -> Option<std::sync::Arc<WasmExecutionEngine>> {
+        self.execution_engine.clone()
+    }
+
+    /// Get pipeline engine for WASM component pipelines
+    pub fn pipeline_engine(&self) -> Option<std::sync::Arc<WasmPipelineEngine>> {
+        self.pipeline_engine.clone()
+    }
+
+    /// Get simulation engine for complex WASM simulations
+    pub fn simulation_engine(&self) -> Option<std::sync::Arc<WasmSimulationEngine>> {
+        self.simulation_engine.clone()
+    }
+
+    /// Check if WASM execution capabilities are available
+    pub fn is_execution_enabled(&self) -> bool {
+        self.execution_engine.is_some() && self.pipeline_engine.is_some()
+    }
+
+    /// Check if full simulation capabilities are available
+    pub fn is_simulation_enabled(&self) -> bool {
+        self.execution_engine.is_some() && self.pipeline_engine.is_some() && self.simulation_engine.is_some()
     }
 
     pub async fn list_tools(
@@ -832,8 +1131,15 @@ impl GlspBackend {
             .get_mut(diagram_id)
             .ok_or_else(|| GlspError::ToolExecution("Diagram not found".to_string()))?;
 
-        let node = Node::new(node_type, position, label);
+        let mut node = Node::new(node_type, position, label);
         let node_id = node.base.id.clone();
+
+        // Add custom properties if provided
+        if let Some(properties) = args["properties"].as_object() {
+            for (key, value) in properties {
+                node.base.properties.insert(key.clone(), value.clone());
+            }
+        }
 
         diagram.add_element(node.base);
         diagram.add_child_to_root(&node_id);
@@ -1163,21 +1469,33 @@ impl GlspBackend {
 
     // WASM component implementations
     async fn scan_wasm_components(&self) -> std::result::Result<CallToolResult, GlspError> {
-        // Get current known files from the filesystem watcher
-        let filesystem_watcher = self.filesystem_watcher.read().await;
-        let known_files = filesystem_watcher.get_known_files().await;
+        // Trigger rescan and get components from the wasm watcher
+        let wasm_watcher = self.wasm_watcher.lock().await;
+        let components = wasm_watcher.get_components();
+        let available = components.iter().filter(|c| c.file_exists).count();
+        let missing = components.len() - available;
 
-        let wasm_files: Vec<_> = known_files
-            .iter()
-            .filter(|path| path.extension().and_then(|s| s.to_str()) == Some("wasm"))
-            .collect();
+        // Convert components to JSON format expected by the client
+        let components_json: Vec<_> = components.iter().map(|c| json!({
+            "name": c.name,
+            "path": c.path,
+            "fileExists": c.file_exists,
+            "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
+            "metadata": c.metadata,
+            "interfaces": c.interfaces
+        })).collect();
 
-        let component_count = wasm_files.len();
+        let result = json!({
+            "components": components_json,
+            "summary": {
+                "total": components.len(),
+                "available": available,
+                "missing": missing
+            }
+        });
 
         Ok(CallToolResult {
-            content: vec![Content::text(format!(
-                "WASM component scan completed.\\nFound {component_count} WASM files: {component_count} available, 0 missing"
-            ))],
+            content: vec![Content::text(result.to_string())],
             is_error: Some(false),
         })
     }

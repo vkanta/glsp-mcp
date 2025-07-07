@@ -30,7 +30,48 @@ fn default_name() -> String {
     "Untitled Diagram".to_string()
 }
 
-/// Base model element
+/// Base model element - Core building block for all diagram elements
+///
+/// Represents any element in a diagram including nodes, edges, containers, and other
+/// graphical components. Each element has a unique ID, type, and can contain various
+/// properties for styling, positioning, and behavior.
+///
+/// # Fields
+///
+/// - `id`: Unique identifier for the element
+/// - `element_type`: The type of element (node, edge, container, etc.)
+/// - `children`: Optional list of child element IDs for containers
+/// - `bounds`: Position and size information for visual elements
+/// - `properties`: Key-value pairs for element-specific data
+/// - `label`: Optional text label for the element
+/// - `source_id`/`target_id`: Connection points for edges
+/// - `route`: Path points for edge routing
+/// - `visible`: Whether the element should be displayed
+/// - `z_index`: Layering order for overlapping elements
+/// - `style`: Visual styling properties
+///
+/// # Examples
+///
+/// ```rust
+/// use glsp_mcp_server::{ModelElement, ElementType, Bounds};
+/// use std::collections::HashMap;
+///
+/// let mut element = ModelElement {
+///     id: "node1".to_string(),
+///     element_type: ElementType::Node,
+///     children: None,
+///     bounds: Some(Bounds { x: 100.0, y: 50.0, width: 120.0, height: 80.0 }),
+///     layout_options: None,
+///     properties: HashMap::new(),
+///     label: Some("Process Step".to_string()),
+///     source_id: None,
+///     target_id: None,
+///     route: None,
+///     visible: true,
+///     z_index: Some(1),
+///     style: HashMap::new(),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelElement {
     pub id: String,
@@ -42,7 +83,6 @@ pub struct ModelElement {
     pub bounds: Option<Bounds>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layout_options: Option<HashMap<String, serde_json::Value>>,
-    #[serde(flatten)]
     pub properties: HashMap<String, serde_json::Value>,
     // Extended fields for backend operations
     #[serde(skip_serializing_if = "Option::is_none")]
