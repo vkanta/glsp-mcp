@@ -228,6 +228,52 @@ export class DiagramControlsSection {
         });
         
         section.appendChild(grid);
+        
+        // Add interface names toggle for WASM components
+        const toggleContainer = document.createElement('div');
+        toggleContainer.style.cssText = `
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color, #2A3441);
+        `;
+        
+        const toggleLabel = document.createElement('label');
+        toggleLabel.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-primary, #E6EDF3);
+        `;
+        
+        const labelText = document.createElement('span');
+        labelText.textContent = 'Show Interface Names';
+        toggleLabel.appendChild(labelText);
+        
+        const toggleSwitch = document.createElement('input');
+        toggleSwitch.type = 'checkbox';
+        toggleSwitch.id = 'show-interface-names';
+        toggleSwitch.checked = localStorage.getItem('showInterfaceNames') === 'true';
+        toggleSwitch.style.cssText = `
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        `;
+        
+        // Handle toggle change
+        toggleSwitch.addEventListener('change', (e) => {
+            const checked = (e.target as HTMLInputElement).checked;
+            localStorage.setItem('showInterfaceNames', checked.toString());
+            window.dispatchEvent(new CustomEvent('toggle-interface-names', { 
+                detail: { show: checked } 
+            }));
+        });
+        
+        toggleLabel.appendChild(toggleSwitch);
+        toggleContainer.appendChild(toggleLabel);
+        section.appendChild(toggleContainer);
+        
         return section;
     }
     

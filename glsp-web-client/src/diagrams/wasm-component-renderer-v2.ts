@@ -5,33 +5,47 @@
 
 import { Bounds, ModelElement } from '../model/diagram.js';
 
+// Interface for WASM component interfaces
+interface ComponentInterface {
+    name?: string;
+    interface_type?: 'import' | 'export';
+    type?: 'import' | 'export';
+    direction?: 'input' | 'output';
+}
+
+export interface ComponentColors {
+    primary: string;
+    secondary: string;
+    input: string;
+    output: string;
+    selected: string;
+    text: string;
+    textSecondary: string;
+    background: string;
+    border: string;
+    status: {
+        loaded: string;
+        unloaded: string;
+        error: string;
+    };
+}
+
 export interface WasmRenderingContextV2 {
     ctx: CanvasRenderingContext2D;
     scale: number;
     isSelected: boolean;
     isHovered: boolean;
     isMissing?: boolean;
-    colors: {
-        primary: string;      // Main component color
-        secondary: string;    // Header/accent color
-        input: string;        // Input port color
-        output: string;       // Output port color
-        selected: string;     // Selection border
-        text: string;         // Text color
-        textSecondary: string; // Secondary text
-        background: string;   // Background
-        border: string;       // Border
-        status: {
-            loaded: string;
-            unloaded: string;
-            error: string;
-        };
-    };
+    colors: ComponentColors;
+    showTooltip?: boolean;
+    mousePosition?: { x: number; y: number };
+    showInterfaceNames?: boolean; // Toggle to show/hide interface names
 }
 
 export class WasmComponentRendererV2 {
-    // Standard dimensions for consistency
-    private static readonly DEFAULT_WIDTH = 200;
+    // Minimum dimensions - components will expand to fit content
+    private static readonly MIN_WIDTH = 180;
+    private static readonly MAX_WIDTH = 400;
     private static readonly DEFAULT_HEIGHT = 120;
     private static readonly HEADER_HEIGHT = 40;
     private static readonly PORT_RADIUS = 8;
@@ -43,7 +57,7 @@ export class WasmComponentRendererV2 {
         bounds: Bounds,
         context: WasmRenderingContextV2
     ): void {
-        const { ctx, isSelected, isHovered, isMissing, colors } = context;
+        const { ctx, isSelected, isHovered, isMissing, colors, showTooltip, mousePosition } = context;
 
         // Get component properties
         // First check the label field (set by MCP create_node), then fall back to other properties
@@ -53,20 +67,41 @@ export class WasmComponentRendererV2 {
                             'Component';
         const componentType = element.properties?.componentType?.toString() || 'WASM';
         const isLoaded = element.properties?.isLoaded === true;
-        const interfaces = element.properties?.interfaces as any[] || [];
+        const interfaces = element.properties?.interfaces || [];
         const status = isMissing ? 'error' : (isLoaded ? 'loaded' : 'unloaded');
         
         // Debug interface data
         console.log('WasmComponentRendererV2: Rendering component', componentName);
         console.log('WasmComponentRendererV2: Element properties:', element.properties);
         console.log('WasmComponentRendererV2: Interfaces:', interfaces);
-        console.log('WasmComponentRendererV2: Interface count:', interfaces.length);
+        
+        // Handle both interface count (number) and interface array
+        let actualInterfaces: ComponentInterface[] = [];
+        
+        if (typeof interfaces === 'number') {
+            // If interfaces is a number (count), create placeholder interfaces
+            console.log('WasmComponentRendererV2: Interface count:', interfaces);
+            actualInterfaces = Array.from({ length: interfaces }, (_, i) => ({
+                name: `interface-${i + 1}`,
+                interface_type: i % 2 === 0 ? 'import' : 'export',
+                type: i % 2 === 0 ? 'import' : 'export',
+                direction: i % 2 === 0 ? 'input' : 'output'
+            }));
+        } else if (Array.isArray(interfaces)) {
+            // If interfaces is already an array, use it directly
+            console.log('WasmComponentRendererV2: Interface array length:', interfaces.length);
+            actualInterfaces = interfaces;
+        } else {
+            // Fallback for other cases
+            console.log('WasmComponentRendererV2: No valid interfaces found, using empty array');
+            actualInterfaces = [];
+        }
 
         // Separate input and output interfaces for height calculation
-        const inputs = interfaces.filter(i => 
+        const inputs = actualInterfaces.filter(i => 
             i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
         );
-        const outputs = interfaces.filter(i => 
+        const outputs = actualInterfaces.filter(i => 
             i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
         );
         
@@ -74,8 +109,16 @@ export class WasmComponentRendererV2 {
         const maxPorts = Math.max(inputs.length, outputs.length);
         const minHeightForPorts = this.HEADER_HEIGHT + 40 + (maxPorts * this.PORT_SPACING);
         
-        // Use consistent sizing with dynamic height adjustment
-        const width = Math.max(bounds.width, this.DEFAULT_WIDTH);
+        // Calculate required width for component name (no truncation)
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const nameWidth = ctx.measureText(componentName).width;
+        const iconSpace = 12 + 24 + 8; // left padding + icon + spacing
+        const badgeSpace = 60; // space for type badge and right padding
+        const requiredWidth = iconSpace + nameWidth + badgeSpace;
+        
+        // Use dynamic width that fits the component name, constrained by min/max
+        const dynamicWidth = Math.max(this.MIN_WIDTH, Math.min(this.MAX_WIDTH, requiredWidth));
+        const width = Math.max(bounds.width, dynamicWidth);
         const height = Math.max(bounds.height, this.DEFAULT_HEIGHT, minHeightForPorts);
         
         console.log(`WasmComponentRendererV2: Component ${componentName} - inputs: ${inputs.length}, outputs: ${outputs.length}, max: ${maxPorts}`);
@@ -99,13 +142,23 @@ export class WasmComponentRendererV2 {
         this.drawComponentBody(ctx, actualBounds, colors, isSelected, isHovered, status);
         
         // Draw header section
-        this.drawComponentHeader(ctx, actualBounds, componentName, componentType, colors, status);
+        const wasTruncated = this.drawComponentHeader(ctx, actualBounds, componentName, componentType, colors, status);
+        
+        // Show tooltip if hovering and name was actually truncated
+        if (isHovered && showTooltip && mousePosition && wasTruncated) {
+            this.drawTooltip(ctx, componentName, mousePosition.x, actualBounds.y, colors);
+        }
         
         // Draw status indicator
         this.drawStatusIndicator(ctx, actualBounds, status, colors);
         
+        // Draw interface names inside component if enabled
+        if (context.showInterfaceNames) {
+            this.drawInterfaceNames(ctx, actualBounds, actualInterfaces, colors);
+        }
+        
         // Draw input/output ports
-        this.drawPorts(ctx, actualBounds, interfaces, colors, isSelected);
+        this.drawPorts(ctx, actualBounds, actualInterfaces, colors, isSelected);
         
         // Draw missing indicator if needed
         if (isMissing) {
@@ -116,7 +169,7 @@ export class WasmComponentRendererV2 {
     private static drawComponentBody(
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
-        colors: any,
+        colors: ComponentColors,
         isSelected: boolean,
         isHovered: boolean,
         _status: string
@@ -148,9 +201,9 @@ export class WasmComponentRendererV2 {
         bounds: Bounds,
         componentName: string,
         componentType: string,
-        colors: any,
+        colors: ComponentColors,
         _status: string
-    ): void {
+    ): boolean {
         // Header background with component color
         const headerGradient = ctx.createLinearGradient(
             bounds.x, bounds.y, 
@@ -187,13 +240,27 @@ export class WasmComponentRendererV2 {
         const textX = iconX + iconSize + 8;
         const textY = bounds.y + this.HEADER_HEIGHT / 2;
         
-        // Truncate long names
-        const maxTextWidth = bounds.width - textX - bounds.x - 50; // Leave space for type badge
-        const truncatedName = this.truncateText(ctx, componentName, maxTextWidth);
-        ctx.fillText(truncatedName, textX, textY);
+        // Calculate available space for text with dynamic width
+        const maxTextWidth = bounds.width - textX + bounds.x - 60; // Leave space for type badge
+        
+        // Only truncate if we've hit the maximum width constraint
+        let displayName = componentName;
+        let wasTruncated = false;
+        
+        if (bounds.width >= this.MAX_WIDTH) {
+            const truncationResult = this.smartTruncateText(ctx, componentName, maxTextWidth);
+            displayName = truncationResult.text;
+            wasTruncated = truncationResult.wasTruncated;
+        }
+        
+        console.log(`Rendering component: "${componentName}" -> "${displayName}" (truncated: ${wasTruncated}, width: ${bounds.width}, maxTextWidth: ${maxTextWidth})`);
+        
+        ctx.fillText(displayName, textX, textY);
 
         // Component type badge (right side of header)
         this.drawTypeBadge(ctx, bounds, componentType, colors);
+        
+        return wasTruncated;
     }
 
     private static drawComponentIcon(
@@ -202,7 +269,7 @@ export class WasmComponentRendererV2 {
         y: number,
         size: number,
         componentType: string,
-        _colors: any
+        _colors: ComponentColors
     ): void {
         // Simple geometric icon based on component type
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -231,7 +298,7 @@ export class WasmComponentRendererV2 {
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
         status: string,
-        colors: any
+        colors: ComponentColors
     ): void {
         const indicatorSize = 8;
         const x = bounds.x + bounds.width - indicatorSize - 8;
@@ -256,8 +323,8 @@ export class WasmComponentRendererV2 {
     private static drawPorts(
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
-        interfaces: any[],
-        colors: any,
+        interfaces: ComponentInterface[],
+        colors: ComponentColors,
         isSelected: boolean
     ): void {
         // Separate input and output interfaces
@@ -278,9 +345,9 @@ export class WasmComponentRendererV2 {
     private static drawPortGroup(
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
-        ports: any[],
+        ports: Array<{ name?: string; interface_type?: string; type?: string; direction?: string }>,
         type: 'input' | 'output',
-        colors: any,
+        colors: ComponentColors,
         isSelected: boolean
     ): void {
         if (ports.length === 0) return;
@@ -326,7 +393,7 @@ export class WasmComponentRendererV2 {
         x: number,
         y: number,
         isInput: boolean,
-        _colors: any
+        _colors: ComponentColors
     ): void {
         ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textBaseline = 'middle';
@@ -353,7 +420,7 @@ export class WasmComponentRendererV2 {
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
         componentType: string,
-        _colors: any
+        _colors: ComponentColors
     ): void {
         const badgeWidth = 45;
         const badgeHeight = 16;
@@ -378,7 +445,7 @@ export class WasmComponentRendererV2 {
     private static drawErrorOverlay(
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
-        colors: any
+        colors: ComponentColors
     ): void {
         // Semi-transparent red overlay
         ctx.fillStyle = 'rgba(244, 67, 54, 0.1)';
@@ -523,16 +590,152 @@ export class WasmComponentRendererV2 {
         return color;
     }
 
-    private static truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
-        if (ctx.measureText(text).width <= maxWidth) return text;
+    private static smartTruncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): { text: string; wasTruncated: boolean } {
+        if (ctx.measureText(text).width <= maxWidth) {
+            return { text, wasTruncated: false };
+        }
         
+        // Try to break at sensible points first (underscore, dash, camelCase)
+        const breakPoints = [/_/g, /-/g, /(?=[A-Z])/g];
+        
+        for (const breakPattern of breakPoints) {
+            const parts = text.split(breakPattern);
+            if (parts.length > 1) {
+                // Try to keep the most important part (usually the end)
+                let truncated = parts[parts.length - 1];
+                if (ctx.measureText(truncated).width <= maxWidth) {
+                    return { text: truncated, wasTruncated: true };
+                }
+                
+                // If last part is still too long, try first part
+                truncated = parts[0];
+                if (ctx.measureText(truncated).width <= maxWidth) {
+                    return { text: truncated, wasTruncated: true };
+                }
+            }
+        }
+        
+        // Fall back to character-by-character truncation
         let truncated = text;
-        while (ctx.measureText(truncated + '...').width > maxWidth && truncated.length > 0) {
+        while (ctx.measureText(truncated + '…').width > maxWidth && truncated.length > 0) {
             truncated = truncated.slice(0, -1);
         }
-        return truncated + (truncated.length < text.length ? '...' : '');
+        return { 
+            text: truncated + (truncated.length < text.length ? '…' : ''), 
+            wasTruncated: truncated.length < text.length 
+        };
     }
 
+    // Method to render tooltip for truncated text
+    private static drawTooltip(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        colors: ComponentColors
+    ): void {
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const metrics = ctx.measureText(text);
+        const padding = 8;
+        const tooltipWidth = metrics.width + padding * 2;
+        const tooltipHeight = 24;
+        
+        // Position tooltip above the component
+        const tooltipX = x - tooltipWidth / 2;
+        const tooltipY = y - tooltipHeight - 10;
+        
+        // Draw tooltip background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        this.drawRoundedRect(ctx, tooltipX, tooltipY, tooltipWidth, tooltipHeight, 6);
+        ctx.fill();
+        
+        // Draw tooltip border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Draw tooltip text
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, tooltipX + tooltipWidth / 2, tooltipY + tooltipHeight / 2);
+    }
+
+    // Draw interface names inside the component
+    private static drawInterfaceNames(
+        ctx: CanvasRenderingContext2D,
+        bounds: Bounds,
+        interfaces: ComponentInterface[],
+        colors: ComponentColors
+    ): void {
+        // Separate imports and exports
+        const imports = interfaces.filter(i => 
+            i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
+        );
+        const exports = interfaces.filter(i => 
+            i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
+        );
+        
+        // Set up text style for interface names
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textBaseline = 'middle';
+        
+        // Use the same positioning as the ports
+        const startY = bounds.y + this.HEADER_HEIGHT + 20;
+        const spacing = this.PORT_SPACING;
+        
+        // Draw imports on the left side (aligned with ports)
+        if (imports.length > 0) {
+            ctx.textAlign = 'left';
+            ctx.fillStyle = colors.input;
+            
+            imports.forEach((imp, index) => {
+                const y = startY + (index * spacing);
+                if (y < bounds.y + bounds.height - 20) { // Don't overflow component bounds
+                    const name = imp.name || `import-${index + 1}`;
+                    // Position text just inside the port
+                    const textX = bounds.x + this.PORT_RADIUS + 15;
+                    // Truncate long names
+                    const maxWidth = (bounds.width / 2) - 40;
+                    const truncated = this.truncateText(ctx, name, maxWidth);
+                    ctx.fillText(truncated, textX, y);
+                }
+            });
+        }
+        
+        // Draw exports on the right side (aligned with ports)
+        if (exports.length > 0) {
+            ctx.textAlign = 'right';
+            ctx.fillStyle = colors.output;
+            
+            exports.forEach((exp, index) => {
+                const y = startY + (index * spacing);
+                if (y < bounds.y + bounds.height - 20) { // Don't overflow component bounds
+                    const name = exp.name || `export-${index + 1}`;
+                    // Position text just inside the port
+                    const textX = bounds.x + bounds.width - this.PORT_RADIUS - 15;
+                    // Truncate long names
+                    const maxWidth = (bounds.width / 2) - 40;
+                    const truncated = this.truncateText(ctx, name, maxWidth);
+                    ctx.fillText(truncated, textX, y);
+                }
+            });
+        }
+    }
+    
+    // Simple text truncation helper
+    private static truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+        if (ctx.measureText(text).width <= maxWidth) {
+            return text;
+        }
+        
+        let truncated = text;
+        while (ctx.measureText(truncated + '…').width > maxWidth && truncated.length > 0) {
+            truncated = truncated.slice(0, -1);
+        }
+        return truncated + '…';
+    }
+    
     // Default color scheme inspired by modern workflow tools
     static getDefaultColors() {
         return {
@@ -558,13 +761,29 @@ export class WasmComponentRendererV2 {
         element: ModelElement,
         bounds: Bounds,
         position: { x: number; y: number }
-    ): { port: any; type: 'input' | 'output' } | null {
-        const interfaces = element.properties?.interfaces as any[] || [];
+    ): { port: ComponentInterface & { name: string }; type: 'input' | 'output' } | null {
+        const interfaces = element.properties?.interfaces || [];
         
-        const inputs = interfaces.filter(i => 
+        // Handle both interface count (number) and interface array
+        let actualInterfaces: ComponentInterface[] = [];
+        
+        if (typeof interfaces === 'number') {
+            // If interfaces is a number (count), create placeholder interfaces
+            actualInterfaces = Array.from({ length: interfaces }, (_, i) => ({
+                name: `interface-${i + 1}`,
+                interface_type: i % 2 === 0 ? 'import' : 'export',
+                type: i % 2 === 0 ? 'import' : 'export',
+                direction: i % 2 === 0 ? 'input' : 'output'
+            }));
+        } else if (Array.isArray(interfaces)) {
+            // If interfaces is already an array, use it directly
+            actualInterfaces = interfaces;
+        }
+        
+        const inputs = actualInterfaces.filter(i => 
             i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
         );
-        const outputs = interfaces.filter(i => 
+        const outputs = actualInterfaces.filter(i => 
             i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
         );
 
@@ -581,7 +800,7 @@ export class WasmComponentRendererV2 {
             
             if (distance <= this.PORT_RADIUS + 20) { // Larger tolerance for easier clicking
                 console.log(`FOUND INPUT PORT: ${inputs[i].name} at (${portX}, ${portY}), click: (${position.x}, ${position.y}), distance: ${distance}`);
-                return { port: inputs[i], type: 'input' };
+                return { port: { ...inputs[i], name: inputs[i].name || `input-${i + 1}` }, type: 'input' };
             }
         }
 
@@ -593,10 +812,32 @@ export class WasmComponentRendererV2 {
             
             if (distance <= this.PORT_RADIUS + 20) { // Larger tolerance for easier clicking
                 console.log(`FOUND OUTPUT PORT: ${outputs[i].name} at (${portX}, ${portY}), click: (${position.x}, ${position.y}), distance: ${distance}`);
-                return { port: outputs[i], type: 'output' };
+                return { port: { ...outputs[i], name: outputs[i].name || `output-${i + 1}` }, type: 'output' };
             }
         }
 
         return null;
+    }
+
+    // Check if component name would be truncated (useful for hover logic)
+    static wouldNameBeTruncated(
+        componentName: string,
+        bounds: Bounds,
+        ctx: CanvasRenderingContext2D
+    ): boolean {
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const iconSize = 24;
+        const textX = bounds.x + 12 + iconSize + 8;
+        const maxTextWidth = bounds.width - textX - bounds.x - 60;
+        const textWidth = ctx.measureText(componentName).width;
+        return textWidth > maxTextWidth;
+    }
+
+    // Get the full component name for tooltip display
+    static getFullComponentName(element: ModelElement): string {
+        return element.label?.toString() || 
+               element.properties?.label?.toString() || 
+               element.properties?.componentName?.toString() || 
+               'Component';
     }
 }

@@ -1,0 +1,110 @@
+[component]
+name = "adas-localization"
+version = "0.1.0"
+description = "Localization component for ADAS systems providing accurate position and orientation estimation"
+author = "ADAS Development Team"
+license = "Apache-2.0"
+created = "2025-06-26"
+
+[interfaces]
+exports = ["adas:localization/localization"]
+imports = ["adas:sensor-fusion/types", "adas:sensor-fusion/fusion"]
+
+[dependencies]
+external = [
+    "adas:sensor-fusion@0.1.0"
+]
+
+[hardware_requirements]
+min_cpu_cores = 2
+min_memory_mb = 512
+min_storage_mb = 100
+requires_gpu = false
+supported_architectures = ["x86_64", "aarch64", "wasm32"]
+
+[real_time_constraints]
+max_processing_latency_ms = 50
+update_frequency_hz = 20
+priority_level = "high"
+deadline_type = "hard"
+
+[safety_certification]
+iso26262_asil = "D"  # Automotive Safety Integrity Level D (highest)
+functional_safety_tested = true
+fail_safe_behavior = "maintain_last_known_position"
+redundancy_required = true
+
+[performance_characteristics]
+typical_accuracy_meters = 0.1
+degraded_accuracy_meters = 0.5
+convergence_time_seconds = 5.0
+memory_usage_mb = 128
+cpu_usage_percent = 15
+
+[configuration]
+supported_localization_methods = [
+    "gnss_only",
+    "gnss_imu", 
+    "lidar_map",
+    "visual_odometry",
+    "sensor_fusion"
+]
+
+coordinate_systems = [
+    "wgs84",      # World Geodetic System 1984
+    "utm",        # Universal Transverse Mercator
+    "local_enu"   # East-North-Up local frame
+]
+
+kalman_filter_variants = [
+    "extended_kf",    # Extended Kalman Filter
+    "unscented_kf",   # Unscented Kalman Filter
+    "particle_filter" # Particle Filter
+]
+
+[data_interfaces]
+input_sensors = [
+    "imu",       # Inertial Measurement Unit
+    "gnss",      # Global Navigation Satellite System
+    "lidar",     # Light Detection and Ranging
+    "odometry",  # Vehicle wheel odometry
+    "camera"     # Visual odometry (optional)
+]
+
+output_topics = [
+    "localization_result",
+    "pose_with_covariance", 
+    "velocity_estimate",
+    "localization_status"
+]
+
+map_formats = [
+    "point_cloud_map",  # .pcd files
+    "occupancy_grid",   # .pgm/.yaml
+    "vector_map",       # OpenDRIVE format
+    "lanelet2"          # Lanelet2 format
+]
+
+[testing]
+unit_tests_coverage = 95
+integration_tests = true
+hardware_in_loop_tested = true
+simulation_environments = [
+    "carla",
+    "lgsvl", 
+    "gazebo",
+    "unity"
+]
+
+benchmark_datasets = [
+    "kitti",
+    "nuscenes", 
+    "apollo_scape",
+    "argoverse"
+]
+
+[documentation]
+api_documentation = "docs/localization_api.md"
+user_guide = "docs/localization_user_guide.md"
+tuning_guide = "docs/localization_tuning.md"
+troubleshooting = "docs/localization_troubleshooting.md"

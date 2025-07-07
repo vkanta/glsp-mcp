@@ -7,6 +7,19 @@ import { DiagramModel, ModelElement, Node, Edge, Bounds, Position } from '../mod
 import { SelectionManager } from '../selection/selection-manager.js';
 import { InteractionMode, InteractionModeManager } from '../interaction/interaction-mode.js';
 import { WasmComponentRendererV2 } from '../diagrams/wasm-component-renderer-v2.js';
+
+interface ComponentInterface {
+    name: string;
+    interface_type: 'import' | 'export';
+    functions?: Array<{ name: string; parameters?: unknown[]; return_type?: string }>;
+}
+
+interface InterfaceInfo {
+    componentId: string;
+    interface: ComponentInterface;
+    interfaceType: 'import' | 'export';
+    position: Position;
+}
 import { McpClient } from '../mcp/client.js';
 
 export interface RenderOptions {
@@ -28,7 +41,7 @@ export interface InteractionEvent {
     sourceElement?: ModelElement; // For edge creation
     interfaceInfo?: {
         componentId: string;
-        interface: any;
+        interface: import('../diagrams/interface-compatibility.js').WitInterface;
         interfaceType: 'import' | 'export';
         connectorPosition: Position;
     };
@@ -49,6 +62,7 @@ export class CanvasRenderer {
     private dragStart?: Position;
     private dragOffsets: Map<string, Position> = new Map();
     private hasDragged = false;
+    private lastMousePosition?: Position;
     private isPanning = false;
     private panStart?: Position;
     private selectionRect?: { start: Position; end: Position };
@@ -58,13 +72,14 @@ export class CanvasRenderer {
     private edgePreviewTarget?: Position;
     // Interface linking properties
     private interfaceLinkingMode = false;
-    private sourceInterfaceInfo?: any;
+    private sourceInterfaceInfo?: InterfaceInfo;
     private highlightedInterfaces: Map<string, string[]> = new Map(); // componentId -> interface names
     private interfaceTooltip?: HTMLElement;
     private minScale = 0.1;
     private maxScale = 5.0;
     private scrollBounds?: { minX: number; minY: number; maxX: number; maxY: number };
     private mcpClient?: McpClient;
+    private showInterfaceNames: boolean = false;
 
     constructor(canvas: HTMLCanvasElement, options: RenderOptions = {}) {
         this.canvas = canvas;
@@ -112,6 +127,16 @@ export class CanvasRenderer {
             this.render();
         });
         resizeObserver.observe(this.canvas.parentElement || this.canvas);
+        
+        // Listen for interface names toggle
+        window.addEventListener('toggle-interface-names', (e: Event) => {
+            const customEvent = e as CustomEvent;
+            this.showInterfaceNames = customEvent.detail.show;
+            this.render(); // Re-render to show/hide interface names
+        });
+        
+        // Initialize from localStorage
+        this.showInterfaceNames = localStorage.getItem('showInterfaceNames') === 'true';
     }
 
     private resizeCanvas(): void {
@@ -151,6 +176,13 @@ export class CanvasRenderer {
             y: (event.clientY - rect.top - this.options.offset.y) / this.options.scale
         };
         return worldPos;
+    }
+    
+    public screenToWorld(screenX: number, screenY: number): Position {
+        return {
+            x: (screenX - this.options.offset.x) / this.options.scale,
+            y: (screenY - this.options.offset.y) / this.options.scale
+        };
     }
 
     private getElementAt(position: Position): ModelElement | undefined {
@@ -194,7 +226,7 @@ export class CanvasRenderer {
                point.y <= bounds.y + bounds.height;
     }
 
-    private isPointOnEdge(point: Position, edge: any): boolean {
+    private isPointOnEdge(point: Position, edge: Edge): boolean {
         const tolerance = 8; // Pixels tolerance for edge selection (scaled)
         const scaledTolerance = tolerance / this.options.scale;
         
@@ -359,7 +391,7 @@ export class CanvasRenderer {
                 }
                 break;
                 
-            case InteractionMode.CreateEdge:
+            case InteractionMode.CreateEdge: {
                 const elementTypeForEdge = element?.type || element?.element_type || '';
                 if (element && (elementTypeForEdge === 'task' || elementTypeForEdge.includes('event') || elementTypeForEdge === 'gateway')) {
                     if (!this.edgeCreationSource) {
@@ -390,6 +422,7 @@ export class CanvasRenderer {
                     this.render();
                 }
                 break;
+            }
 
             // Note: InteractionMode.CreateInterfaceLink is handled above the switch statement
         }
@@ -397,6 +430,7 @@ export class CanvasRenderer {
 
     private handleMouseMove(event: MouseEvent): void {
         const position = this.getMousePosition(event);
+        this.lastMousePosition = position; // Track mouse position for tooltips
         const element = this.getElementAt(position);
         
         // Handle panning
@@ -614,6 +648,10 @@ export class CanvasRenderer {
     getModeManager(): InteractionModeManager {
         return this.modeManager;
     }
+    
+    getCurrentDiagram(): DiagramModel | undefined {
+        return this.currentDiagram;
+    }
 
     pan(deltaX: number, deltaY: number): void {
         this.options.offset.x += deltaX;
@@ -739,7 +777,7 @@ export class CanvasRenderer {
                 // For WASM components, account for interface connectors that extend beyond bounds
                 const nodeType = element.type || element.element_type || '';
                 if (this.isWasmComponentType(nodeType) && nodeType !== 'import-interface' && nodeType !== 'export-interface') {
-                    const interfaces = element.properties?.interfaces as any[] || [];
+                    const interfaces = element.properties?.interfaces as ComponentInterface[] || [];
                     if (interfaces.length > 0) {
                         const connectorExtension = 20; // connectors extend ~20px from component edges
                         elementMinX -= connectorExtension; // Left side import connectors
@@ -874,7 +912,7 @@ export class CanvasRenderer {
             
             // Check if component file is missing or not loaded
             const isMissing = this.isComponentMissingFile(node);
-            const isLoaded = node.properties?.isLoaded === true;
+            const _isLoaded = node.properties?.isLoaded === true;
             
             // Update node properties to include load status
             if (!node.properties) {
@@ -887,7 +925,10 @@ export class CanvasRenderer {
                 isSelected,
                 isHovered,
                 isMissing: isMissing, // Only show as missing if file is actually missing
-                colors
+                colors,
+                showTooltip: isHovered, // Show tooltip when hovering
+                mousePosition: this.lastMousePosition, // Add mouse position for tooltip
+                showInterfaceNames: this.showInterfaceNames // Pass the toggle state
             };
 
             // Use the new V2 renderer for all WASM components
@@ -1178,7 +1219,7 @@ export class CanvasRenderer {
     }
 
     // Interface linking methods
-    public startInterfaceLinking(interfaceInfo: any): void {
+    public startInterfaceLinking(interfaceInfo: InterfaceInfo): void {
         this.sourceInterfaceInfo = interfaceInfo;
         this.interfaceLinkingMode = true;
         this.updateInterfaceHighlights();
@@ -1202,14 +1243,14 @@ export class CanvasRenderer {
         return this.interfaceLinkingMode;
     }
 
-    public getSourceInterfaceInfo(): any {
+    public getSourceInterfaceInfo(): InterfaceInfo | undefined {
         return this.sourceInterfaceInfo;
     }
 
     // Find interface connector at a given position
     private findInterfaceConnector(position: Position): { 
         element: ModelElement; 
-        interface: any; 
+        interface: ComponentInterface; 
         side: 'left' | 'right'; 
         connectorPosition: Position 
     } | undefined {
@@ -1224,10 +1265,10 @@ export class CanvasRenderer {
             if (interfaces.length === 0) continue;
 
             // Separate inputs and outputs
-            const inputs = interfaces.filter((i: any) => 
+            const inputs = interfaces.filter((i: { interface_type?: string; type?: string; direction?: string }) => 
                 i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
             );
-            const outputs = interfaces.filter((i: any) => 
+            const outputs = interfaces.filter((i: { interface_type?: string; type?: string; direction?: string }) => 
                 i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
             );
 
@@ -1245,10 +1286,10 @@ export class CanvasRenderer {
 
     private checkInterfacePorts(
         element: ModelElement,
-        interfaces: any[],
+        interfaces: ComponentInterface[],
         side: 'left' | 'right',
         clickPosition: Position
-    ): { element: ModelElement; interface: any; side: 'left' | 'right'; connectorPosition: Position } | undefined {
+    ): { element: ModelElement; interface: ComponentInterface; side: 'left' | 'right'; connectorPosition: Position } | undefined {
         if (!element.bounds) return undefined;
 
         const headerHeight = 40; // V2 HEADER_HEIGHT
@@ -1284,14 +1325,14 @@ export class CanvasRenderer {
     }
 
     // Check if a component's file is missing (async, but we'll cache results)
-    private isComponentMissingFile(node: Node): boolean {
+    private isComponentMissingFile(_node: Node): boolean {
         // For now, return false and implement async checking later
         // TODO: Implement async component status checking via MCP
         return false;
     }
 
     // Get missing component info for UI via MCP
-    async getMissingComponents(): Promise<Array<{ path: string; component: any; removedAt: number }>> {
+    async getMissingComponents(): Promise<Array<{ path: string; component: { name: string; description?: string }; removedAt: number }>> {
         if (!this.mcpClient) return [];
         
         try {
@@ -1339,7 +1380,7 @@ export class CanvasRenderer {
 
     private getInterfaceConnectorAt(position: Position): {
         element: ModelElement;
-        interface: any;
+        interface: { name: string; interface_type?: string; type?: string; direction?: string };
         side: 'left' | 'right';
         connectorPosition: Position;
     } | undefined {
@@ -1355,7 +1396,7 @@ export class CanvasRenderer {
                 continue;
             }
 
-            const interfaces = element.properties?.interfaces as any[] || [];
+            const interfaces = element.properties?.interfaces as ComponentInterface[] || [];
             if (interfaces.length === 0) continue;
 
             // Use the V2 renderer's port detection method
@@ -1364,11 +1405,28 @@ export class CanvasRenderer {
             if (portInfo) {
                 console.log('getInterfaceConnectorAt: Port found, creating connector:', portInfo);
                 // Calculate the actual connector position for the found port
-                const interfaces = element.properties?.interfaces as any[] || [];
-                const inputs = interfaces.filter(i => 
+                const interfaces = element.properties?.interfaces || [];
+                
+                // Handle both interface count (number) and interface array
+                let actualInterfaces: ComponentInterface[] = [];
+                
+                if (typeof interfaces === 'number') {
+                    // If interfaces is a number (count), create placeholder interfaces
+                    actualInterfaces = Array.from({ length: interfaces }, (_, i) => ({
+                        name: `interface-${i + 1}`,
+                        interface_type: i % 2 === 0 ? 'import' : 'export',
+                        type: i % 2 === 0 ? 'import' : 'export',
+                        direction: i % 2 === 0 ? 'input' : 'output'
+                    }));
+                } else if (Array.isArray(interfaces)) {
+                    // If interfaces is already an array, use it directly
+                    actualInterfaces = interfaces as ComponentInterface[];
+                }
+                
+                const inputs = actualInterfaces.filter(i => 
                     i.interface_type === 'import' || i.type === 'import' || i.direction === 'input'
                 );
-                const outputs = interfaces.filter(i => 
+                const outputs = actualInterfaces.filter(i => 
                     i.interface_type === 'export' || i.type === 'export' || i.direction === 'output'
                 );
 
@@ -1403,7 +1461,7 @@ export class CanvasRenderer {
     private showInterfaceTooltip(
         connector: {
             element: ModelElement;
-            interface: any;
+            interface: { name: string; interface_type?: string; type?: string; direction?: string };
             side: 'left' | 'right';
             connectorPosition: Position;
         },

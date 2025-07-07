@@ -1,0 +1,225 @@
+/// ADAS Data Interfaces - Standardized data exchange contracts
+package adas:data;
+
+/// Sensor data interface - standardized sensor outputs
+interface sensor-data {
+    use adas:common-types/types.{
+        position3d,
+        velocity3d,
+        acceleration3d,
+        bounding-box3d,
+        bounding-box2d,
+        timestamp,
+        data-quality
+    };
+    
+    /// Generic sensor reading
+    record sensor-reading {
+        sensor-id: string,
+        timestamp: timestamp,
+        quality: data-quality,
+        sensor-pose: sensor-pose,
+    }
+    
+    record sensor-pose {
+        position: position3d,
+        orientation: orientation,
+    }
+    
+    record orientation {
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+    }
+    
+    /// Camera frame data
+    record camera-frame {
+        reading: sensor-reading,
+        width: u32,
+        height: u32,
+        data: list<u8>,
+        format: pixel-format,
+        exposure-time: f32,
+        gain: f32,
+    }
+    
+    enum pixel-format {
+        rgb8,
+        rgba8,
+        yuv420,
+        yuv422,
+        raw,
+    }
+    
+    /// Radar detection data
+    record radar-detection {
+        reading: sensor-reading,
+        objects: list<radar-object>,
+    }
+    
+    record radar-object {
+        position: position3d,
+        velocity: velocity3d,
+        rcs: f32,  // Radar cross section
+        confidence: f32,
+    }
+    
+    /// LiDAR point cloud data
+    record lidar-pointcloud {
+        reading: sensor-reading,
+        points: list<lidar-point>,
+    }
+    
+    record lidar-point {
+        position: position3d,
+        intensity: f32,
+        ring: u32,
+    }
+}
+
+/// Perception data interface - processed environmental understanding
+interface perception-data {
+    use adas:common-types/types.{
+        position3d,
+        velocity3d,
+        acceleration3d,
+        bounding-box3d,
+        object-type,
+        timestamp
+    };
+    
+    /// Detected and tracked object
+    record perceived-object {
+        object-id: u32,
+        object-type: object-type,
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        bounding-box: bounding-box3d,
+        confidence: f32,
+        tracking-state: tracking-state,
+        timestamp: timestamp,
+    }
+    
+    enum tracking-state {
+        new,
+        stable,
+        unstable,
+        lost,
+    }
+    
+    /// Scene understanding
+    record scene-model {
+        objects: list<perceived-object>,
+        ego-state: ego-vehicle-state,
+        timestamp: timestamp,
+        confidence: f32,
+    }
+    
+    record ego-vehicle-state {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        heading: f32,
+        yaw-rate: f32,
+    }
+}
+
+/// Prediction data interface - future state predictions
+interface prediction-data {
+    use adas:common-types/types.{
+        position3d,
+        velocity3d,
+        timestamp
+    };
+    use perception-data.{perceived-object};
+    
+    /// Object trajectory prediction
+    record trajectory-prediction {
+        object-id: u32,
+        predicted-states: list<predicted-state>,
+        most-likely-trajectory: u32,
+        prediction-horizon: f32,
+        confidence: f32,
+        timestamp: timestamp,
+    }
+    
+    record predicted-state {
+        position: position3d,
+        velocity: velocity3d,
+        timestamp-offset: f32,
+        probability: f32,
+    }
+    
+    /// Behavior prediction
+    record behavior-prediction {
+        object-id: u32,
+        predicted-behavior: predicted-behavior,
+        confidence: f32,
+        time-to-action: option<f32>,
+        timestamp: timestamp,
+    }
+    
+    enum predicted-behavior {
+        lane-keeping,
+        lane-change-left,
+        lane-change-right,
+        accelerating,
+        decelerating,
+        turning,
+        merging,
+        yielding,
+        stopped,
+        unknown,
+    }
+}
+
+/// Planning data interface - trajectory and decision outputs
+interface planning-data {
+    use adas:common-types/types.{
+        position3d,
+        velocity3d,
+        acceleration3d,
+        timestamp
+    };
+    
+    /// Planned trajectory
+    record planned-trajectory {
+        trajectory-id: u32,
+        waypoints: list<trajectory-point>,
+        total-length: f32,
+        total-duration: f32,
+        cost: f32,
+        feasibility: f32,
+        timestamp: timestamp,
+    }
+    
+    record trajectory-point {
+        position: position3d,
+        velocity: velocity3d,
+        acceleration: acceleration3d,
+        heading: f32,
+        curvature: f32,
+        time-offset: f32,
+    }
+    
+    /// Planning decision
+    record planning-decision {
+        selected-trajectory: planned-trajectory,
+        maneuver-type: maneuver-type,
+        reason: string,
+        confidence: f32,
+        timestamp: timestamp,
+    }
+    
+    enum maneuver-type {
+        follow-lane,
+        lane-change-left,
+        lane-change-right,
+        merge,
+        turn-left,
+        turn-right,
+        stop,
+        emergency-stop,
+    }
+}

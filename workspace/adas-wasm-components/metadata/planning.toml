@@ -1,0 +1,228 @@
+[component]
+name = "adas-planning"
+version = "0.1.0"
+description = "Path planning and motion planning component for autonomous navigation in ADAS systems"
+author = "ADAS Development Team"
+license = "Apache-2.0"
+created = "2025-06-26"
+
+[interfaces]
+exports = ["adas:planning/planning"]
+imports = ["adas:sensor-fusion/types", "adas:perception/perception"]
+
+[dependencies]
+external = [
+    "adas:sensor-fusion@0.1.0",
+    "adas:perception@0.1.0"
+]
+
+[hardware_requirements]
+min_cpu_cores = 2
+min_memory_mb = 1024
+min_storage_mb = 200
+requires_gpu = false
+supported_architectures = ["x86_64", "aarch64", "wasm32"]
+
+[real_time_constraints]
+max_processing_latency_ms = 200
+update_frequency_hz = 10
+priority_level = "medium"
+deadline_type = "soft"
+
+[safety_certification]
+iso26262_asil = "D"  # Automotive Safety Integrity Level D (highest)
+functional_safety_tested = true
+fail_safe_behavior = "emergency_stop"
+redundancy_required = true
+
+[performance_characteristics]
+planning_horizon_seconds = 8.0
+planning_resolution_meters = 0.1
+trajectory_smoothness = 0.95
+safety_margin_meters = 1.5
+computational_complexity = "O(n log n)"
+memory_usage_mb = 256
+cpu_usage_percent = 25
+
+[planning_algorithms]
+global_planners = [
+    "a_star",
+    "dijkstra",
+    "rrt_star",        # Rapidly-exploring Random Tree*
+    "hybrid_a_star",
+    "lattice_planner"
+]
+
+local_planners = [
+    "dwa",             # Dynamic Window Approach
+    "teb",             # Timed Elastic Band
+    "mpc",             # Model Predictive Control
+    "quintic_polynomial",
+    "frenet_frame"
+]
+
+trajectory_optimization = [
+    "gradient_descent",
+    "sequential_quadratic_programming",
+    "interior_point",
+    "genetic_algorithm"
+]
+
+[behavior_planning]
+state_machine_states = [
+    "lane_following",
+    "lane_change_left",
+    "lane_change_right", 
+    "merging",
+    "overtaking",
+    "parking",
+    "emergency_stop"
+]
+
+decision_methods = [
+    "finite_state_machine",
+    "behavior_tree",
+    "hierarchical_planning",
+    "reinforcement_learning"
+]
+
+traffic_rules_support = [
+    "traffic_lights",
+    "stop_signs",
+    "yield_signs",
+    "speed_limits",
+    "no_overtaking_zones",
+    "right_of_way"
+]
+
+[cost_functions]
+supported_costs = [
+    "safety_distance",
+    "comfort_acceleration",
+    "path_deviation",
+    "speed_tracking",
+    "fuel_efficiency",
+    "time_to_goal"
+]
+
+optimization_objectives = [
+    "minimize_time",
+    "minimize_fuel",
+    "maximize_comfort",
+    "maximize_safety"
+]
+
+[constraints]
+kinematic_constraints = [
+    "max_velocity",
+    "max_acceleration", 
+    "max_steering_angle",
+    "wheelbase_length"
+]
+
+dynamic_constraints = [
+    "lateral_acceleration",
+    "tire_friction_limits",
+    "weight_transfer",
+    "stability_margins"
+]
+
+safety_constraints = [
+    "collision_avoidance",
+    "lane_boundaries",
+    "traffic_rules",
+    "visibility_limits"
+]
+
+[path_representation]
+supported_formats = [
+    "waypoint_list",
+    "polynomial_curves",
+    "bezier_curves",
+    "splines",
+    "clothoid_segments"
+]
+
+coordinate_systems = [
+    "cartesian",
+    "frenet_serret",    # Road-aligned coordinates
+    "polar"
+]
+
+[map_integration]
+map_formats = [
+    "opendrive",
+    "lanelet2",
+    "apollo_hdmap",
+    "autoware_vector_map"
+]
+
+map_features = [
+    "lane_geometry",
+    "lane_connectivity",
+    "traffic_rules",
+    "speed_limits",
+    "road_boundaries"
+]
+
+[scenario_handling]
+supported_scenarios = [
+    "highway_driving",
+    "urban_intersection",
+    "roundabout",
+    "parking_lot",
+    "construction_zone",
+    "emergency_vehicle"
+]
+
+weather_conditions = [
+    "clear",
+    "rain",
+    "snow", 
+    "fog",
+    "ice"
+]
+
+traffic_densities = [
+    "light",
+    "moderate", 
+    "heavy",
+    "congested"
+]
+
+[validation]
+simulation_testing = true
+closed_loop_validation = true
+monte_carlo_testing = true
+corner_case_testing = true
+
+safety_metrics = [
+    "time_to_collision",
+    "minimum_safe_distance",
+    "lateral_offset",
+    "comfort_metrics"
+]
+
+[testing]
+unit_tests_coverage = 94
+integration_tests = true
+scenario_based_testing = true
+
+simulation_environments = [
+    "carla",
+    "sumo",        # Simulation of Urban Mobility
+    "prescan",
+    "ipg_carmaker"
+]
+
+benchmark_scenarios = [
+    "nhtsa_scenarios",
+    "euro_ncap_scenarios", 
+    "pegasus_scenarios"
+]
+
+[documentation]
+api_documentation = "docs/planning_api.md"
+algorithm_guide = "docs/planning_algorithms.md"
+parameter_tuning = "docs/planning_tuning.md"
+scenario_guide = "docs/planning_scenarios.md"
