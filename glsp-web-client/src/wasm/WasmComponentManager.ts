@@ -17,6 +17,18 @@ import { DiagramService } from '../services/DiagramService.js';
 import { ValidationService } from '../services/ValidationService.js';
 import { CanvasRenderer } from '../renderer/canvas-renderer.js';
 
+interface SecurityAnalysis {
+    safe: boolean;
+    warnings: string[];
+    restrictions: string[];
+}
+
+interface ComponentUpdateData {
+    componentId: string;
+    status: string;
+    message?: string;
+}
+
 export interface WasmComponent {
     name: string;
     path: string;
@@ -24,7 +36,7 @@ export interface WasmComponent {
     file_exists: boolean;
     last_seen?: string;
     interfaces: WasmInterface[];
-    security_analysis?: any;
+    security_analysis?: SecurityAnalysis;
     last_security_scan?: string;
 }
 
@@ -60,7 +72,7 @@ export class WasmComponentManager {
         this.diagramService = diagramService;
         this.renderer = renderer;
         this.validationService = new ValidationService(mcpService);
-        this.wasmComponentPalette = new WasmComponentPalette(mcpService as any);
+        this.wasmComponentPalette = new WasmComponentPalette(mcpService as unknown as import('../mcp/client.js').McpClient);
         
         // Setup real-time updates via streaming
         this.setupStreamingUpdates();
@@ -134,10 +146,19 @@ export class WasmComponentManager {
         console.log('WasmComponentManager: Refreshing component list from backend...');
         
         try {
-            const result = await this.mcpService.callTool('list_wasm_components', {});
+            const result = await this.mcpService.callTool('scan_wasm_components', {});
             
             if (result && result.content && result.content[0]) {
-                const componentData = JSON.parse(result.content[0].text);
+                console.log('WasmComponentManager: Raw response from scan_wasm_components:', result.content[0].text);
+                
+                // Check if response looks like JSON
+                const rawText = result.content[0].text;
+                if (!rawText.startsWith('{') && !rawText.startsWith('[')) {
+                    console.warn('WasmComponentManager: Response does not appear to be JSON, got:', rawText.substring(0, 100));
+                    return [];
+                }
+                
+                const componentData = JSON.parse(rawText);
                 const components: WasmComponent[] = componentData.components || [];
                 
                 // Update cache
@@ -157,21 +178,21 @@ export class WasmComponentManager {
     /**
      * Request security analysis for a component (delegates to ValidationService)
      */
-    public async getSecurityAnalysis(componentName: string): Promise<any | null> {
+    public async getSecurityAnalysis(componentName: string): Promise<SecurityAnalysis | null> {
         return await this.validationService.requestSecurityAnalysis(componentName);
     }
 
     /**
      * Request WIT validation for a component (delegates to ValidationService)
      */
-    public async getWitAnalysis(componentName: string): Promise<any | null> {
+    public async getWitAnalysis(componentName: string): Promise<import('../services/ValidationService.js').ComponentWitAnalysis | null> {
         return await this.validationService.requestWitValidation(componentName);
     }
 
     /**
      * Check compatibility between two components
      */
-    public async checkCompatibility(componentA: string, componentB: string): Promise<any | null> {
+    public async checkCompatibility(componentA: string, componentB: string): Promise<Record<string, unknown> | null> {
         return await this.validationService.requestCompatibilityAnalysis(componentA, componentB);
     }
 
@@ -182,19 +203,19 @@ export class WasmComponentManager {
         const mcpClient = this.mcpService.getClient();
         
         // Listen for component updates
-        mcpClient.addStreamListener('wasm_component_update', (data: any) => {
+        mcpClient.addStreamListener('wasm_component_update', (data: ComponentUpdateData) => {
             console.log('WasmComponentManager: Component update received:', data);
             this.handleComponentUpdate(data);
         });
 
         // Listen for component discovery
-        mcpClient.addStreamListener('wasm_component_discovered', (data: any) => {
+        mcpClient.addStreamListener('wasm_component_discovered', (data: Record<string, unknown>) => {
             console.log('WasmComponentManager: New component discovered:', data);
             this.handleComponentDiscovered(data);
         });
 
         // Listen for component removal
-        mcpClient.addStreamListener('wasm_component_removed', (data: any) => {
+        mcpClient.addStreamListener('wasm_component_removed', (data: Record<string, unknown>) => {
             console.log('WasmComponentManager: Component removed:', data);
             this.handleComponentRemoved(data);
         });
@@ -206,7 +227,7 @@ export class WasmComponentManager {
     /**
      * Handle component update from streaming
      */
-    private handleComponentUpdate(data: any): void {
+    private handleComponentUpdate(data: ComponentUpdateData): void {
         if (data.component) {
             const component = data.component as WasmComponent;
             this.componentsCache.set(component.name, component);
@@ -219,7 +240,7 @@ export class WasmComponentManager {
     /**
      * Handle new component discovery
      */
-    private handleComponentDiscovered(data: any): void {
+    private handleComponentDiscovered(data: Record<string, unknown>): void {
         if (data.component) {
             const component = data.component as WasmComponent;
             this.componentsCache.set(component.name, component);
@@ -232,7 +253,7 @@ export class WasmComponentManager {
     /**
      * Handle component removal
      */
-    private handleComponentRemoved(data: any): void {
+    private handleComponentRemoved(data: Record<string, unknown>): void {
         if (data.component_name) {
             this.componentsCache.delete(data.component_name);
             
@@ -244,7 +265,7 @@ export class WasmComponentManager {
     /**
      * Notify UI components of changes
      */
-    private notifyComponentUpdate(type: string, component: any): void {
+    private notifyComponentUpdate(type: string, component: WasmComponent): void {
         const event = new CustomEvent('wasm-component-update', {
             detail: { type, component }
         });
@@ -272,7 +293,7 @@ export class WasmComponentManager {
     /**
      * Get component statistics (for UI display)
      */
-    public async getComponentStatistics(): Promise<any> {
+    public async getComponentStatistics(): Promise<{ total: number; loaded: number; failed: number }> {
         try {
             const result = await this.mcpService.callTool('get_component_statistics', {});
             
@@ -324,4 +345,77 @@ export class WasmComponentManager {
     public getValidationService(): ValidationService {
         return this.validationService;
     }
+
+    /**
+     * Legacy method for compatibility - unload component
+     */
+    public unloadComponent(componentId: string): void {
+        // This is now handled by the backend
+        console.log(`Component ${componentId} unloading is now handled by backend`);
+    }
+
+    /**
+     * Check if a click position is on the load switch of a WASM component
+     */
+    public isLoadSwitchClick(position: { x: number; y: number }, element: any): boolean {
+        // Check if this is a WASM component node
+        if (!element || !element.type || !element.type.includes('wasm-component')) {
+            return false;
+        }
+
+        // Get the element bounds
+        const bounds = element.bounds;
+        if (!bounds) {
+            return false;
+        }
+
+        // The load switch is typically in the top-right corner of the component
+        // Assuming a 20x20 pixel area for the switch
+        const switchSize = 20;
+        const switchX = bounds.x + bounds.width - switchSize - 5; // 5px margin
+        const switchY = bounds.y + 5; // 5px margin
+
+        // Check if click is within switch bounds
+        return position.x >= switchX && 
+               position.x <= switchX + switchSize &&
+               position.y >= switchY && 
+               position.y <= switchY + switchSize;
+    }
+
+    /**
+     * Toggle the load state of a component
+     */
+    public async toggleComponentLoad(componentId: string): Promise<void> {
+        console.log('WasmComponentManager: Toggling load state for component:', componentId);
+        
+        try {
+            // For now, just log the action
+            // In a full implementation, this would:
+            // 1. Track the load state
+            // 2. Update the visual representation
+            // 3. Possibly load/unload the actual WASM module
+            console.log('Component load toggle not yet implemented for:', componentId);
+        } catch (error) {
+            console.error('Failed to toggle component load state:', error);
+        }
+    }
+
+    /**
+     * Clear any cached data
+     */
+    private clearCache(): void {
+        // Clear any in-memory caches
+        console.log('Clearing component manager cache');
+    }
+
+    /**
+     * Clean up resources
+     */
+    public cleanup(): void {
+        console.log('Cleaning up component manager...');
+        // Clear any cached data
+        this.clearCache();
+        console.log('Component manager cleaned up');
+    }
+
 }

@@ -11,6 +11,8 @@ export interface ComponentItem {
     tags?: string[];
     thumbnail?: string;
     status?: 'available' | 'loading' | 'error';
+    path?: string;
+    interfaces?: unknown;
     onDragStart?: (e: DragEvent) => void;
     onSelect?: () => void;
 }
@@ -471,12 +473,17 @@ export class ComponentLibrarySection {
             if (e.dataTransfer) {
                 e.dataTransfer.effectAllowed = 'copy';
                 const dragData = {
+                    type: 'wasm-component',
                     id: component.id,
                     name: component.name,
-                    category: component.category
+                    category: component.category,
+                    path: component.path,
+                    interfaces: component.interfaces
                 };
                 console.log('ComponentLibrarySection - Starting drag with data:', dragData);
-                e.dataTransfer.setData('application/wasm-component', JSON.stringify(dragData));
+                e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+                // Also set text/plain for compatibility
+                e.dataTransfer.setData('text/plain', component.name);
             }
             
             component.onDragStart?.(e);

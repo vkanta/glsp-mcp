@@ -1,7 +1,26 @@
 import { DiagramState, DiagramModel } from '../model/diagram.js';
 import { McpService } from './McpService.js';
 import { diagramTypeRegistry } from '../diagrams/diagram-type-registry.js';
-import { statusManager, DiagramSyncStatus } from './StatusManager.js';
+import { statusManager } from './StatusManager.js';
+
+export interface DiagramMetadata {
+    id: string;
+    name: string;
+    diagramType: string;
+    created: string;
+    modified: string;
+    elementCount?: number;
+}
+
+export interface ElementWithBounds {
+    id: string;
+    bounds: {
+        x: number;
+        y: number;
+        width?: number;
+        height?: number;
+    };
+}
 
 export class DiagramService {
     private diagramState: DiagramState;
@@ -208,12 +227,12 @@ export class DiagramService {
         }
     }
 
-    public async createNode(diagramId: string, nodeType: string, position: { x: number; y: number }, label: string): Promise<void> {
+    public async createNode(diagramId: string, nodeType: string, position: { x: number; y: number }, label: string, properties?: Record<string, unknown>): Promise<void> {
         if (!diagramId) return;
         
         try {
             statusManager.setDiagramSyncStatus('saving');
-            await this.mcpService.createNode(diagramId, nodeType, position, label);
+            await this.mcpService.createNode(diagramId, nodeType, position, label, properties);
             await this.loadDiagram(diagramId);
             // Node creation IS a save operation to the server
             statusManager.setDiagramSaved();
@@ -238,7 +257,7 @@ export class DiagramService {
         }
     }
 
-    public async getAvailableDiagrams(): Promise<any[]> {
+    public async getAvailableDiagrams(): Promise<DiagramMetadata[]> {
         try {
             const data = await this.mcpService.listDiagrams();
             return data.diagrams || [];
@@ -254,7 +273,7 @@ export class DiagramService {
             console.log('DiagramService: Delete result:', result);
             
             // Check if the deletion actually succeeded
-            if (result.is_error || (result.content && result.content.some((c: any) => c.text && c.text.includes('Unknown tool')))) {
+            if (result.is_error || (result.content && result.content.some((c: { text?: string }) => c.text && c.text.includes('Unknown tool')))) {
                 console.error('DiagramService: Server returned error for delete:', result);
                 return false;
             }
@@ -274,7 +293,7 @@ export class DiagramService {
         }
     }
 
-    public getAvailableDiagramTypes(): any[] {
+    public getAvailableDiagramTypes(): import('../diagrams/diagram-type-registry.js').DiagramTypeConfig[] {
         return diagramTypeRegistry.getAvailableTypes();
     }
 
@@ -321,12 +340,12 @@ export class DiagramService {
     }
 
     // Get the MCP client for making direct tool calls
-    public getMcpClient(): any {
+    public getMcpClient(): import('../mcp/client.js').McpClient {
         return this.mcpService.getClient();
     }
 
     // Update positions of selected elements and save to server
-    public async updateSelectedElementPositions(diagramId: string, selectedElements: any[]): Promise<void> {
+    public async updateSelectedElementPositions(diagramId: string, selectedElements: ElementWithBounds[]): Promise<void> {
         try {
             console.log('DiagramService: Updating positions for selected elements:', selectedElements.length);
             statusManager.setDiagramSyncStatus('saving');

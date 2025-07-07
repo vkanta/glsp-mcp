@@ -8,6 +8,32 @@ import { WasmRuntimeManager } from './wasm/WasmRuntimeManager.js';
 import { statusManager } from './services/StatusManager.js';
 import { BaseDialog } from './ui/dialogs/base/BaseDialog.js';
 
+// Debug interface for window properties
+interface WindowDebug {
+    testOllama: () => Promise<boolean>;
+    appController: AppController;
+    wasmRuntime: WasmRuntimeManager;
+    uploadWasm: () => void;
+    testSidebar: () => void;
+    theme: import('./ui/ThemeController.js').ThemeController;
+    toggleSidebar: () => void;
+    checkSidebar: () => void;
+    testWasm: () => void;
+    selectDialog: (config?: unknown) => void;
+    getStatus: () => unknown;
+    checkMCP: () => Promise<boolean>;
+    headerIcons: import('./ui/HeaderIconManager.js').HeaderIconManager;
+    testAIMinimize: () => void;
+    debugDialogs: () => void;
+}
+
+declare global {
+    interface Window {
+        debug?: Partial<WindowDebug>;
+        [key: string]: unknown; // For dynamic properties like deletion flags
+    }
+}
+
 export class AppController {
     private mcpService: McpService;
     private diagramService: DiagramService;
@@ -30,36 +56,36 @@ export class AppController {
             maxCachedComponents: 50
         }, this.renderer);
 
-        // Expose for debugging
-        (window as any).testOllama = () => this.aiService.testOllamaConnection();
-        (window as any).appController = this;
-        (window as any).wasmRuntime = this.wasmRuntimeManager;
-        (window as any).uploadWasm = () => this.wasmRuntimeManager.showUploadPanel();
-        (window as any).testSidebar = () => this.testSidebarIntegration();
-        (window as any).theme = this.uiManager.getThemeController();
-        (window as any).toggleSidebar = () => this.uiManager.toggleSidebar();
-        (window as any).checkSidebar = () => {
-            console.log('Sidebar collapsed:', this.uiManager.isSidebarCollapsed());
-            console.log('Body classes:', document.body.className);
-            const btn = document.querySelector('.sidebar-collapse-btn');
-            console.log('Collapse button:', btn);
-            console.log('Button visible:', btn ? window.getComputedStyle(btn).display !== 'none' : 'Not found');
-        };
-        (window as any).headerIcons = this.uiManager.getHeaderIconManager();
-        (window as any).testAIMinimize = () => {
-            console.log('Testing AI minimize manually...');
-            this.uiManager.getHeaderIconManager().addIcon({
-                id: 'test-ai',
-                title: 'Test AI',
-                icon: '🤖',
-                color: 'var(--accent-wasm)',
-                onClick: () => console.log('Test AI clicked'),
-                onClose: () => console.log('Test AI closed')
+        // Development-only debug utilities
+        if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+            if (!window.debug) window.debug = {};
+            window.debug.testOllama = () => this.aiService.testOllamaConnection();
+            window.debug.appController = this;
+            window.debug.wasmRuntime = this.wasmRuntimeManager;
+            window.debug.uploadWasm = () => this.wasmRuntimeManager.showUploadPanel();
+            window.debug.testSidebar = () => this.testSidebarIntegration();
+            window.debug.theme = this.uiManager.getThemeController();
+            window.debug.toggleSidebar = () => this.uiManager.toggleSidebar();
+            window.debug.checkSidebar = () => ({
+                sidebarCollapsed: this.uiManager.isSidebarCollapsed(),
+                bodyClasses: document.body.className,
+                collapseButton: document.querySelector('.sidebar-collapse-btn'),
+                buttonVisible: document.querySelector('.sidebar-collapse-btn') ? 
+                    window.getComputedStyle(document.querySelector('.sidebar-collapse-btn')!).display !== 'none' : false
             });
-        };
-        
-        // Dialog debugging
-        (window as any).debugDialogs = () => BaseDialog.debugDialogState();
+            window.debug.headerIcons = this.uiManager.getHeaderIconManager();
+            window.debug.testAIMinimize = () => {
+                this.uiManager.getHeaderIconManager().addIcon({
+                    id: 'test-ai',
+                    title: 'Test AI',
+                    icon: '🤖',
+                    color: 'var(--accent-wasm)',
+                    onClick: () => { /* Test AI clicked */ },
+                    onClose: () => { /* Test AI closed */ }
+                });
+            };
+            window.debug.debugDialogs = () => BaseDialog.debugDialogState();
+        }
 
         this.mountUI();
 
@@ -130,24 +156,17 @@ export class AppController {
             const scanResult = await this.mcpService.callTool('scan_wasm_components', {});
             console.log('Scan result:', scanResult);
             
-            // Read the components list from MCP resource
-            console.log('Reading wasm://components/list resource...');
-            const componentsList = await this.mcpService.readResource('wasm://components/list');
-            console.log('Raw MCP response:', JSON.stringify(componentsList, null, 2));
-            
-            // Note: The components list already includes status information for each component
-            // No need for a separate status resource
-            
-            if (componentsList && componentsList.text) {
-                console.log('Raw text content:', componentsList.text);
+            // Use the scan result directly which contains detailed interface data
+            if (scanResult && scanResult.content && scanResult.content[0] && scanResult.content[0].text) {
+                console.log('Raw scan result text:', scanResult.content[0].text);
                 
-                // Parse the text content which contains the JSON
-                const componentsData = JSON.parse(componentsList.text);
-                console.log('Parsed components data:', JSON.stringify(componentsData, null, 2));
+                // Parse the scan result which contains the full component data
+                const scanData = JSON.parse(scanResult.content[0].text);
+                console.log('Parsed scan data:', JSON.stringify(scanData, null, 2));
                 
-                const components = componentsData.components || [];
-                console.log(`Found ${components.length} WASM components in parsed data`);
-                console.log('First few components:', components.slice(0, 3));
+                const components = scanData.components || [];
+                console.log(`Found ${components.length} WASM components from scan`);
+                console.log('First few components with interfaces:', components.slice(0, 3));
                 
                 if (components.length === 0) {
                     console.warn('Components array is empty!');
@@ -163,7 +182,7 @@ export class AppController {
                     return;
                 }
                 
-                components.forEach((component: any, index: number) => {
+                components.forEach((component: import('./wasm/WasmComponentManager.js').WasmComponent, index: number) => {
                     console.log(`Processing component ${index + 1}:`, JSON.stringify(component, null, 2));
                     
                     // Extract component info from the MCP data
@@ -174,10 +193,11 @@ export class AppController {
                         id: component.name || name,
                         name: name,
                         description: component.description || `WASM component: ${name}`,
-                        interfaces: component.interfaces || 0, // This is the count from the server
+                        interfaces: component.interfaces || [], // Pass the full interface array from the server
                         status: status,
                         version: '1.0.0', // Default version as server doesn't provide this yet
-                        category: this.categorizeWasmComponent(component)
+                        category: this.categorizeWasmComponent(component),
+                        path: component.path  // Include the path for drag and drop
                     };
                     
                     console.log(`Adding component to sidebar:`, componentData);
@@ -188,10 +208,10 @@ export class AppController {
                 
                 console.log(`🎉 Successfully loaded ${components.length} WASM components to sidebar`);
             } else {
-                console.warn('Invalid MCP response structure:', {
-                    hasComponentsList: !!componentsList,
-                    hasText: !!(componentsList?.text),
-                    textLength: componentsList?.text?.length
+                console.warn('Invalid scan result structure:', {
+                    hasScanResult: !!scanResult,
+                    hasContent: !!(scanResult?.content),
+                    hasText: !!(scanResult?.content?.[0]?.text)
                 });
                 
                 this.uiManager.addWasmComponentToLibrary({
@@ -224,7 +244,7 @@ export class AppController {
         }
     }
     
-    private categorizeWasmComponent(component: any): string {
+    private categorizeWasmComponent(component: import('./wasm/WasmComponentManager.js').WasmComponent): string {
         const name = component.name?.toLowerCase() || '';
         const path = component.path?.toLowerCase() || '';
         
@@ -260,7 +280,8 @@ export class AppController {
             this.interactionManager.setupEventHandlers();
             this.interactionManager.setWasmComponentManager(this.wasmRuntimeManager);
             this.interactionManager.setUIManager(this.uiManager);
-            this.wasmRuntimeManager.setupCanvasDragAndDrop(this.canvas);
+            // Setup drag and drop for WASM components
+            this.setupCanvasDragAndDrop();
 
             // Setup connection status monitoring
             this.mcpService.addConnectionListener((connected: boolean) => {
@@ -347,7 +368,7 @@ export class AppController {
                     if (diagramType === 'wasm-component' && this.wasmRuntimeManager) {
                         console.log('AppController: Refreshing WASM component interfaces...');
                         try {
-                            await this.wasmRuntimeManager.refreshComponentInterfaces();
+                            await this.wasmRuntimeManager.refreshComponentInterfaces('all');
                         } catch (error) {
                             console.error('Failed to refresh component interfaces:', error);
                         }
@@ -438,7 +459,7 @@ export class AppController {
         }
     }
 
-    private async _handleAIDiagramResponse(response: any): Promise<void> {
+    private async _handleAIDiagramResponse(response: import('./ai/diagram-agent.js').AgentResponse): Promise<void> {
         const statusIcon = response.success ? '✅' : '❌';
         let message = `${statusIcon} ${response.message}`;
         
@@ -544,11 +565,11 @@ export class AppController {
     private async deleteDiagramCallback(diagramId: string, diagramName: string): Promise<void> {
         // Prevent double deletion
         const deleteKey = `deleting-${diagramId}`;
-        if ((window as any)[deleteKey]) {
+        if (window[deleteKey]) {
             console.log('AppController: Delete already in progress for', diagramId);
             return;
         }
-        (window as any)[deleteKey] = true;
+        window[deleteKey] = true;
 
         try {
             console.log('AppController: Delete request for diagram:', diagramId, diagramName);
@@ -615,7 +636,7 @@ export class AppController {
             }
         } finally {
             // Clear the lock
-            delete (window as any)[deleteKey];
+            delete window[deleteKey];
         }
     }
 
@@ -670,6 +691,101 @@ export class AppController {
                 error instanceof Error ? error.message : 'Unknown error'
             );
         }
+    }
+    
+    private setupCanvasDragAndDrop(): void {
+        console.log('Setting up canvas drag and drop...');
+        
+        // Prevent default drag behaviors
+        this.canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = 'copy';
+        });
+        
+        this.canvas.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            
+            // Get the drag data
+            const dragDataString = e.dataTransfer?.getData('application/json');
+            if (!dragDataString) {
+                console.log('No drag data received');
+                return;
+            }
+            
+            try {
+                const dragData = JSON.parse(dragDataString);
+                console.log('Canvas drop received:', dragData);
+                
+                // Only handle WASM component drops
+                if (dragData.type !== 'wasm-component') {
+                    console.log('Not a WASM component drop, ignoring');
+                    return;
+                }
+                
+                // Get the drop position relative to the canvas
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Convert to world coordinates (account for canvas transform)
+                const worldPos = this.renderer.screenToWorld(x, y);
+                
+                // Create a WASM component node at the drop position
+                const nodeData = {
+                    type: 'wasm-component',
+                    label: dragData.name,
+                    properties: {
+                        componentName: dragData.id,
+                        componentPath: dragData.path || '',
+                        category: dragData.category || 'WASM Components',
+                        status: 'unloaded',
+                        interfaces: dragData.interfaces || []
+                    },
+                    x: worldPos.x,
+                    y: worldPos.y
+                };
+                
+                console.log('Creating WASM node at position:', worldPos, 'with data:', nodeData);
+                
+                // Get current diagram ID
+                const diagramId = this.diagramService.getCurrentDiagramId();
+                if (!diagramId) {
+                    console.error('No active diagram to add component to');
+                    this.uiManager.updateStatus('Please create or load a diagram first');
+                    return;
+                }
+                
+                // Create the node using the diagram service
+                try {
+                    // Use the correct method signature with properties
+                    await this.diagramService.createNode(
+                        diagramId,
+                        nodeData.type,  // nodeType
+                        { x: nodeData.x, y: nodeData.y },  // position
+                        nodeData.label,  // label
+                        nodeData.properties  // properties (includes interfaces)
+                    );
+                    
+                    console.log('WASM component node created successfully');
+                    this.uiManager.updateStatus(`Added ${dragData.name} to diagram`);
+                    
+                    // The diagram service automatically refreshes the diagram after creating the node
+                    // Now update the renderer to show the new component immediately
+                    const currentDiagram = this.diagramService.getCurrentDiagram();
+                    if (currentDiagram) {
+                        console.log('Updating renderer with refreshed diagram');
+                        this.renderer.setDiagram(currentDiagram);
+                    }
+                } catch (error) {
+                    console.error('Failed to create WASM component node:', error);
+                    this.uiManager.updateStatus('Failed to add component to diagram');
+                }
+            } catch (error) {
+                console.error('Failed to parse drag data:', error);
+            }
+        });
+        
+        console.log('Canvas drag and drop setup complete');
     }
     
     public testSidebarIntegration(): void {

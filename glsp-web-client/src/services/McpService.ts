@@ -1,5 +1,30 @@
 import { McpClient } from '../mcp/client.js';
 
+export interface McpToolResponse {
+    is_error?: boolean;
+    content?: Array<{ text?: string; type?: string }>;
+}
+
+export interface DiagramListResponse {
+    diagrams: Array<{
+        id: string;
+        name: string;
+        diagramType: string;
+        created: string;
+        modified: string;
+        elementCount?: number;
+    }>;
+}
+
+export interface McpResourceContent {
+    text?: string;
+    type?: string;
+}
+
+export interface McpResourceResponse {
+    contents?: McpResourceContent[];
+}
+
 export class McpService {
     private mcpClient: McpClient;
 
@@ -27,43 +52,47 @@ export class McpService {
         this.mcpClient.disconnect();
     }
 
-    async callTool(toolName: string, params: any): Promise<any> {
+    async callTool(toolName: string, params: Record<string, unknown>): Promise<McpToolResponse> {
         return this.mcpClient.callTool(toolName, params);
     }
 
-    async createDiagram(diagramType: string, name: string): Promise<any> {
+    async createDiagram(diagramType: string, name: string): Promise<McpToolResponse> {
         return this.callTool('create_diagram', { diagramType, name });
     }
 
-    async deleteDiagram(diagramId: string): Promise<any> {
+    async deleteDiagram(diagramId: string): Promise<McpToolResponse> {
         return this.callTool('delete_diagram', { diagramId });
     }
 
-    async createNode(diagramId: string, nodeType: string, position: { x: number; y: number }, label: string): Promise<any> {
-        return this.callTool('create_node', { diagramId, nodeType, position, label });
+    async createNode(diagramId: string, nodeType: string, position: { x: number; y: number }, label: string, properties?: Record<string, unknown>): Promise<McpToolResponse> {
+        const params: Record<string, unknown> = { diagramId, nodeType, position, label };
+        if (properties) {
+            params.properties = properties;
+        }
+        return this.callTool('create_node', params);
     }
 
-    async createEdge(diagramId: string, edgeType: string, sourceId: string, targetId: string, label?: string): Promise<any> {
+    async createEdge(diagramId: string, edgeType: string, sourceId: string, targetId: string, label?: string): Promise<McpToolResponse> {
         return this.callTool('create_edge', { diagramId, edgeType, sourceId, targetId, label });
     }
 
-    async updateElement(diagramId: string, elementId: string, position: { x: number, y: number }): Promise<any> {
+    async updateElement(diagramId: string, elementId: string, position: { x: number, y: number }): Promise<McpToolResponse> {
         return this.callTool('update_element', { diagramId, elementId, position });
     }
 
-    async exportDiagram(diagramId: string, format: string): Promise<any> {
+    async exportDiagram(diagramId: string, format: string): Promise<McpToolResponse> {
         return this.callTool('export_diagram', { diagramId, format });
     }
 
-    async deleteElement(diagramId: string, elementId: string): Promise<any> {
+    async deleteElement(diagramId: string, elementId: string): Promise<McpToolResponse> {
         return this.callTool('delete_element', { diagramId, elementId });
     }
 
-    async applyLayout(diagramId: string, algorithm: string): Promise<any> {
+    async applyLayout(diagramId: string, algorithm: string): Promise<McpToolResponse> {
         return this.callTool('apply_layout', { diagramId, algorithm });
     }
 
-    async listDiagrams(): Promise<any> {
+    async listDiagrams(): Promise<DiagramListResponse> {
         const resource = await this.readResource('diagram://list');
         console.log('McpService: List diagrams resource:', resource);
         if (resource && resource.text) {
@@ -75,12 +104,12 @@ export class McpService {
         return { diagrams: [] };
     }
 
-    async readResource(uri: string): Promise<any> {
+    async readResource(uri: string): Promise<McpResourceContent> {
         const result = await this.mcpClient.readResource(uri);
         console.log('McpService: Raw resource result for', uri, ':', result);
         
         // Handle both direct ResourceContent and wrapped response formats
-        const wrappedResult = result as any;
+        const wrappedResult = result as McpResourceResponse;
         if (wrappedResult.contents && Array.isArray(wrappedResult.contents) && wrappedResult.contents.length > 0) {
             // MCP server is returning wrapped format
             return wrappedResult.contents[0];
@@ -90,7 +119,7 @@ export class McpService {
         return result;
     }
 
-    async getDiagramModel(diagramId: string): Promise<any> {
+    async getDiagramModel(diagramId: string): Promise<import('../model/diagram.js').DiagramModel> {
         const resource = await this.readResource(`diagram://model/${diagramId}`);
         console.log('McpService: Diagram model resource for', diagramId, ':', resource);
         console.log('McpService: Resource has text?', !!resource?.text);
