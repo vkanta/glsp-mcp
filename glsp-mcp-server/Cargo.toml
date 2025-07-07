@@ -21,7 +21,7 @@ pulseengine-mcp-monitoring = "0.3.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
@@ -38,8 +38,21 @@ wit-component = { workspace = true }
 wit-parser = { workspace = true }
 chrono = { workspace = true }
 
+# WASM execution
+wasmtime = "25.0"
+
 # Filesystem watching
 notify = "6.1"
+
+# Graphics rendering dependencies
+lru = { workspace = true }
+sha2 = { workspace = true }
+
+# Database abstraction dependencies
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
+influxdb = { version = "0.7", optional = true }
+base64 = "0.21"
 
 # SSE support is now provided by the framework
 
@@ -53,3 +66,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "server"
 path = "src/main.rs"
+
+[features]
+default = ["postgresql"]
+postgresql = ["sqlx"]
+influxdb = ["dep:influxdb"]
+redis = ["dep:redis"]
+all-databases = ["postgresql", "influxdb", "redis"]

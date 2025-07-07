@@ -115,7 +115,7 @@ export class SidebarComponent {
         });
         
         // Add double-click to expand when collapsed (backup method)
-        sidebar.addEventListener('dblclick', (e) => {
+        sidebar.addEventListener('dblclick', (_e) => {
             if (this.element.classList.contains('collapsed')) {
                 console.log('Double-click detected on collapsed sidebar - expanding');
                 this.toggleCollapse();

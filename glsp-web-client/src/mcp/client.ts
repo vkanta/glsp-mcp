@@ -12,13 +12,13 @@
 export interface JsonRpcRequest {
     jsonrpc: string;
     method: string;
-    params?: any;
+    params?: Record<string, unknown>;
     id?: string | number;
 }
 
 export interface JsonRpcResponse {
     jsonrpc: string;
-    result?: any;
+    result?: unknown;
     error?: JsonRpcError;
     id?: string | number;
 }
@@ -26,7 +26,7 @@ export interface JsonRpcResponse {
 export interface JsonRpcError {
     code: number;
     message: string;
-    data?: any;
+    data?: unknown;
 }
 
 export interface InitializeParams {
@@ -36,8 +36,30 @@ export interface InitializeParams {
 }
 
 export interface ClientCapabilities {
-    experimental?: Record<string, any>;
+    experimental?: Record<string, unknown>;
     sampling?: SamplingCapabilities;
+}
+
+export interface InitializeResult {
+    protocolVersion: string;
+    capabilities: ServerCapabilities;
+    serverInfo: ServerInfo;
+}
+
+export interface ServerCapabilities {
+    tools?: Record<string, unknown>;
+    resources?: Record<string, unknown>;
+    prompts?: Record<string, unknown>;
+}
+
+export interface ServerInfo {
+    name: string;
+    version: string;
+}
+
+export interface McpNotification {
+    method: string;
+    params?: Record<string, unknown>;
 }
 
 export interface SamplingCapabilities {}
@@ -64,12 +86,12 @@ export interface ResourceContent {
 export interface Tool {
     name: string;
     description?: string;
-    inputSchema: any;
+    inputSchema: Record<string, unknown>;
 }
 
 export interface CallToolParams {
     name: string;
-    arguments?: any;
+    arguments?: Record<string, unknown>;
 }
 
 export interface CallToolResult {
@@ -119,10 +141,10 @@ export class McpClient {
     private maxReconnectAttempts: number = 5;
     private connectionListeners: ((connected: boolean) => void)[] = [];
     private sessionId: string | null = null;
-    private notificationListeners: Map<string, ((notification: any) => void)[]> = new Map();
+    private notificationListeners: Map<string, ((notification: McpNotification) => void)[]> = new Map();
     private streamingController?: AbortController;
     private streamingActive: boolean = false;
-    private streamListeners: Map<string, ((data: any) => void)[]> = new Map();
+    private streamListeners: Map<string, ((data: unknown) => void)[]> = new Map();
 
     constructor(baseUrl: string = 'http://127.0.0.1:3000') {
         this.baseUrl = baseUrl;
@@ -155,7 +177,7 @@ export class McpClient {
         return this.connected;
     }
 
-    private async sendNotification(method: string, params?: any): Promise<void> {
+    private async sendNotification(method: string, params?: Record<string, unknown>): Promise<void> {
         console.log(`McpClient: Sending notification ${method}`, params);
         const notification: JsonRpcRequest = {
             jsonrpc: '2.0',
@@ -194,7 +216,7 @@ export class McpClient {
         }
     }
 
-    private async sendRequest(method: string, params?: any): Promise<any> {
+    private async sendRequest(method: string, params?: Record<string, unknown>): Promise<unknown> {
         console.log(`McpClient: Sending request ${method}`, params);
         const request: JsonRpcRequest = {
             jsonrpc: '2.0',
@@ -262,11 +284,11 @@ export class McpClient {
                 this.reconnectAttempts = 0;
 
                 return jsonResponse.result;
-            } catch (fetchError: any) {
+            } catch (fetchError: unknown) {
                 clearTimeout(timeoutId);
                 
                 // Check if it's an abort error (timeout)
-                if (fetchError.name === 'AbortError') {
+                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
                     throw new Error('Request timeout after 8 seconds');
                 }
                 throw fetchError;
@@ -335,13 +357,13 @@ export class McpClient {
         this.notifyConnectionChange(false);
     }
 
-    async ping(): Promise<any> {
+    async ping(): Promise<unknown> {
         // Try ping first, fall back to a simpler method if ping isn't supported
         try {
             return await this.sendRequest('ping', {});
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If ping method is not supported, try listing tools as a health check
-            if (error.message && error.message.includes('Unknown method')) {
+            if (error instanceof Error && error.message && error.message.includes('Unknown method')) {
                 console.log('MCP server does not support ping method, using listTools as health check');
                 return await this.listTools();
             }
@@ -349,7 +371,7 @@ export class McpClient {
         }
     }
 
-    async initialize(): Promise<any> {
+    async initialize(): Promise<InitializeResult> {
         console.log('McpClient: Initializing...');
         // Reset session ID on new initialization
         this.sessionId = null;
@@ -369,8 +391,8 @@ export class McpClient {
 
             const result = await this.sendRequest('initialize', params);
             
-            // Send initialized notification (as a notification, not a request)
-            await this.sendNotification('initialized', {});
+            // Note: PulseEngine MCP framework doesn't require 'initialized' notification
+            // await this.sendNotification('initialized', {});
             
             // Explicitly set connection to true after successful initialization
             console.log('MCP client successfully initialized and connected');
@@ -393,7 +415,7 @@ export class McpClient {
         return result.tools;
     }
 
-    async callTool(name: string, args?: any): Promise<CallToolResult> {
+    async callTool(name: string, args?: Record<string, unknown>): Promise<CallToolResult> {
         const params: CallToolParams = {
             name,
             arguments: args
@@ -423,19 +445,19 @@ export class McpClient {
         return await this.sendRequest('prompts/get', params);
     }
 
-    async healthCheck(): Promise<any> {
+    async healthCheck(): Promise<unknown> {
         // Use ping instead of separate health endpoint
         return await this.ping();
     }
     
-    public addNotificationListener(method: string, listener: (notification: any) => void): void {
+    public addNotificationListener(method: string, listener: (notification: McpNotification) => void): void {
         if (!this.notificationListeners.has(method)) {
             this.notificationListeners.set(method, []);
         }
         this.notificationListeners.get(method)!.push(listener);
     }
     
-    public removeNotificationListener(method: string, listener: (notification: any) => void): void {
+    public removeNotificationListener(method: string, listener: (notification: McpNotification) => void): void {
         const listeners = this.notificationListeners.get(method);
         if (listeners) {
             const index = listeners.indexOf(listener);
@@ -445,7 +467,7 @@ export class McpClient {
         }
     }
     
-    private handleNotification(notification: any): void {
+    private handleNotification(notification: McpNotification): void {
         console.log('Received MCP notification:', notification);
         const listeners = this.notificationListeners.get(notification.method);
         if (listeners) {
@@ -461,19 +483,20 @@ export class McpClient {
 
     /// HTTP Streaming Support for MCP 0.3.0
     
-    public addStreamListener(streamType: string, listener: (data: any) => void): void {
+    public addStreamListener(streamType: string, listener: (data: unknown) => void): void {
         if (!this.streamListeners.has(streamType)) {
             this.streamListeners.set(streamType, []);
         }
         this.streamListeners.get(streamType)!.push(listener);
         
-        // Start streaming if not already active
-        if (!this.streamingActive) {
-            this.startStreaming();
-        }
+        // Note: streamable_http transport doesn't use SSE streaming
+        // All communication happens via POST requests to /messages
+        // if (!this.streamingActive) {
+        //     this.startStreaming();
+        // }
     }
     
-    public removeStreamListener(streamType: string, listener: (data: any) => void): void {
+    public removeStreamListener(streamType: string, listener: (data: unknown) => void): void {
         const listeners = this.streamListeners.get(streamType);
         if (listeners) {
             const index = listeners.indexOf(listener);
@@ -502,7 +525,7 @@ export class McpClient {
         this.streamingActive = true;
 
         try {
-            const url = `${this.baseUrl}/stream`;
+            const url = `${this.baseUrl}/sse`;
             
             const headers: Record<string, string> = {
                 'Accept': 'text/event-stream',
@@ -542,17 +565,17 @@ export class McpClient {
                 this.processStreamChunk(chunk);
             }
 
-        } catch (error: any) {
-            if (error.name !== 'AbortError') {
+        } catch (error: unknown) {
+            if (error instanceof Error && error.name !== 'AbortError') {
                 console.error('HTTP streaming error:', error);
                 this.notifyConnectionChange(false);
                 
-                // Attempt to reconnect streaming
-                setTimeout(() => {
-                    if (this.streamListeners.size > 0) {
-                        this.startStreaming();
-                    }
-                }, 5000);
+                // Note: streamable_http doesn't need reconnection for streaming
+                // setTimeout(() => {
+                //     if (this.streamListeners.size > 0) {
+                //         this.startStreaming();
+                //     }
+                // }, 5000);
             }
         } finally {
             this.streamingActive = false;

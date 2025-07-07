@@ -1,5 +1,4 @@
-import { WasmTranspiler } from '../transpiler/WasmTranspiler.js';
-import { ComponentRegistry } from '../runtime/ComponentRegistry.js';
+import { ComponentUploadService, UploadProgress as ServiceUploadProgress } from '../../services/ComponentUploadService.js';
 
 export interface UploadProgress {
     stage: 'uploading' | 'validating' | 'transpiling' | 'registering' | 'complete' | 'error';
@@ -9,20 +8,17 @@ export interface UploadProgress {
 }
 
 export class ComponentUploadPanel {
-    private element: HTMLElement;
-    private transpiler: WasmTranspiler;
-    private registry: ComponentRegistry;
+    private element: HTMLElement & { _selectedFile?: File | null };
+    private uploadService: ComponentUploadService;
     private onUploadComplete?: (componentId: string) => void;
     private onUploadError?: (error: string) => void;
 
     constructor(
-        transpiler: WasmTranspiler, 
-        registry: ComponentRegistry,
+        uploadService: ComponentUploadService,
         onUploadComplete?: (componentId: string) => void,
         onUploadError?: (error: string) => void
     ) {
-        this.transpiler = transpiler;
-        this.registry = registry;
+        this.uploadService = uploadService;
         this.onUploadComplete = onUploadComplete;
         this.onUploadError = onUploadError;
         this.element = this.createElement();
@@ -207,7 +203,7 @@ export class ComponentUploadPanel {
                     font-size: 14px;
                     font-weight: 500;
                     disabled: true;
-                " disabled>Upload & Transpile</button>
+                " disabled>Upload Component</button>
             </div>
         `;
 
@@ -295,7 +291,7 @@ export class ComponentUploadPanel {
         componentInfo.style.display = 'block';
         
         // Store file for upload
-        (this.element as any)._selectedFile = file;
+        this.element._selectedFile = file;
         
         // Enable upload button
         const uploadBtn = this.element.querySelector('.upload-btn') as HTMLButtonElement;
@@ -306,7 +302,7 @@ export class ComponentUploadPanel {
     }
 
     private async handleUpload(): Promise<void> {
-        const file = (this.element as any)._selectedFile as File;
+        const file = this.element._selectedFile;
         const componentNameInput = this.element.querySelector('.component-name-input') as HTMLInputElement;
         const componentName = componentNameInput.value.trim();
 
@@ -315,24 +311,36 @@ export class ComponentUploadPanel {
             return;
         }
 
-        this.showProgress({ stage: 'uploading', progress: 0, message: 'Reading file...' });
+        // Disable upload button during upload
+        const uploadBtn = this.element.querySelector('.upload-btn') as HTMLButtonElement;
+        uploadBtn.disabled = true;
 
         try {
-            // Read file
-            const arrayBuffer = await this.readFileAsArrayBuffer(file);
-            this.updateProgress({ stage: 'validating', progress: 25, message: 'Validating component...' });
-
-            // Transpile component
-            this.updateProgress({ stage: 'transpiling', progress: 50, message: 'Transpiling to JavaScript...' });
-            const transpiledComponent = await this.transpiler.transpileComponent(arrayBuffer, componentName);
-
-            // Register component
-            this.updateProgress({ stage: 'registering', progress: 75, message: 'Registering component...' });
-            const componentId = this.registry.registerComponent(transpiledComponent);
+            // Upload component with progress tracking
+            const componentId = await this.uploadService.uploadComponent(
+                file,
+                componentName,
+                undefined, // description
+                '1.0.0',   // version
+                (progress: ServiceUploadProgress) => {
+                    // Map service progress to UI progress
+                    const uiProgress: UploadProgress = {
+                        stage: progress.stage === 'complete' ? 'complete' : 
+                               progress.stage === 'error' ? 'error' : progress.stage,
+                        progress: progress.progress,
+                        message: progress.message,
+                        error: progress.error
+                    };
+                    
+                    if (progress.stage === 'uploading' && progress.progress === 0) {
+                        this.showProgress(uiProgress);
+                    } else {
+                        this.updateProgress(uiProgress);
+                    }
+                }
+            );
 
             // Complete
-            this.updateProgress({ stage: 'complete', progress: 100, message: 'Component uploaded successfully!' });
-
             setTimeout(() => {
                 this.onUploadComplete?.(componentId);
                 this.hide();
@@ -342,17 +350,10 @@ export class ComponentUploadPanel {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             this.showError(errorMessage);
             this.onUploadError?.(errorMessage);
+            uploadBtn.disabled = false;
         }
     }
 
-    private readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as ArrayBuffer);
-            reader.onerror = () => reject(new Error('Failed to read file'));
-            reader.readAsArrayBuffer(file);
-        });
-    }
 
     private showProgress(progress: UploadProgress): void {
         const progressSection = this.element.querySelector('.progress-section') as HTMLElement;
@@ -391,7 +392,7 @@ export class ComponentUploadPanel {
         errorSection.style.display = 'none';
     }
     
-    private showValidation(validation: any): void {
+    private showValidation(validation: { isValid: boolean; issues?: Array<{ message: string; severity: string }> }): void {
         const validationSection = this.element.querySelector('.validation-section') as HTMLElement;
         const securityScoreDiv = this.element.querySelector('.security-score') as HTMLElement;
         const scoreValue = this.element.querySelector('.score-value') as HTMLElement;
@@ -487,7 +488,7 @@ export class ComponentUploadPanel {
         
         this.hideError();
         this.hideValidation();
-        (this.element as any)._selectedFile = null;
+        this.element._selectedFile = null;
     }
 
     getElement(): HTMLElement {

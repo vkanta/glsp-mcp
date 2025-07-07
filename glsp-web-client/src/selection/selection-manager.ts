@@ -117,7 +117,7 @@ export class SelectionManager {
         return Array.from(this.state.selectedElements);
     }
 
-    getSelectedElements(diagramElements?: Record<string, any>): any[] {
+    getSelectedElements(diagramElements?: Record<string, import('../model/diagram.js').ModelElement>): import('../model/diagram.js').ModelElement[] {
         const selectedIds = this.getSelectedIds();
         if (!diagramElements) {
             // Return basic objects with just IDs if no diagram provided
@@ -225,7 +225,7 @@ export class SelectionManager {
         };
     }
 
-    fromJSON(data: any): void {
+    fromJSON(data: { selectedElementIds?: string[] }): void {
         if (data.selectedElements && Array.isArray(data.selectedElements)) {
             this.state.selectedElements = new Set(data.selectedElements);
         }

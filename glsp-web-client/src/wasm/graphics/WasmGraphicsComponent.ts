@@ -1,4 +1,4 @@
-import { WasmGraphicsBridge, GraphicsAPI } from './WasmGraphicsBridge.js';
+import { GraphicsAPI } from './GraphicsBridge.js';
 
 export interface GraphicsComponentConfig {
     width: number;
@@ -40,9 +40,10 @@ export abstract class BaseGraphicsComponent implements GraphicsComponent {
         
         // Clear canvas with background color
         if (config.backgroundColor) {
-            const ctx = graphics.getContext().ctx;
-            ctx.fillStyle = config.backgroundColor;
-            ctx.fillRect(0, 0, config.width, config.height);
+            graphics.clear();
+            graphics.drawRect(0, 0, config.width, config.height, {
+                fillColor: config.backgroundColor
+            });
         }
         
         await this.onInitialize();
@@ -64,7 +65,7 @@ export abstract class BaseGraphicsComponent implements GraphicsComponent {
     
     // Override these in subclasses
     protected async onInitialize(): Promise<void> {}
-    protected onResize(width: number, height: number): void {}
+    protected onResize(_width: number, _height: number): void {}
     protected onDestroy(): void {}
 }
 
@@ -96,21 +97,23 @@ export class SineWaveComponent extends BaseGraphicsComponent {
             wavePoints.push({ x, y });
         }
         
-        // Draw wave
-        graphics.drawPath(wavePoints, false, {
-            strokeColor: '#4A9EFF',
-            lineWidth: 3,
-            shadowColor: '#4A9EFF',
-            shadowBlur: 10
-        });
+        // Draw wave using lines
+        for (let i = 0; i < wavePoints.length - 1; i++) {
+            graphics.drawLine(
+                wavePoints[i].x, wavePoints[i].y,
+                wavePoints[i + 1].x, wavePoints[i + 1].y,
+                {
+                    strokeColor: '#4A9EFF',
+                    lineWidth: 3
+                }
+            );
+        }
         
         // Draw points
         wavePoints.forEach((point, index) => {
             if (index % 10 === 0) {
                 graphics.drawCircle(point.x, point.y, 4, {
-                    fillColor: '#00D4AA',
-                    shadowColor: '#00D4AA',
-                    shadowBlur: 5
+                    fillColor: '#00D4AA'
                 });
             }
         });
@@ -155,8 +158,6 @@ export class ParticleSystemComponent extends BaseGraphicsComponent {
         }
         
         // Update and draw particles
-        graphics.beginBatch();
-        
         this.particles = this.particles.filter(particle => {
             // Update particle
             particle.x += particle.vx * frame.deltaTime / 16;
@@ -171,15 +172,11 @@ export class ParticleSystemComponent extends BaseGraphicsComponent {
             
             graphics.drawCircle(particle.x, particle.y, size, {
                 fillColor: particle.color,
-                globalAlpha: alpha,
-                shadowColor: particle.color,
-                shadowBlur: size * 2
+                alpha: alpha
             });
             
             return true;
         });
-        
-        graphics.endBatch();
         
         // Draw particle count
         graphics.drawText(`Particles: ${this.particles.length}`, 10, 20, {

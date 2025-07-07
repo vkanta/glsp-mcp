@@ -77,7 +77,7 @@ export class AIService {
         return result;
     }
 
-    public async checkConnections(): Promise<any> {
+    public async checkConnections(): Promise<{ollama: boolean, mcp: boolean}> {
         console.log('AIService: Checking Ollama and MCP connections...');
         const connections = await this.diagramAgent.checkConnections();
         console.log('AIService: Connection check results:', connections);
@@ -108,7 +108,7 @@ export class AIService {
         this.ollamaClient.setDefaultModel(model);
     }
 
-    public async createDiagramFromDescription(description: string, diagramType: string): Promise<any> {
+    public async createDiagramFromDescription(description: string, diagramType: string): Promise<import('../ai/diagram-agent.js').AgentResponse> {
         const request: DiagramRequest = {
             description,
             diagramType
@@ -117,15 +117,15 @@ export class AIService {
     }
 
 
-    public async optimizeDiagram(diagramId: string, optimizationType: string): Promise<any> {
+    public async optimizeDiagram(diagramId: string, optimizationType: string): Promise<import('../ai/diagram-agent.js').AgentResponse> {
         return this.diagramAgent.optimizeDiagram(diagramId, optimizationType);
     }
 
-    public async createTestDiagram(): Promise<any> {
+    public async createTestDiagram(): Promise<import('../ai/diagram-agent.js').AgentResponse> {
         return this.diagramAgent.createTestDiagram();
     }
     
-    public async createDiagramFromPrompt(prompt: string, _currentDiagramId?: string): Promise<any> {
+    public async createDiagramFromPrompt(prompt: string, _currentDiagramId?: string): Promise<import('../ai/diagram-agent.js').AgentResponse> {
         // Determine diagram type from prompt or use current diagram type
         let diagramType = 'workflow'; // default
         

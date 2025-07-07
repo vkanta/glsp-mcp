@@ -5,7 +5,7 @@ use glsp_mcp_server::{GlspBackend, GlspConfig};
 use pulseengine_mcp_server::{McpServer, ServerConfig};
 use std::fs;
 use std::path::Path;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -37,18 +37,16 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     } else {
         // Verify paths exist when not forcing
         if !Path::new(&config.wasm_path).exists() {
-            eprintln!(
-                "Warning: WASM components directory does not exist: {}",
+            warn!(
+                "WASM components directory does not exist: {}. Use --force flag to create it automatically",
                 config.wasm_path
             );
-            eprintln!("Use --force flag to create it automatically");
         }
         if !Path::new(&config.diagrams_path).exists() {
-            eprintln!(
-                "Warning: Diagrams directory does not exist: {}",
+            warn!(
+                "Diagrams directory does not exist: {}. Use --force flag to create it automatically",
                 config.diagrams_path
             );
-            eprintln!("Use --force flag to create it automatically");
         }
     }
 
@@ -72,7 +70,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         "websocket" => TransportConfig::websocket(config.port),
         "stdio" => TransportConfig::stdio(),
         _ => {
-            eprintln!(
+            warn!(
                 "Unknown transport type: {}, defaulting to HTTP streaming",
                 config.transport
             );

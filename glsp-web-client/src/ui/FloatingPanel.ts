@@ -102,7 +102,7 @@ export abstract class FloatingPanel {
         style.color = 'var(--text-primary, #E5E9F0)';
         style.overflow = 'hidden';
         style.boxSizing = 'border-box';
-        style.transition = 'height 0.3s ease';
+        // style.transition = 'height 0.3s ease'; // DISABLED: Causes blur in dialogs
 
         if (this.config.resizable) {
             style.resize = 'both';

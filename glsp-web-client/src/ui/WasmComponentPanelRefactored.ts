@@ -319,8 +319,9 @@ export class WasmComponentPanel extends FloatingPanel {
                 clearTimeout(timeoutId!);
                 clearInterval(countdownId!);
 
-                if (data && (data as any).content && (data as any).content[0]) {
-                    const componentData = JSON.parse((data as any).content[0].text || '[]');
+                const mcpData = data as { content?: Array<{ text?: string }> };
+                if (data && mcpData.content && mcpData.content[0]) {
+                    const componentData = JSON.parse(mcpData.content[0].text || '[]');
                     this.components = Array.isArray(componentData) ? componentData : [];
                     this.renderComponents();
                 } else {
@@ -603,7 +604,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    public updateClientSideComponents(components: any[]): void {
+    public updateClientSideComponents(components: import('../wasm/WasmComponentManager.js').WasmComponent[]): void {
         const clientComponentsList = this.contentElement.querySelector('.client-components-list') as HTMLElement;
         const clientCountElement = this.contentElement.querySelector('.client-component-count') as HTMLElement;
 
@@ -629,7 +630,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    private createClientComponentElement(component: any): HTMLElement {
+    private createClientComponentElement(component: import('../wasm/WasmComponentManager.js').WasmComponent): HTMLElement {
         const element = document.createElement('div');
         element.className = 'client-component-item';
         
@@ -778,7 +779,7 @@ export class WasmComponentPanel extends FloatingPanel {
         return element;
     }
 
-    private setupDiagramComponentEvents(element: HTMLElement, component: any): void {
+    private setupDiagramComponentEvents(element: HTMLElement, component: import('../wasm/WasmComponentManager.js').WasmComponent): void {
         // Load button
         const loadBtn = element.querySelector('.load-btn') as HTMLButtonElement;
         loadBtn?.addEventListener('click', () => this.handleLoadComponent(component.elementId));
@@ -1018,7 +1019,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    private async getWitInterfacesOverview(): Promise<any> {
+    private async getWitInterfacesOverview(): Promise<{ interfaces?: unknown[] }> {
         // Call MCP resource directly using the client
         try {
             const result = await this.mcpClient.readResource('wasm://wit/interfaces');
@@ -1028,7 +1029,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    private async getWitTypesCatalog(): Promise<any> {
+    private async getWitTypesCatalog(): Promise<{ types?: Array<{ name: string; kind: string }> }> {
         try {
             const result = await this.mcpClient.readResource('wasm://wit/types');
             return JSON.parse(result.text || '{}');
@@ -1037,7 +1038,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    private async getWitDependenciesGraph(): Promise<any> {
+    private async getWitDependenciesGraph(): Promise<{ dependencies?: Array<{ name: string; version?: string }> }> {
         try {
             const result = await this.mcpClient.readResource('wasm://wit/dependencies');
             return JSON.parse(result.text || '{}');
@@ -1046,7 +1047,7 @@ export class WasmComponentPanel extends FloatingPanel {
         }
     }
 
-    private displayWitAnalysisResults(overview: any, typesData: any, dependenciesData: any): void {
+    private displayWitAnalysisResults(overview: { summary?: { imports?: number; exports?: number; types?: number; dependencies?: number } }, typesData: { types?: Array<{ name: string; kind: string }> }, dependenciesData: { dependencies?: Array<{ name: string; version?: string }> }): void {
         const analysisContent = this.contentElement.querySelector('.wit-analysis-content') as HTMLElement;
         if (!analysisContent) return;
 
@@ -1082,7 +1083,7 @@ export class WasmComponentPanel extends FloatingPanel {
                     <h5>📋 Interfaces</h5>
                     <div class="interfaces-list">
                         ${interfaces.length > 0 ? 
-                            interfaces.map((iface: any) => `
+                            interfaces.map((iface) => `
                                 <div class="interface-item">
                                     <div class="interface-header">
                                         <span class="interface-name">${iface.name}</span>
@@ -1104,7 +1105,7 @@ export class WasmComponentPanel extends FloatingPanel {
                     <h5>🔧 Types</h5>
                     <div class="types-list">
                         ${types.length > 0 ? 
-                            types.slice(0, 10).map((type: any) => `
+                            types.slice(0, 10).map((type) => `
                                 <div class="type-item">
                                     <span class="type-name">${type.type}</span>
                                     <span class="type-usage">${type.usedIn}</span>
@@ -1121,7 +1122,7 @@ export class WasmComponentPanel extends FloatingPanel {
                     <h5>🔗 Components</h5>
                     <div class="dependencies-list">
                         ${dependencies.length > 0 ? 
-                            dependencies.map((dep: any) => `
+                            dependencies.map((dep) => `
                                 <div class="dependency-item">
                                     <span class="dependency-name">${dep.id}</span>
                                     <div class="dependency-stats">
@@ -1150,7 +1151,7 @@ export class WasmComponentPanel extends FloatingPanel {
         detailedBtn?.addEventListener('click', () => this.showDetailedWitAnalysis());
     }
 
-    private styleWitAnalysisResults(container: HTMLElement): void {
+    private styleWitAnalysisResults(_container: HTMLElement): void {
         const style = document.createElement('style');
         style.textContent = `
             .wit-analysis-results {

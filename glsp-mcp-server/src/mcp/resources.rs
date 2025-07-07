@@ -1,7 +1,7 @@
 use crate::mcp::protocol::{Resource, ResourceContent};
 use crate::mcp::tools::DiagramTools;
 use crate::model::ElementType;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use serde_json::{json, Value};
 
 pub struct DiagramResources;
@@ -78,6 +78,30 @@ impl DiagramResources {
                 uri: "wasm://wit/dependencies".to_string(),
                 name: "WIT Dependencies Graph".to_string(),
                 description: Some("Dependency relationships between WIT interfaces".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://changes/recent".to_string(),
+                name: "Recent Component Changes".to_string(),
+                description: Some("Recent file system changes to WASM components".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://changes/stream".to_string(),
+                name: "Component Changes Stream".to_string(),
+                description: Some("Real-time stream of WASM component file changes".to_string()),
+                mime_type: Some("application/x-ndjson".to_string()),
+            },
+            Resource {
+                uri: "wasm://executions/active".to_string(),
+                name: "Active WASM Executions".to_string(),
+                description: Some("Currently running WASM component executions".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://security/summary".to_string(),
+                name: "Security Analysis Summary".to_string(),
+                description: Some("Summary of security analysis across all components".to_string()),
                 mime_type: Some("application/json".to_string()),
             },
         ];
@@ -219,19 +243,24 @@ impl DiagramResources {
             }),
             _ => {
                 if uri.starts_with("diagram://model/") {
-                    let diagram_id = uri.strip_prefix("diagram://model/").unwrap();
+                    let diagram_id = uri.strip_prefix("diagram://model/")
+                        .ok_or_else(|| anyhow!("Invalid diagram model URI: {}", uri))?;
                     self.get_diagram_model(diagram_id, tools)
                 } else if uri.starts_with("diagram://elements/") {
-                    let diagram_id = uri.strip_prefix("diagram://elements/").unwrap();
+                    let diagram_id = uri.strip_prefix("diagram://elements/")
+                        .ok_or_else(|| anyhow!("Invalid diagram elements URI: {}", uri))?;
                     self.get_diagram_elements(diagram_id, tools)
                 } else if uri.starts_with("diagram://metadata/") {
-                    let diagram_id = uri.strip_prefix("diagram://metadata/").unwrap();
+                    let diagram_id = uri.strip_prefix("diagram://metadata/")
+                        .ok_or_else(|| anyhow!("Invalid diagram metadata URI: {}", uri))?;
                     self.get_diagram_metadata(diagram_id, tools)
                 } else if uri.starts_with("diagram://validation/") {
-                    let diagram_id = uri.strip_prefix("diagram://validation/").unwrap();
+                    let diagram_id = uri.strip_prefix("diagram://validation/")
+                        .ok_or_else(|| anyhow!("Invalid diagram validation URI: {}", uri))?;
                     self.get_validation_results(diagram_id, tools)
                 } else if uri.starts_with("wasm://component/") {
-                    let path = uri.strip_prefix("wasm://component/").unwrap();
+                    let path = uri.strip_prefix("wasm://component/")
+                        .ok_or_else(|| anyhow!("Invalid WASM component URI: {}", uri))?;
                     if let Some((component_name, suffix)) = path.split_once('/') {
                         match suffix {
                             "wit" => self.get_component_wit_analysis(component_name, tools),
@@ -603,7 +632,6 @@ impl DiagramResources {
     }
 
     fn get_wasm_components_list(&self, tools: &DiagramTools) -> String {
-        // TODO: Get actual WASM components from file watcher
         let components = tools.get_wasm_components();
 
         let component_list: Vec<Value> = components

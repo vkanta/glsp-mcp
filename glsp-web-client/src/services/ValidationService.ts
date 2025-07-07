@@ -9,7 +9,7 @@
 import { McpService } from './McpService.js';
 
 export interface SecurityIssue {
-    issue_type: any;
+    issue_type: 'syntax' | 'semantic' | 'compatibility' | 'security' | 'dependency';
     risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
     description: string;
     recommendation: string;
@@ -31,23 +31,55 @@ export interface SecurityAnalysis {
 }
 
 export interface WitValidationIssue {
-    issue_type: any;
+    issue_type: 'syntax' | 'semantic' | 'compatibility' | 'security' | 'dependency';
     severity: 'Info' | 'Warning' | 'Error' | 'Critical';
     message: string;
     suggestion?: string;
     location?: string;
 }
 
+export interface WitImport {
+    interface_name: string;
+    functions: WitFunction[];
+}
+
+export interface WitExport {
+    interface_name: string;
+    functions: WitFunction[];
+}
+
+export interface WitFunction {
+    name: string;
+    parameters: WitParameter[];
+    return_type?: string;
+}
+
+export interface WitParameter {
+    name: string;
+    type: string;
+}
+
+export interface WitType {
+    name: string;
+    kind: 'record' | 'enum' | 'variant' | 'flags' | 'resource';
+    fields?: Array<{ name: string; type: string }>;
+}
+
+export interface WitDependency {
+    name: string;
+    version?: string;
+}
+
 export interface ComponentWitAnalysis {
     component_name: string;
     world_name?: string;
-    imports: any[];
-    exports: any[];
-    types: any[];
-    dependencies: any[];
+    imports: WitImport[];
+    exports: WitExport[];
+    types: WitType[];
+    dependencies: WitDependency[];
     raw_wit?: string;
     validation_results: WitValidationIssue[];
-    compatibility_report?: any;
+    compatibility_report?: Record<string, unknown>;
     analysis_timestamp: string;
 }
 
@@ -60,9 +92,27 @@ export interface ValidationSummary {
     overall_health: 'Excellent' | 'Good' | 'Degraded' | 'Critical';
 }
 
+interface CompatibilityAnalysis {
+    compatible: boolean;
+    compatibility_score: number;
+    shared_interfaces: string[];
+    potential_connections: Array<{
+        from_interface: string;
+        to_interface: string;
+        compatibility: 'full' | 'partial' | 'none';
+    }>;
+    warnings?: string[];
+    recommendations?: string[];
+}
+
+interface CachedValidation {
+    data: SecurityAnalysis | ComponentWitAnalysis | WasmValidationResult | CompatibilityAnalysis | Record<string, unknown>;
+    timestamp: number;
+}
+
 export class ValidationService {
     private mcpService: McpService;
-    private validationCache: Map<string, any> = new Map();
+    private validationCache: Map<string, CachedValidation> = new Map();
     private cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
     constructor(mcpService: McpService) {
@@ -140,7 +190,7 @@ export class ValidationService {
     /**
      * Request compatibility analysis between two components
      */
-    async requestCompatibilityAnalysis(componentA: string, componentB: string): Promise<any | null> {
+    async requestCompatibilityAnalysis(componentA: string, componentB: string): Promise<CompatibilityAnalysis | null> {
         console.log(`ValidationService: Requesting compatibility analysis between ${componentA} and ${componentB}`);
 
         try {
@@ -203,10 +253,16 @@ export class ValidationService {
         try {
             const result = await this.mcpService.callTool('refresh_component_validations', {});
             
+            // Check if the refresh was successful
+            if (result.is_error || result.content?.[0]?.text?.includes('error')) {
+                console.warn('ValidationService: Validation refresh returned error:', result);
+                return false;
+            }
+            
             // Clear cache to force fresh data
             this.clearCache();
             
-            console.log('ValidationService: Validation refresh completed');
+            console.log('ValidationService: Validation refresh completed successfully');
             return true;
         } catch (error) {
             console.error('ValidationService: Failed to refresh validations:', error);
@@ -221,7 +277,7 @@ export class ValidationService {
         const mcpClient = this.mcpService.getClient();
         
         // Listen for security analysis updates
-        mcpClient.addStreamListener('security_analysis_update', (data: any) => {
+        mcpClient.addStreamListener('security_analysis_update', (data: Record<string, unknown>) => {
             console.log('ValidationService: Received security analysis update:', data);
             
             // Update cache with new data
@@ -235,7 +291,7 @@ export class ValidationService {
         });
 
         // Listen for WIT analysis updates
-        mcpClient.addStreamListener('wit_analysis_update', (data: any) => {
+        mcpClient.addStreamListener('wit_analysis_update', (data: Record<string, unknown>) => {
             console.log('ValidationService: Received WIT analysis update:', data);
             
             // Update cache with new data
@@ -249,7 +305,7 @@ export class ValidationService {
         });
 
         // Listen for component discovery updates
-        mcpClient.addStreamListener('component_discovered', (data: any) => {
+        mcpClient.addStreamListener('component_discovered', (data: Record<string, unknown>) => {
             console.log('ValidationService: New component discovered:', data);
             
             // Clear summary cache to get updated counts
@@ -260,7 +316,7 @@ export class ValidationService {
         });
     }
 
-    private notifyValidationUpdate(type: string, data: any): void {
+    private notifyValidationUpdate(type: string, data: Record<string, unknown>): void {
         // Dispatch custom events that UI components can listen to
         const event = new CustomEvent('validation-update', {
             detail: { type, data }
@@ -268,7 +324,7 @@ export class ValidationService {
         window.dispatchEvent(event);
     }
 
-    private getFromCache(key: string): any | null {
+    private getFromCache(key: string): unknown {
         const item = this.validationCache.get(key);
         if (item && Date.now() - item.timestamp < this.cacheTimeout) {
             return item.data;
@@ -279,7 +335,7 @@ export class ValidationService {
         return null;
     }
 
-    private setCache(key: string, data: any, customTimeout?: number): void {
+    private setCache(key: string, data: unknown, customTimeout?: number): void {
         this.validationCache.set(key, {
             data,
             timestamp: Date.now()

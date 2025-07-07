@@ -20,6 +20,11 @@ export interface AgentResponse {
     errors?: string[];
 }
 
+export interface ToolCall {
+    tool: string;
+    arguments: Record<string, unknown>;
+}
+
 export class DiagramAgent {
     private ollama: OllamaClient;
     private mcpClient: McpClient;
@@ -161,7 +166,7 @@ Respond with valid JSON only, no additional text.`;
         }
     }
 
-    private async executeToolCalls(toolCalls: any[], steps: string[], errors: string[]): Promise<AgentResponse> {
+    private async executeToolCalls(toolCalls: ToolCall[], steps: string[], errors: string[]): Promise<AgentResponse> {
         let diagramId: string | undefined;
         const nodeIds: string[] = [];
         

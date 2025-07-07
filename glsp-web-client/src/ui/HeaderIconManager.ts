@@ -235,8 +235,8 @@ export class HeaderIconManager {
             const iconElement = this.container.querySelector(`[data-icon-id="${id}"]`) as HTMLElement;
             if (iconElement) {
                 // Update only the visual parts without recreating the entire element
-                const iconSpan = iconElement.querySelector('span:first-child');
-                const titleSpan = iconElement.querySelector('span:last-of-type');
+                const iconSpan = iconElement.querySelector('span:first-child') as HTMLElement;
+                const titleSpan = iconElement.querySelector('span:last-of-type') as HTMLElement;
                 
                 if (iconSpan && updates.icon) {
                     iconSpan.textContent = updates.icon;
@@ -251,8 +251,8 @@ export class HeaderIconManager {
                 
                 // Update hover colors if color changed
                 if (updates.color) {
-                    const originalMouseEnter = iconElement.onmouseenter;
-                    const originalMouseLeave = iconElement.onmouseleave;
+                    const _originalMouseEnter = iconElement.onmouseenter;
+                    const _originalMouseLeave = iconElement.onmouseleave;
                     
                     iconElement.onmouseenter = () => {
                         iconElement.style.background = updates.color || 'var(--accent-wasm)';

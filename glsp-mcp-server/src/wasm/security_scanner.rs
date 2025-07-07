@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
+use tracing::{debug, info, warn};
 use wasmparser::{Parser, Payload};
 
 /// Security risk levels for WASM components
@@ -59,6 +60,7 @@ pub struct SecurityAnalysis {
 }
 
 /// WASM Security Scanner
+#[derive(Clone)]
 pub struct WasmSecurityScanner {
     /// Known dangerous imports that should be flagged
     dangerous_imports: HashSet<String>,
@@ -114,7 +116,7 @@ impl WasmSecurityScanner {
         let start_time = std::time::Instant::now();
         let scan_timestamp = Utc::now();
 
-        println!("🔒 Starting security analysis for: {}", component_name);
+        info!("Starting security analysis for: {}", component_name);
 
         // Read the WASM file
         let wasm_bytes = tokio::fs::read(path)
@@ -139,16 +141,16 @@ impl WasmSecurityScanner {
         let component_hash = self.calculate_component_hash(&wasm_bytes);
         if self.trusted_components.contains(&component_hash) {
             analysis.trusted_signature = Some(component_hash);
-            println!("✅ Component is in trusted list: {}", component_name);
+            info!("Component is in trusted list: {}", component_name);
         }
 
         // Parse WASM and analyze security
         match self.analyze_wasm_security(&wasm_bytes, &mut analysis).await {
             Ok(_) => {
-                println!("✅ Security analysis completed for: {}", component_name);
+                info!("Security analysis completed for: {}", component_name);
             }
             Err(e) => {
-                println!("⚠️  Security analysis failed for {}: {}", component_name, e);
+                warn!("Security analysis failed for {}: {}", component_name, e);
                 analysis.is_component_valid = false;
                 analysis.issues.push(SecurityIssue {
                     issue_type: SecurityIssueType::MalformedComponent {
@@ -333,7 +335,7 @@ impl WasmSecurityScanner {
             }
             section_name if section_name.starts_with("adas") => {
                 // ADAS-specific metadata sections are generally trusted
-                println!("Found ADAS metadata section: {}", section_name);
+                debug!("Found ADAS metadata section: {}", section_name);
             }
             _ => {
                 // Unknown custom sections might be suspicious
@@ -366,7 +368,7 @@ impl WasmSecurityScanner {
             analysis.imports_analyzed += 1;
 
             // Component-level security analysis
-            println!("Analyzing component import: {:?}", import.name);
+            debug!("Analyzing component import: {:?}", import.name);
         }
 
         Ok(())

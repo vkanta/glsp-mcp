@@ -55,7 +55,7 @@ export class ThemeController {
                     case '4':
                     case '5':
                     case '6':
-                    case '7':
+                    case '7': {
                         e.preventDefault();
                         const themeIndex = parseInt(e.key) - 1;
                         if (themeIndex >= 0 && themeIndex < this.themes.length) {
@@ -63,6 +63,7 @@ export class ThemeController {
                             this.slider.value = themeIndex.toString();
                         }
                         break;
+                    }
                     case 'b': // Toggle bright/dark
                         e.preventDefault();
                         this.toggleBrightDark();

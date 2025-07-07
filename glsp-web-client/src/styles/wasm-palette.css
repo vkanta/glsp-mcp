@@ -193,7 +193,9 @@
 
 .component-item:hover {
     border-color: var(--accent-wasm, #654FF0);
-    transform: translateY(-1px);
+    /* Use position offset instead of transform to avoid blur */
+    position: relative;
+    top: -1px;
     box-shadow: 0 2px 8px rgba(101, 79, 240, 0.2);
     background: var(--bg-tertiary);
 }
@@ -388,7 +390,9 @@
 .retry-btn:hover {
     background: var(--accent-wasm, #654FF0);
     color: white;
-    transform: translateY(-1px);
+    /* Use position offset instead of transform to avoid blur */
+    position: relative;
+    top: -1px;
     box-shadow: 0 2px 8px rgba(101, 79, 240, 0.3);
 }
 

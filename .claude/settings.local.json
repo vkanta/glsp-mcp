@@ -31,7 +31,9 @@
       "Bash(rg:*)",
       "Bash(rg:*)",
       "Bash(sed:*)",
-      "WebFetch(domain:docs.rs)"
+      "WebFetch(domain:docs.rs)",
+      "Bash(timeout 10s npm run lint)",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": []
   }

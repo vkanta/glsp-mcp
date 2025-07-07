@@ -75,7 +75,7 @@ impl FileSystemWatcher {
                     });
                 }
                 Err(e) => {
-                    eprintln!("Watch error: {e:?}");
+                    error!("Watch error: {e:?}");
                 }
             }
         })?;

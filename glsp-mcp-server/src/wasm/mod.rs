@@ -1,7 +1,16 @@
+mod execution_engine;
 mod filesystem_watcher;
 mod security_scanner;
 mod wit_analyzer;
+mod graphics_renderer;
+mod sensor_bridge;
+mod pipeline;
+mod simulation;
 
+pub use execution_engine::{
+    ExecutionContext, ExecutionProgress, ExecutionResult, ExecutionStage, GraphicsFormat,
+    GraphicsOutput, VideoFormat, WasmExecutionEngine,
+};
 pub use filesystem_watcher::{FileSystemWatcher, WasmChangeType, WasmComponentChange};
 pub use security_scanner::{
     SecurityAnalysis, SecurityIssue, SecurityIssueType, SecurityRiskLevel, WasmSecurityScanner,
@@ -11,12 +20,38 @@ pub use wit_analyzer::{
     WitInterface, WitInterfaceType, WitParam, WitType, WitTypeDefinition, WitValidationIssue,
     WitValidationIssueType, WitValidationSeverity,
 };
+pub use graphics_renderer::{
+    WasmGraphicsRenderer, GraphicsConfig, CanvasCommand, ImageFormat,
+};
+pub use sensor_bridge::{
+    SensorDataBridge, SensorBridgeConfig, SensorFrame, BridgeStatus, WasmSensorInterface,
+    TimingConfig, BufferSettings, SyncMode as SensorSyncMode, SimulationTimeInfo, BufferStats,
+};
+pub use pipeline::{
+    WasmPipelineEngine, PipelineConfig, PipelineStage, PipelineExecution, PipelineState,
+    DataConnection, DataMapping, DataTransform, ConnectionType, StageExecutionSettings,
+    RetryConfig, BackoffStrategy, PipelineSettings, PersistenceSettings, ExecutionMode,
+    StageResult, ExecutionStats, StageStats,
+};
+pub use simulation::{
+    WasmSimulationEngine, SimulationConfig, SimulationScenario, SimulationExecution, SimulationState,
+    PipelineDependency, DependencyType, DataSharingConfig, ScenarioSettings, ResourceLimits,
+    ScenarioExecutionMode, SimulationSettings, SimulationExecutionMode, RealTimeSyncSettings,
+    SyncMode, OutputConfig, OutputFormat, OutputDestination, SimulationStats, ScenarioStats,
+    ResourceUsage, ScenarioTrigger, TriggerType, TriggerCondition, ScenarioCondition,
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::{info, warn, debug};
 
+/// WASM interface definition representing import or export interfaces
+///
+/// Describes a collection of functions that a WASM component either provides
+/// (exports) or requires (imports) from the host environment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmInterface {
     pub name: String,
@@ -24,6 +59,10 @@ pub struct WasmInterface {
     pub functions: Vec<WasmFunction>,
 }
 
+/// WASM function signature with parameters and return types
+///
+/// Represents a single function within a WASM interface, including
+/// its parameter list and return values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmFunction {
     pub name: String,
@@ -31,12 +70,20 @@ pub struct WasmFunction {
     pub returns: Vec<WasmParam>,
 }
 
+/// Parameter or return value definition for WASM functions
+///
+/// Describes a single parameter or return value with its name and type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmParam {
     pub name: String,
     pub param_type: String,
 }
 
+/// WASM component metadata and interface information
+///
+/// Contains comprehensive information about a WebAssembly component including
+/// its file location, interfaces, security analysis, and runtime metadata.
+/// This is the primary data structure for managing WASM components in the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmComponent {
     pub name: String,
@@ -53,11 +100,15 @@ pub struct WasmComponent {
     pub last_security_scan: Option<DateTime<Utc>>,
 }
 
+#[derive(Clone)]
 pub struct WasmFileWatcher {
     watch_path: PathBuf,
     components: HashMap<String, WasmComponent>,
     last_scan: DateTime<Utc>,
     security_scanner: WasmSecurityScanner,
+    execution_engine: Option<Arc<WasmExecutionEngine>>,
+    recent_changes: Arc<tokio::sync::Mutex<Vec<WasmComponentChange>>>,
+    filesystem_watcher: Option<Arc<tokio::sync::RwLock<FileSystemWatcher>>>,
 }
 
 impl WasmFileWatcher {
@@ -67,7 +118,56 @@ impl WasmFileWatcher {
             components: HashMap::new(),
             last_scan: Utc::now(),
             security_scanner: WasmSecurityScanner::new(),
+            execution_engine: None,
+            recent_changes: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            filesystem_watcher: None,
         }
+    }
+    
+    /// Start filesystem watcher for real-time component monitoring
+    pub async fn start_file_watching(&mut self) -> Result<(), anyhow::Error> {
+        // Create and start the filesystem watcher
+        let mut fs_watcher = FileSystemWatcher::new(self.watch_path.clone());
+        fs_watcher.start_watching().await?;
+        
+        // Get the changes receiver before storing watcher
+        let changes_rx = fs_watcher.get_changes_receiver();
+        let recent_changes = self.recent_changes.clone();
+        
+        // Spawn a task to collect changes
+        tokio::spawn(async move {
+            let mut rx = changes_rx.write().await;
+            while let Some(change) = rx.recv().await {
+                info!("Component change detected: {:?}", change);
+                
+                // Add to recent changes
+                let mut changes = recent_changes.lock().await;
+                changes.push(change);
+                
+                // Keep only last 100 changes
+                if changes.len() > 100 {
+                    let drain_count = changes.len() - 100;
+                    changes.drain(0..drain_count);
+                }
+            }
+        });
+        
+        // Store the watcher
+        self.filesystem_watcher = Some(Arc::new(tokio::sync::RwLock::new(fs_watcher)));
+        
+        info!("Filesystem watcher started for path: {:?}", self.watch_path);
+        Ok(())
+    }
+    
+    /// Get recent component changes
+    pub async fn get_recent_changes(&self) -> Vec<WasmComponentChange> {
+        self.recent_changes.lock().await.clone()
+    }
+
+    /// Initialize execution engine with given configuration
+    pub fn with_execution_engine(mut self, max_concurrent: usize) -> Result<Self, anyhow::Error> {
+        self.execution_engine = Some(Arc::new(WasmExecutionEngine::new(max_concurrent)?));
+        Ok(self)
     }
 
     pub fn get_watch_path(&self) -> &PathBuf {
@@ -121,11 +221,11 @@ impl WasmFileWatcher {
         use std::ffi::OsStr;
 
         let watch_path = &self.watch_path;
-        println!("Scanning WASM components in: {watch_path:?}");
+        info!("Scanning WASM components in: {watch_path:?}");
 
         if !self.watch_path.exists() {
             let watch_path = &self.watch_path;
-            println!("WASM watch path does not exist: {watch_path:?}");
+            warn!("WASM watch path does not exist: {watch_path:?}");
             return Ok(());
         }
 
@@ -134,7 +234,7 @@ impl WasmFileWatcher {
         self.scan_directory_recursive(&self.watch_path, &mut wasm_files)
             .await?;
 
-        println!("Found {} WASM files", wasm_files.len());
+        info!("Found {} WASM files", wasm_files.len());
 
         // Track which components we found this scan
         let mut found_components = std::collections::HashSet::new();
@@ -163,7 +263,7 @@ impl WasmFileWatcher {
             if !found_components.contains(name) && component.file_exists {
                 component.file_exists = false;
                 component.removed_at = Some(Utc::now());
-                println!("Component {name} file is now missing");
+                warn!("Component {name} file is now missing");
             }
         }
 
@@ -203,7 +303,7 @@ impl WasmFileWatcher {
             .unwrap_or("unknown")
             .to_string();
 
-        println!("Extracting component info from: {wasm_path:?}");
+        debug!("Extracting component info from: {wasm_path:?}");
 
         // Try to extract actual metadata using wasm-tools
         match self.extract_wasm_metadata(wasm_path).await {
@@ -217,12 +317,12 @@ impl WasmFileWatcher {
                 // Perform security analysis
                 let security_analysis = match self.security_scanner.analyze_component(wasm_path).await {
                     Ok(analysis) => {
-                        println!("✅ Security analysis completed for {}: {:?} risk", 
+                        info!("Security analysis completed for {}: {:?} risk", 
                                 component_name, analysis.overall_risk);
                         Some(analysis)
                     }
                     Err(e) => {
-                        println!("⚠️  Security analysis failed for {}: {}", component_name, e);
+                        warn!("Security analysis failed for {}: {}", component_name, e);
                         None
                     }
                 };
@@ -243,7 +343,7 @@ impl WasmFileWatcher {
                 })
             }
             Err(e) => {
-                println!(
+                warn!(
                     "Failed to extract WASM metadata for {component_name}: {e}. Using fallback."
                 );
 
@@ -329,12 +429,12 @@ impl WasmFileWatcher {
         // First try to use the advanced WIT analyzer
         match WitAnalyzer::analyze_component(wasm_path).await {
             Ok(wit_analysis) => {
-                println!("✅ Successfully analyzed component with WIT analyzer");
+                debug!("Successfully analyzed component with WIT analyzer");
                 self.convert_wit_analysis_to_legacy_format(wit_analysis)
                     .await
             }
             Err(wit_error) => {
-                println!("⚠️  WIT analysis failed: {wit_error}, falling back to wasmparser");
+                warn!("WIT analysis failed: {wit_error}, falling back to wasmparser");
                 self.extract_wasm_metadata_fallback(wasm_path).await
             }
         }
@@ -477,7 +577,7 @@ impl WasmFileWatcher {
     )> {
         use wasmparser::{Parser, Payload};
 
-        println!("🔧 Using fallback WASM parser for basic metadata extraction");
+        debug!("Using fallback WASM parser for basic metadata extraction");
 
         // Read the WASM file
         let wasm_bytes = tokio::fs::read(wasm_path).await?;
@@ -493,19 +593,19 @@ impl WasmFileWatcher {
             match payload? {
                 Payload::CustomSection(reader) => match reader.name() {
                     "component-type" => {
-                        println!("Found component-type section");
+                        debug!("Found component-type section");
                     }
                     "wit-component" => {
-                        println!("Found wit-component section");
+                        debug!("Found wit-component section");
                         if let Ok(wit_str) = std::str::from_utf8(reader.data()) {
                             wit_content = Some(wit_str.to_string());
                         }
                     }
                     "producers" => {
-                        println!("Found producers section");
+                        debug!("Found producers section");
                     }
                     name if name.starts_with("adas:") => {
-                        println!("Found ADAS metadata section: {name}");
+                        debug!("Found ADAS metadata section: {name}");
                         if let Ok(metadata_str) = std::str::from_utf8(reader.data()) {
                             if let Ok(json_val) =
                                 serde_json::from_str::<serde_json::Value>(metadata_str)
@@ -578,7 +678,7 @@ impl WasmFileWatcher {
 
         // Add default interfaces if none found
         if interfaces.is_empty() {
-            println!("No interfaces found, adding default ones for visualization");
+            debug!("No interfaces found, adding default ones for visualization");
             interfaces.push(WasmInterface {
                 name: "component-export".to_string(),
                 interface_type: "export".to_string(),
@@ -633,6 +733,69 @@ impl WasmFileWatcher {
         }
 
         summary
+    }
+
+    /// Execute a WASM component method
+    pub async fn execute_component(
+        &self,
+        component_name: &str,
+        method: &str,
+        args: serde_json::Value,
+        timeout_ms: u64,
+        max_memory_mb: u32,
+    ) -> Result<String, anyhow::Error> {
+        let execution_engine = self.execution_engine.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Execution engine not initialized"))?;
+
+        let component = self.components.get(component_name)
+            .ok_or_else(|| anyhow::anyhow!("Component '{}' not found", component_name))?;
+
+        if !component.file_exists {
+            return Err(anyhow::anyhow!("Component '{}' file does not exist", component_name));
+        }
+
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        
+        let context = ExecutionContext {
+            execution_id: execution_id.clone(),
+            component_name: component_name.to_string(),
+            method: method.to_string(),
+            args,
+            timeout_ms,
+            max_memory_mb,
+            created_at: Utc::now(),
+            sensor_config: None,
+        };
+
+        let component_path = std::path::Path::new(&component.path);
+        
+        execution_engine.execute_component(context, component_path).await
+    }
+
+    /// Get execution progress
+    pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
+        self.execution_engine.as_ref()
+            .and_then(|engine| engine.get_execution_progress(execution_id))
+    }
+
+    /// Get execution result
+    pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
+        self.execution_engine.as_ref()
+            .and_then(|engine| engine.get_execution_result(execution_id))
+    }
+
+    /// List all executions
+    pub fn list_executions(&self) -> Vec<ExecutionProgress> {
+        self.execution_engine.as_ref()
+            .map(|engine| engine.list_executions())
+            .unwrap_or_default()
+    }
+
+    /// Cancel an execution
+    pub fn cancel_execution(&self, execution_id: &str) -> bool {
+        self.execution_engine.as_ref()
+            .map(|engine| engine.cancel_execution(execution_id))
+            .unwrap_or(false)
     }
 
     /// Display comprehensive statistics after component scan
@@ -730,67 +893,67 @@ impl WasmFileWatcher {
         };
 
         // Display formatted statistics
-        println!("\n🔍 WASM Component Scan Statistics");
-        println!("=====================================");
-        println!("📁 Scan Path: {:?}", self.watch_path);
-        println!(
-            "⏰ Scan Time: {}",
+        info!("WASM Component Scan Statistics");
+        info!("=====================================");
+        info!("Scan Path: {:?}", self.watch_path);
+        info!(
+            "Scan Time: {}",
             self.last_scan.format("%Y-%m-%d %H:%M:%S UTC")
         );
-        println!();
+        // Empty line for formatting
 
         // Component Overview
-        println!("📦 Component Overview:");
-        println!("   Total Components: {total_components}");
+        info!("Component Overview:");
+        info!("   Total Components: {total_components}");
         let available_pct = if total_components > 0 {
             (available_components as f64 / total_components as f64) * 100.0
         } else {
             0.0
         };
-        println!("   Available: {available_components} ({available_pct:.1}%)");
+        info!("   Available: {available_components} ({available_pct:.1}%)");
         let missing_pct = if total_components > 0 {
             (missing_components as f64 / total_components as f64) * 100.0
         } else {
             0.0
         };
-        println!("   Missing: {missing_components} ({missing_pct:.1}%)");
-        println!("   WIT Analysis Coverage: {components_with_wit} ({wit_coverage:.1}%)");
-        println!();
+        info!("   Missing: {missing_components} ({missing_pct:.1}%)");
+        info!("   WIT Analysis Coverage: {components_with_wit} ({wit_coverage:.1}%)");
+        // Empty line for formatting
 
         // Interface Statistics
-        println!("🔗 Interface Analysis:");
-        println!("   Total Interfaces: {total_interfaces}");
+        info!("Interface Analysis:");
+        info!("   Total Interfaces: {total_interfaces}");
         let imports_pct = if total_interfaces > 0 {
             (total_imports as f64 / total_interfaces as f64) * 100.0
         } else {
             0.0
         };
-        println!("   Imports: {total_imports} ({imports_pct:.1}%)");
+        info!("   Imports: {total_imports} ({imports_pct:.1}%)");
         let exports_pct = if total_interfaces > 0 {
             (total_exports as f64 / total_interfaces as f64) * 100.0
         } else {
             0.0
         };
-        println!("   Exports: {total_exports} ({exports_pct:.1}%)");
-        println!("   Total Functions: {total_functions}");
-        println!("   Dependencies: {dependency_count}");
-        println!();
+        info!("   Exports: {total_exports} ({exports_pct:.1}%)");
+        info!("   Total Functions: {total_functions}");
+        info!("   Dependencies: {dependency_count}");
+        // Empty line for formatting
 
         // Averages
-        println!("📊 Averages:");
-        println!("   Interfaces per Component: {avg_interfaces_per_component:.1}");
-        println!("   Functions per Interface: {avg_functions_per_interface:.1}");
+        info!("Averages:");
+        info!("   Interfaces per Component: {avg_interfaces_per_component:.1}");
+        info!("   Functions per Interface: {avg_functions_per_interface:.1}");
         let deps_per_component = if available_components > 0 {
             dependency_count as f64 / available_components as f64
         } else {
             0.0
         };
-        println!("   Dependencies per Component: {deps_per_component:.1}");
-        println!();
+        info!("   Dependencies per Component: {deps_per_component:.1}");
+        // Empty line for formatting
 
         // Interface Type Breakdown
         if !interface_types.is_empty() {
-            println!("🏷️  Interface Categories:");
+            info!("Interface Categories:");
             let mut sorted_types: Vec<_> = interface_types.iter().collect();
             sorted_types.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -800,14 +963,14 @@ impl WasmFileWatcher {
                 } else {
                     0.0
                 };
-                println!("   {category}: {count} ({percentage:.1}%)");
+                info!("   {category}: {count} ({percentage:.1}%)");
             }
-            println!();
+            // Empty line for formatting
         }
 
         // Component Details (top 5 by interface count)
         if available_components > 0 {
-            println!("🏆 Top Components by Interface Count:");
+            info!("Top Components by Interface Count:");
             let mut components_by_interfaces: Vec<_> =
                 self.components.values().filter(|c| c.file_exists).collect();
             components_by_interfaces.sort_by(|a, b| b.interfaces.len().cmp(&a.interfaces.len()));
@@ -822,21 +985,21 @@ impl WasmFileWatcher {
                 let name = &component.name;
                 let interface_count = component.interfaces.len();
                 let dep_count = component.dependencies.len();
-                println!("   {rank}. {name} - {interface_count} interfaces, {dep_count} deps {wit_status}");
+                info!("   {rank}. {name} - {interface_count} interfaces, {dep_count} deps {wit_status}");
             }
-            println!();
+            // Empty line for formatting
         }
 
         // Security Analysis Summary
         if components_with_security_analysis > 0 {
-            println!("🔒 Security Analysis Summary:");
+            info!("Security Analysis Summary:");
             let security_coverage = if available_components > 0 {
                 (components_with_security_analysis as f64 / available_components as f64) * 100.0
             } else {
                 0.0
             };
-            println!("   Security Coverage: {components_with_security_analysis}/{available_components} ({security_coverage:.1}%)");
-            println!("   Total Security Issues: {total_security_issues}");
+            info!("   Security Coverage: {components_with_security_analysis}/{available_components} ({security_coverage:.1}%)");
+            info!("   Total Security Issues: {total_security_issues}");
             
             for (risk_level, count) in &security_summary {
                 if *count > 0 {
@@ -846,7 +1009,7 @@ impl WasmFileWatcher {
                         SecurityRiskLevel::Medium => "🟡",
                         SecurityRiskLevel::Low => "🟢",
                     };
-                    println!("   {icon} {:?}: {count} components", risk_level);
+                    info!("   {icon} {:?}: {count} components", risk_level);
                 }
             }
             
@@ -855,12 +1018,12 @@ impl WasmFileWatcher {
             let high_count = security_summary.get(&SecurityRiskLevel::High).unwrap_or(&0);
             
             if *critical_count > 0 {
-                println!("   ⚠️  URGENT: {critical_count} components have critical security issues!");
+                warn!("   URGENT: {critical_count} components have critical security issues!");
             }
             if *high_count > 0 {
-                println!("   ⚠️  WARNING: {high_count} components have high-risk security issues");
+                warn!("   WARNING: {high_count} components have high-risk security issues");
             }
-            println!();
+            // Empty line for formatting
         }
 
         // Health Assessment
@@ -874,16 +1037,16 @@ impl WasmFileWatcher {
             "🔴 CRITICAL"
         };
 
-        println!("🎯 Component Ecosystem Health: {health_status}");
+        info!("Component Ecosystem Health: {health_status}");
 
         if missing_components > 0 {
-            println!("⚠️  Warning: {missing_components} components have missing files");
+            warn!("Warning: {missing_components} components have missing files");
         }
 
         if wit_coverage < 50.0 && available_components > 0 {
-            println!("💡 Suggestion: Consider running WIT analysis on more components");
+            info!("Suggestion: Consider running WIT analysis on more components");
         }
 
-        println!("=====================================\n");
+        info!("=====================================");
     }
 }

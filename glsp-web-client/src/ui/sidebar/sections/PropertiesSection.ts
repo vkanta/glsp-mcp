@@ -3,14 +3,14 @@ import { SidebarSection } from '../SidebarComponent.js';
 export interface Property {
     key: string;
     label: string;
-    value: any;
+    value: unknown;
     type: 'text' | 'number' | 'boolean' | 'select' | 'color' | 'range';
-    options?: Array<{label: string, value: any}>;
+    options?: Array<{label: string, value: unknown}>;
     min?: number;
     max?: number;
     step?: number;
     readonly?: boolean;
-    onChange?: (value: any) => void;
+    onChange?: (value: unknown) => void;
 }
 
 export interface PropertyGroup {
@@ -44,7 +44,7 @@ export class PropertiesSection {
         this.refresh();
     }
     
-    public updateProperty(groupId: string, key: string, value: any): void {
+    public updateProperty(groupId: string, key: string, value: unknown): void {
         const group = this.groups.get(groupId);
         if (group) {
             const property = group.properties.find(p => p.key === key);

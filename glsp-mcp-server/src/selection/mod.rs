@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// Selection state management for diagram elements
+///
+/// Tracks which elements are currently selected, hovered, or focused in the diagram.
+/// Supports multiple selection modes and maintains selection history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelectionState {
     pub selected_elements: HashSet<String>,
@@ -9,6 +13,9 @@ pub struct SelectionState {
     pub selection_mode: SelectionMode,
 }
 
+/// Selection behavior modes for user interaction
+///
+/// Determines how element selection behaves when users interact with the diagram.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum SelectionMode {
     Single,

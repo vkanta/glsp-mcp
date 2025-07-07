@@ -2,7 +2,7 @@ import { TranspiledComponent, ComponentMetadata } from '../transpiler/WasmTransp
 
 export interface LoadedComponent {
     component: TranspiledComponent;
-    instance?: any;
+    instance?: WebAssembly.Instance;
     isLoaded: boolean;
     loadedAt?: Date;
     lastUsed?: Date;
@@ -45,7 +45,7 @@ export class ComponentRegistry {
         return component || null;
     }
 
-    async loadComponent(id: string): Promise<any> {
+    async loadComponent(id: string): Promise<WebAssembly.Instance> {
         const loadedComponent = this.components.get(id);
         if (!loadedComponent) {
             throw new Error(`Component not found: ${id}`);
@@ -139,6 +139,10 @@ export class ComponentRegistry {
         console.log(`Component removed: ${loadedComponent.component.metadata.name}`);
         
         return true;
+    }
+
+    hasComponent(id: string): boolean {
+        return this.components.has(id);
     }
 
     listComponents(filter?: ComponentFilter): ComponentMetadata[] {

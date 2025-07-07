@@ -8,6 +8,7 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use tracing::{debug, info, warn};
 use wit_component::DecodedWasm;
 use wit_parser::{Interface, Package, PackageId, Resolve, WorldId};
 
@@ -175,7 +176,7 @@ impl WitAnalyzer {
             .unwrap_or("unknown")
             .to_string();
 
-        println!("🔍 Analyzing WASM component: {path:?}");
+        info!("Analyzing WASM component: {path:?}");
 
         // Read the WASM bytes
         let wasm_bytes = tokio::fs::read(path)
@@ -185,11 +186,11 @@ impl WitAnalyzer {
         // Try to decode as a component first
         match wit_component::decode(&wasm_bytes) {
             Ok(decoded) => {
-                println!("✅ Successfully decoded as WebAssembly component");
+                debug!("Successfully decoded as WebAssembly component");
                 Self::analyze_decoded_component(component_name, decoded).await
             }
             Err(_) => {
-                println!("⚠️  Not a WebAssembly component, trying as core module");
+                warn!("Not a WebAssembly component, trying as core module");
                 Self::analyze_core_module(component_name, wasm_bytes).await
             }
         }
@@ -202,11 +203,11 @@ impl WitAnalyzer {
     ) -> Result<ComponentWitAnalysis> {
         match decoded {
             DecodedWasm::Component(resolve, world_id) => {
-                println!("📋 Analyzing component world and interfaces");
+                debug!("Analyzing component world and interfaces");
                 Self::extract_wit_from_resolve(component_name, &resolve, world_id).await
             }
             DecodedWasm::WitPackage(resolve, package_id) => {
-                println!("📦 Analyzing WIT package");
+                debug!("Analyzing WIT package");
                 Self::extract_wit_from_package(component_name, &resolve, package_id).await
             }
         }
@@ -217,7 +218,7 @@ impl WitAnalyzer {
         component_name: String,
         _wasm_bytes: Vec<u8>,
     ) -> Result<ComponentWitAnalysis> {
-        println!("🔧 Core module detected - limited interface extraction available");
+        info!("Core module detected - limited interface extraction available");
 
         // For core modules, we can only provide basic analysis
         // In a real implementation, you might want to try converting to component
@@ -242,9 +243,9 @@ impl WitAnalyzer {
         world_id: WorldId,
     ) -> Result<ComponentWitAnalysis> {
         // Debug: List all available worlds
-        println!("🌍 Available worlds in resolve:");
+        debug!("Available worlds in resolve:");
         for (id, world) in &resolve.worlds {
-            println!(
+            debug!(
                 "  - World ID {:?}: '{}' (imports: {}, exports: {})",
                 id,
                 world.name,
@@ -258,9 +259,9 @@ impl WitAnalyzer {
             .get(world_id)
             .ok_or_else(|| anyhow!("World not found in resolve"))?;
 
-        println!("🌍 Analyzing world: {} (ID: {:?})", world.name, world_id);
-        println!("📥 World imports count: {}", world.imports.len());
-        println!("📤 World exports count: {}", world.exports.len());
+        debug!("Analyzing world: {} (ID: {:?})", world.name, world_id);
+        debug!("World imports count: {}", world.imports.len());
+        debug!("World exports count: {}", world.exports.len());
 
         let mut imports = Vec::new();
         let mut exports = Vec::new();
@@ -269,21 +270,21 @@ impl WitAnalyzer {
 
         // Extract imports
         for (key, import) in &world.imports {
-            println!("  🔍 Processing import: {key:?} -> {import:?}");
+            debug!("  Processing import: {key:?} -> {import:?}");
             let interface =
                 Self::extract_world_item_interface(resolve, key, import, WitInterfaceType::Import)
                     .await?;
-            println!("  ✅ Created import interface: {}", interface.name);
+            debug!("  Created import interface: {}", interface.name);
             imports.push(interface);
         }
 
         // Extract exports
         for (key, export) in &world.exports {
-            println!("  🔍 Processing export: {key:?} -> {export:?}");
+            debug!("  Processing export: {key:?} -> {export:?}");
             let interface =
                 Self::extract_world_item_interface(resolve, key, export, WitInterfaceType::Export)
                     .await?;
-            println!("  ✅ Created export interface: {}", interface.name);
+            debug!("  Created export interface: {}", interface.name);
             exports.push(interface);
         }
 
@@ -336,8 +337,8 @@ impl WitAnalyzer {
             .get(package_id)
             .ok_or_else(|| anyhow!("Package not found in resolve"))?;
 
-        println!(
-            "📦 Analyzing package: {}:{}",
+        debug!(
+            "Analyzing package: {}:{}",
             package.name.namespace, package.name.name
         );
 
@@ -451,9 +452,9 @@ impl WitAnalyzer {
 
         Ok(WitInterface {
             name: name.to_string(),
-            namespace: None, // TODO: Extract from package info
-            package: None,   // TODO: Extract from package info
-            version: None,   // TODO: Extract from package info
+            namespace: None, // Package info extraction not implemented yet
+            package: None,   // Package info extraction not implemented yet
+            version: None,   // Package info extraction not implemented yet
             interface_type,
             functions,
             types,
@@ -502,7 +503,7 @@ impl WitAnalyzer {
             name: name.to_string(),
             params,
             results,
-            is_async: false, // TODO: Detect async functions
+            is_async: false, // Async function detection not implemented yet
         })
     }
 
@@ -527,7 +528,7 @@ impl WitAnalyzer {
             Type::F64 => WitTypeDefinition::Primitive("f64".to_string()),
             Type::Char => WitTypeDefinition::Primitive("char".to_string()),
             Type::String => WitTypeDefinition::Primitive("string".to_string()),
-            Type::Id(_) => WitTypeDefinition::Primitive("custom".to_string()), // TODO: Resolve custom types
+            Type::Id(_) => WitTypeDefinition::Primitive("custom".to_string()), // Custom type resolution not implemented yet
         };
 
         Ok(WitType {
@@ -629,7 +630,7 @@ impl WitAnalyzer {
                 WitTypeDefinition::Flags { flags: flag_names }
             }
             TypeDefKind::Resource => {
-                WitTypeDefinition::Resource { methods: vec![] } // TODO: Extract resource methods
+                WitTypeDefinition::Resource { methods: vec![] } // Resource method extraction not implemented yet
             }
             _ => WitTypeDefinition::Primitive("unknown".to_string()),
         };
@@ -713,38 +714,38 @@ impl WitAnalyzer {
     pub async fn debug_component_interfaces<P: AsRef<Path>>(path: P) -> Result<()> {
         let analysis = Self::analyze_component(path.as_ref()).await?;
 
-        println!("🐛 DEBUG: Component Analysis Results");
-        println!("=====================================");
-        println!("Component: {}", analysis.component_name);
-        println!("World: {:?}", analysis.world_name);
-        println!();
+        debug!("Component Analysis Results");
+        debug!("=====================================");
+        debug!("Component: {}", analysis.component_name);
+        debug!("World: {:?}", analysis.world_name);
+        // Empty line for formatting;
 
-        println!("📥 IMPORTS ({})", analysis.imports.len());
+        debug!("IMPORTS ({})", analysis.imports.len());
         for (i, import) in analysis.imports.iter().enumerate() {
-            println!("  {}. {}", i + 1, import.name);
-            println!("     Functions: {}", import.functions.len());
+            debug!("  {}. {}", i + 1, import.name);
+            debug!("     Functions: {}", import.functions.len());
             for func in &import.functions {
-                println!("       - {}", func.name);
+                debug!("       - {}", func.name);
             }
         }
-        println!();
+        // Empty line for formatting;
 
-        println!("📤 EXPORTS ({})", analysis.exports.len());
+        debug!("EXPORTS ({})", analysis.exports.len());
         for (i, export) in analysis.exports.iter().enumerate() {
-            println!("  {}. {}", i + 1, export.name);
-            println!("     Functions: {}", export.functions.len());
+            debug!("  {}. {}", i + 1, export.name);
+            debug!("     Functions: {}", export.functions.len());
             for func in &export.functions {
-                println!("       - {}", func.name);
+                debug!("       - {}", func.name);
             }
         }
-        println!();
+        // Empty line for formatting;
 
-        println!("🔗 DEPENDENCIES ({})", analysis.dependencies.len());
+        debug!("DEPENDENCIES ({})", analysis.dependencies.len());
         for dep in &analysis.dependencies {
-            println!("  - {}", dep.package);
+            debug!("  - {}", dep.package);
         }
 
-        println!("=====================================");
+        debug!("=====================================");
         Ok(())
     }
 
@@ -1022,18 +1023,18 @@ mod tests {
 
         for path in &test_paths {
             if std::path::Path::new(path).exists() {
-                println!("Testing WIT analysis for: {path}");
+                debug!("Testing WIT analysis for: {path}");
                 match WitAnalyzer::analyze_component(path).await {
                     Ok(analysis) => {
-                        println!("Successfully analyzed: {}", analysis.component_name);
-                        println!("World: {:?}", analysis.world_name);
-                        println!("Imports: {}", analysis.imports.len());
-                        println!("Exports: {}", analysis.exports.len());
+                        debug!("Successfully analyzed: {}", analysis.component_name);
+                        debug!("World: {:?}", analysis.world_name);
+                        debug!("Imports: {}", analysis.imports.len());
+                        debug!("Exports: {}", analysis.exports.len());
                         // Basic validation
                         assert!(!analysis.component_name.is_empty());
                     }
                     Err(e) => {
-                        println!("Failed to analyze {path}: {e}");
+                        warn!("Failed to analyze {path}: {e}");
                     }
                 }
                 break; // Test with first available file

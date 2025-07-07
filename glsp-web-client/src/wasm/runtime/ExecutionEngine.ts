@@ -3,7 +3,7 @@ import { ComponentRegistry } from './ComponentRegistry.js';
 export interface ExecutionContext {
     componentId: string;
     method: string;
-    args: any[];
+    args: unknown[];
     timeout?: number;
     onProgress?: (progress: ExecutionProgress) => void;
 }
@@ -17,7 +17,7 @@ export interface ExecutionProgress {
 
 export interface ExecutionResult {
     success: boolean;
-    result?: any;
+    result?: unknown;
     error?: string;
     executionTime: number;
     memoryUsage?: number;
@@ -35,13 +35,14 @@ export interface ComponentParameter {
     type: string;
     required: boolean;
     description?: string;
-    defaultValue?: any;
+    defaultValue?: unknown;
 }
 
 export class ExecutionEngine {
     private registry: ComponentRegistry;
     private activeExecutions = new Map<string, AbortController>();
     private maxConcurrentExecutions = 5;
+    private totalExecutions = 0;
 
     constructor(registry: ComponentRegistry) {
         this.registry = registry;
@@ -58,6 +59,7 @@ export class ExecutionEngine {
 
         const abortController = new AbortController();
         this.activeExecutions.set(executionId, abortController);
+        this.totalExecutions++;
 
         try {
             context.onProgress?.({
@@ -137,19 +139,23 @@ export class ExecutionEngine {
         }
     }
 
-    private async executeMethod(instance: any, methodName: string, args: any[]): Promise<any> {
+    private async executeMethod(instance: WebAssembly.Instance, methodName: string, args: unknown[]): Promise<unknown> {
         try {
-            const method = instance[methodName];
+            const method = (instance.exports as Record<string, unknown>)[methodName];
             
             // Handle both sync and async methods
-            const result = method.apply(instance, args);
-            
-            // If result is a promise, await it
-            if (result && typeof result.then === 'function') {
-                return await result;
+            if (typeof method === 'function') {
+                const result = (method as (...args: unknown[]) => unknown)(...args);
+                
+                // If result is a promise, await it
+                if (result && typeof result === 'object' && 'then' in result) {
+                    return await (result as Promise<unknown>);
+                }
+                
+                return result;
+            } else {
+                throw new Error(`Method ${methodName} is not a function`);
             }
-            
-            return result;
         } catch (error) {
             console.error(`Error executing method ${methodName}:`, error);
             throw error;
@@ -189,7 +195,7 @@ export class ExecutionEngine {
                         methods.push({
                             name: methodName,
                             parameters: this.extractParameters(method),
-                            returnType: 'any', // TODO: Extract from TypeScript definitions
+                            returnType: 'unknown', // Return type introspection not implemented
                             description: `Component method: ${methodName}`
                         });
                     }
@@ -205,7 +211,7 @@ export class ExecutionEngine {
         }
     }
 
-    private extractParameters(method: Function): ComponentParameter[] {
+    private extractParameters(method: (...args: unknown[]) => unknown): ComponentParameter[] {
         try {
             // Basic parameter extraction from function signature
             const funcStr = method.toString();
@@ -227,7 +233,7 @@ export class ExecutionEngine {
 
                 return {
                     name: paramName || `param${index}`,
-                    type: 'any', // TODO: Extract from TypeScript definitions
+                    type: 'unknown', // Parameter type introspection not implemented
                     required: !param.includes('='),
                     description: `Parameter ${index + 1}`
                 };
@@ -276,9 +282,13 @@ export class ExecutionEngine {
         }
     }
 
-    abortExecution(_executionId: string): boolean {
-        // TODO: Implement execution tracking by ID
-        console.warn('Execution abort by ID not yet implemented');
+    abortExecution(executionId: string): boolean {
+        const abortController = this.activeExecutions.get(executionId);
+        if (abortController) {
+            abortController.abort();
+            this.activeExecutions.delete(executionId);
+            return true;
+        }
         return false;
     }
 
@@ -301,7 +311,7 @@ export class ExecutionEngine {
         return {
             activeExecutions: this.activeExecutions.size,
             maxConcurrentExecutions: this.maxConcurrentExecutions,
-            totalExecutionsToday: 0 // TODO: Implement execution tracking
+            totalExecutionsToday: this.totalExecutions
         };
     }
 

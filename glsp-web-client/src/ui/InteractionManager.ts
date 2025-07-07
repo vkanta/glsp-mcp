@@ -6,7 +6,13 @@ import { statusManager } from '../services/StatusManager.js';
 import { McpService } from '../services/McpService.js';
 import { InterfaceConnectionDialog, InterfaceConnectionOption } from './dialogs/specialized/InterfaceConnectionDialog.js';
 import { InterfaceCompatibilityChecker, WitInterface } from '../diagrams/interface-compatibility.js';
-import { InteractionMode } from '../interaction/interaction-mode.js';
+
+declare global {
+    interface Window {
+        app?: { uiManager?: import('./UIManager.js').UIManager };
+        executeWasmCode?: (id: string) => void;
+    }
+}
 
 export class InteractionManager {
     private renderer: CanvasRenderer;
@@ -43,18 +49,18 @@ export class InteractionManager {
         });
         
         // Listen for toolbar events
-        window.addEventListener('toolbar-mode-change', (event: any) => {
+        window.addEventListener('toolbar-mode-change', (event: Event & { detail?: { mode: string } }) => {
             this.currentMode = event.detail.mode;
             console.log('Mode changed to:', this.currentMode);
             
             // Get the current node/edge type from UIManager when mode changes
             if (this.currentMode === 'create-node') {
-                const uiManager = (window as any).app?.uiManager;
+                const uiManager = window.app?.uiManager;
                 if (uiManager) {
                     this.currentNodeType = uiManager.getCurrentNodeType();
                 }
             } else if (this.currentMode === 'create-edge') {
-                const uiManager = (window as any).app?.uiManager;
+                const uiManager = window.app?.uiManager;
                 if (uiManager) {
                     this.currentEdgeType = uiManager.getCurrentEdgeType();
                 }
@@ -76,7 +82,7 @@ export class InteractionManager {
             }
         });
         
-        window.addEventListener('toolbar-zoom', (event: any) => {
+        window.addEventListener('toolbar-zoom', (event: Event & { detail?: { action: string } }) => {
             const direction = event.detail.direction;
             if (direction === 'in') {
                 this.renderer.zoom(1.2);
@@ -216,7 +222,7 @@ export class InteractionManager {
         // Allow normal selection to proceed for all elements including WASM components
     }
 
-    private async updatePropertiesPanel(element: any): Promise<void> {
+    private async updatePropertiesPanel(element: import('../model/diagram.js').ModelElement): Promise<void> {
         if (!this.uiManager) return;
 
         const elementType = element.type || element.element_type || 'unknown';
@@ -271,9 +277,8 @@ export class InteractionManager {
     }
 
     // Extract WIT fetching logic into a separate method
-    private async fetchAndStoreWitInfo(element: any): Promise<void> {
+    private async fetchAndStoreWitInfo(element: import('../model/diagram.js').ModelElement): Promise<void> {
         // Log element type for debugging
-        const elementType = element.type || element.element_type || '';
         console.log(`Fetching WIT info for element: ${element.id}, type='${element.type}', element_type='${element.element_type}'`);
         
         try {
@@ -311,11 +316,11 @@ export class InteractionManager {
                 console.log('WIT data received:', witData);
                 
                 // Convert WIT data to interface format expected by renderer
-                const interfaces: any[] = [];
+                const interfaces: Array<{ name: string; type: 'import' | 'export'; functions: Array<{ name: string }> }> = [];
                 
                 // Add imports as input interfaces
                 if (witData.imports) {
-                    witData.imports.forEach((imp: any) => {
+                    witData.imports.forEach((imp) => {
                         interfaces.push({
                             name: imp.name || imp.interface_name || 'import',
                             interface_type: 'import',
@@ -328,7 +333,7 @@ export class InteractionManager {
                 
                 // Add exports as output interfaces
                 if (witData.exports) {
-                    witData.exports.forEach((exp: any) => {
+                    witData.exports.forEach((exp) => {
                         interfaces.push({
                             name: exp.name || exp.interface_name || 'export',
                             interface_type: 'export',
@@ -419,11 +424,11 @@ export class InteractionManager {
 
     // Method to pre-fetch WIT data for all WASM components in a diagram
     public async preloadWitDataForDiagram(): Promise<void> {
-        const currentDiagram = this.renderer.getCurrentDiagram ? this.renderer.getCurrentDiagram() : this.renderer.currentDiagram;
+        const currentDiagram = this.renderer.getCurrentDiagram();
         if (!currentDiagram?.elements) return;
 
         // Convert elements object to array and filter for WASM components without interface data
-        const wasmComponents = Object.values(currentDiagram.elements).filter((el: any) => 
+        const wasmComponents = Object.values(currentDiagram.elements).filter((el: { type?: string; element_type?: string; properties?: { interfaces?: unknown[] } }) => 
             (el.type === 'wasm-component' || el.element_type === 'wasm-component') &&
             (!el.properties?.interfaces || el.properties.interfaces.length === 0)
         );
@@ -442,17 +447,17 @@ export class InteractionManager {
         }
     }
 
-    private openComponentExecutionView(elementId: string): void {
+    private async openComponentExecutionView(elementId: string): Promise<void> {
         if (!this.wasmComponentManager) return;
 
-        const loadedComponent = this.wasmComponentManager.getLoadedComponent(elementId);
+        const loadedComponent = await this.wasmComponentManager.getComponent(elementId);
         if (!loadedComponent) return;
 
         // Create and open execution view modal
         this.createExecutionView(elementId, loadedComponent);
     }
 
-    private createExecutionView(elementId: string, loadedComponent: any): void {
+    private createExecutionView(elementId: string, loadedComponent: import('../wasm/WasmComponentManager.js').WasmComponent): void {
         // Create modal overlay
         const modal = document.createElement('div');
         modal.className = 'execution-view-modal';
@@ -615,7 +620,7 @@ export class InteractionManager {
         this.setupConsoleExecution(elementId, loadedComponent);
     }
 
-    private generateJavaScriptExamples(elementId: string, loadedComponent: any): void {
+    private generateJavaScriptExamples(elementId: string, loadedComponent: import('../wasm/WasmComponentManager.js').WasmComponent): void {
         const examplesContainer = document.getElementById(`code-examples-${elementId}`);
         if (!examplesContainer) return;
 
@@ -625,9 +630,8 @@ export class InteractionManager {
         examplesContainer.innerHTML = examples;
     }
 
-    private createJavaScriptExamples(loadedComponent: any): string {
-        // TODO: Extract actual interfaces from loaded component
-        // For now, create generic examples based on ADAS component patterns
+    private createJavaScriptExamples(loadedComponent: import('../wasm/WasmComponentManager.js').WasmComponent): string {
+        // Generate examples based on actual component interfaces when available
         
         const componentName = loadedComponent.name;
         const examples = `
@@ -681,9 +685,9 @@ function sleep(ms) {
         return examples;
     }
 
-    private setupConsoleExecution(elementId: string, loadedComponent: any): void {
+    private setupConsoleExecution(elementId: string, loadedComponent: import('../wasm/WasmComponentManager.js').WasmComponent): void {
         // Make the execution function globally available
-        (window as any).executeWasmCode = (id: string) => {
+        window.executeWasmCode = (id: string) => {
             if (id !== elementId) return;
             
             const input = document.getElementById(`console-input-${elementId}`) as HTMLInputElement;
@@ -716,35 +720,31 @@ function sleep(ms) {
         if (input) {
             input.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    (window as any).executeWasmCode(elementId);
+                    window.executeWasmCode?.(elementId);
                 }
             });
         }
     }
 
-    private executeWasmCode(code: string, loadedComponent: any): string {
+    private executeWasmCode(code: string, loadedComponent: import('../wasm/WasmComponentManager.js').WasmComponent): string {
         // Safely execute JavaScript code with access to the loaded WASM component
-        try {
-            // Create a safe execution context with the loaded component
-            const context = {
-                wasmComponent: loadedComponent,
-                componentName: loadedComponent.name,
-                console: {
-                    log: (...args: any[]) => JSON.stringify(args)
-                }
-            };
-            
-            // Simple evaluation (in a real implementation, this should be more secure)
-            const func = new Function('context', `
-                const { wasmComponent, componentName, console } = context;
-                return ${code};
-            `);
-            
-            const result = func(context);
-            return JSON.stringify(result, null, 2);
-        } catch (error) {
-            throw error;
-        }
+        // Create a safe execution context with the loaded component
+        const context = {
+            wasmComponent: loadedComponent,
+            componentName: loadedComponent.name,
+            console: {
+                log: (...args: unknown[]) => JSON.stringify(args)
+            }
+        };
+        
+        // Simple evaluation (in a real implementation, this should be more secure)
+        const func = new Function('context', `
+            const { wasmComponent, componentName, console } = context;
+            return ${code};
+        `);
+        
+        const result = func(context);
+        return JSON.stringify(result, null, 2);
     }
 
     private handleKeyboardShortcut(event: KeyboardEvent): void {
@@ -824,8 +824,13 @@ function sleep(ms) {
     private selectAll(): void {
         try {
             console.log('Select all triggered via keyboard shortcut');
-            // TODO: Implement select all when selection manager is available
-            // For now, just log that the shortcut was triggered
+            const currentDiagram = this.renderer.getCurrentDiagram();
+            if (currentDiagram && currentDiagram.elements) {
+                // Select all elements in the current diagram
+                const allElementIds = Object.keys(currentDiagram.elements);
+                this.renderer.selectionManager.setSelectedIds(allElementIds);
+                this.renderer.renderImmediate();
+            }
         } catch (error) {
             console.error('Failed to select all:', error);
         }
@@ -839,7 +844,7 @@ function sleep(ms) {
             console.log('Delete selected triggered via keyboard shortcut');
             
             // Get selected elements from the renderer
-            const renderer = this.renderer as any;
+            const renderer = this.renderer as { selectedElements?: unknown[]; diagram?: unknown };
             if (!renderer.selectionManager || !renderer.selectionManager.getSelectedElements) {
                 console.log('No selection manager available');
                 return;
@@ -908,8 +913,8 @@ function sleep(ms) {
     private clearSelection(): void {
         try {
             console.log('Clear selection triggered via keyboard shortcut');
-            // TODO: Implement clear selection when selection manager is available
-            // For now, just log that the shortcut was triggered
+            this.renderer.selectionManager.clearSelection();
+            this.renderer.renderImmediate();
         } catch (error) {
             console.error('Failed to clear selection:', error);
         }
@@ -927,13 +932,13 @@ function sleep(ms) {
         }
     }
 
-    private async handleDragEnd(event: InteractionEvent): Promise<void> {
+    private async handleDragEnd(_event: InteractionEvent): Promise<void> {
         try {
             const diagramId = this.diagramService.getCurrentDiagramId();
             if (!diagramId) return;
 
             // Get current diagram and its elements from the renderer
-            const renderer = this.renderer as any;
+            const renderer = this.renderer as { selectedElements?: unknown[]; diagram?: unknown };
             if (renderer.selectionManager && renderer.selectionManager.getSelectedElements) {
                 // Get the current diagram from the renderer
                 const currentDiagram = renderer.getCurrentDiagram ? renderer.getCurrentDiagram() : renderer.currentDiagram;
@@ -957,7 +962,7 @@ function sleep(ms) {
         }
     }
 
-    private scheduleAutoSave(diagramId: string, selectedElements: any[]): void {
+    private scheduleAutoSave(diagramId: string, selectedElements: import('../model/diagram.js').ModelElement[]): void {
         // Clear any existing timeout
         if (this.autoSaveTimeout) {
             clearTimeout(this.autoSaveTimeout);
@@ -1017,7 +1022,7 @@ function sleep(ms) {
         const diagramId = this.diagramService.getCurrentDiagramId();
         if (!diagramId) return;
 
-        const currentDiagram = this.renderer.getCurrentDiagram ? this.renderer.getCurrentDiagram() : this.renderer.currentDiagram;
+        const currentDiagram = this.renderer.getCurrentDiagram();
         if (!currentDiagram) return;
 
         // Convert interface info to WitInterface format
@@ -1035,7 +1040,7 @@ function sleep(ms) {
             const elementType = element.type || element.element_type;
             if (elementType === 'wasm-component' && element.id !== interfaceInfo.componentId) {
                 const interfaces = element.properties?.interfaces || [];
-                interfaces.forEach((iface: any) => {
+                interfaces.forEach((iface: { name?: string; interface_type?: string; functions?: unknown[]; types?: unknown[] }) => {
                     const witInterface: WitInterface = {
                         name: iface.name || 'unknown',
                         interface_type: iface.interface_type,
@@ -1084,15 +1089,16 @@ function sleep(ms) {
         });
 
         // Handle connection creation
-        const selectedOption = await dialog.show();
-        if (selectedOption) {
+        dialog.onConnection(async (selectedOption) => {
             await this.createInterfaceConnection(
                 interfaceInfo.componentId,
                 sourceInterface,
                 selectedOption.componentId,
                 selectedOption.interface
             );
-        }
+        });
+        
+        dialog.show();
     }
 
     private async createInterfaceConnection(

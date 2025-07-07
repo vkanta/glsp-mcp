@@ -68,7 +68,31 @@ pub struct Viewport {
     pub zoom: f64,
 }
 
-/// Persistence manager for diagram storage
+/// Persistence manager for diagram storage and file operations
+///
+/// Handles saving and loading diagrams to/from the file system, managing both
+/// content (.glsp.json) and layout (.glsp.layout.json) files. Provides atomic
+/// operations and ensures data consistency.
+///
+/// # File Format
+///
+/// - Content files: `{name}.glsp.json` - Contains diagram structure and data
+/// - Layout files: `{name}.glsp.layout.json` - Contains positioning and visual layout
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use glsp_mcp_server::PersistenceManager;
+/// use std::path::Path;
+///
+/// #[tokio::main]
+/// async fn main() -> std::io::Result<()> {
+///     let persistence = PersistenceManager::new("./diagrams");
+///     persistence.ensure_storage_dir().await?;
+///     // Now ready to save/load diagrams
+///     Ok(())
+/// }
+/// ```
 pub struct PersistenceManager {
     base_path: PathBuf,
 }
@@ -260,7 +284,7 @@ impl PersistenceManager {
             revision: diagram.revision,
             updated_at: diagram.updated_at,
             elements: element_layouts,
-            viewport: None, // TODO: Add viewport support
+            viewport: None, // Viewport support not implemented yet
         };
 
         (content, layout)

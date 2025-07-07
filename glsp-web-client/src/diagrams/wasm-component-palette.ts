@@ -25,6 +25,7 @@ export class WasmComponentPalette {
     private mcpClient: McpClient;
     private components: WasmComponentInfo[] = [];
     private dragData?: DragEventData;
+    private _countdownInterval?: NodeJS.Timeout;
 
     constructor(mcpClient: McpClient) {
         this.mcpClient = mcpClient;
@@ -120,7 +121,7 @@ export class WasmComponentPalette {
         
         try {
             // Create timeout promise
-            const timeoutPromise = new Promise<any>((_, reject) => {
+            const timeoutPromise = new Promise<never>((_, reject) => {
                 timeoutId = window.setTimeout(() => {
                     isTimedOut = true;
                     reject(new Error('Request timed out after 10 seconds'));
@@ -147,9 +148,9 @@ export class WasmComponentPalette {
             if (timeoutId) window.clearTimeout(timeoutId);
             
             // Clear countdown interval
-            if ((this as any)._countdownInterval) {
-                clearInterval((this as any)._countdownInterval);
-                delete (this as any)._countdownInterval;
+            if (this._countdownInterval) {
+                clearInterval(this._countdownInterval);
+                this._countdownInterval = undefined;
             }
             
             this.renderComponents();
@@ -159,9 +160,9 @@ export class WasmComponentPalette {
             console.error('Failed to load WASM components:', error);
             
             // Clear countdown interval on error
-            if ((this as any)._countdownInterval) {
-                clearInterval((this as any)._countdownInterval);
-                delete (this as any)._countdownInterval;
+            if (this._countdownInterval) {
+                clearInterval(this._countdownInterval);
+                this._countdownInterval = undefined;
             }
             
             // Clear timeout if it's still pending
@@ -278,7 +279,7 @@ export class WasmComponentPalette {
         });
     }
 
-    private updateStatus(data: any): void {
+    private updateStatus(data: Record<string, unknown>): void {
         const countElement = this.element.querySelector('#component-count');
         const healthElement = this.element.querySelector('#component-health');
         
@@ -380,7 +381,7 @@ export class WasmComponentPalette {
         }, 1000);
         
         // Store interval ID to clear later if needed
-        (this as any)._countdownInterval = countdownInterval;
+        this._countdownInterval = countdownInterval;
     }
 
     private showNotification(message: string): void {

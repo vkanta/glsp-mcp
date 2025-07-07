@@ -21,9 +21,9 @@ export interface ModelElement {
     element_type?: string; // Rust uses element_type
     children?: string[];
     bounds?: Bounds;
-    layoutOptions?: Record<string, any>;
-    properties?: Record<string, any>; // Explicit properties field
-    [key: string]: any; // For additional properties
+    layoutOptions?: Record<string, unknown>;
+    properties?: Record<string, unknown>; // Explicit properties field
+    [key: string]: unknown; // For additional properties
 }
 
 export interface Bounds {

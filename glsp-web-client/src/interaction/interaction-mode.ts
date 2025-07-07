@@ -6,7 +6,7 @@ export interface InterfaceLinkInfo {
     componentId: string;
     interfaceName: string;
     interfaceType: 'import' | 'export';
-    interfaceObject: any; // WIT interface details
+    interfaceObject: import('../diagrams/interface-compatibility.js').WitInterface; // WIT interface details
     position: { x: number; y: number }; // Visual position for UI feedback
 }
 

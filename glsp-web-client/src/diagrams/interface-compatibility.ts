@@ -7,7 +7,7 @@ export interface WitInterface {
     name: string;
     interface_type: 'import' | 'export';
     functions: WitFunction[];
-    types?: any[];
+    types?: WitType[];
 }
 
 export interface WitFunction {
@@ -18,7 +18,18 @@ export interface WitFunction {
 
 export interface WitParam {
     name: string;
-    param_type: any;
+    param_type: string | WitTypeRef;
+}
+
+export interface WitType {
+    name: string;
+    kind: 'record' | 'enum' | 'variant' | 'flags' | 'resource' | 'alias';
+    fields?: Array<{ name: string; type: string | WitTypeRef }>;
+}
+
+export interface WitTypeRef {
+    type: string;
+    namespace?: string;
 }
 
 export interface InterfaceCompatibility {

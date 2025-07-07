@@ -3,6 +3,7 @@ import { WasmTranspiler } from './transpiler/WasmTranspiler.js';
 import { ComponentRegistry } from './runtime/ComponentRegistry.js';
 import { ExecutionEngine, ExecutionContext, ExecutionResult } from './runtime/ExecutionEngine.js';
 import { ComponentUploadPanel } from './ui/ComponentUploadPanel.js';
+import { ComponentUploadService } from '../services/ComponentUploadService.js';
 import { WasmComponentPanel } from '../ui/WasmComponentPanelRefactored.js';
 import { McpService } from '../services/McpService.js';
 import { DiagramService } from '../services/DiagramService.js';
@@ -20,6 +21,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
     private registry: ComponentRegistry;
     private executionEngine: ExecutionEngine;
     private uploadPanel: ComponentUploadPanel;
+    private uploadService: ComponentUploadService;
     private enhancedPalette: WasmComponentPanel;
     private config: WasmRuntimeConfig;
     private headerIconManager?: HeaderIconManager;
@@ -41,12 +43,9 @@ export class WasmRuntimeManager extends WasmComponentManager {
 
         // Initialize new runtime services with validation configuration
         this.transpiler = new WasmTranspiler({
-            maxFileSize: 50 * 1024 * 1024, // 50MB
-            allowedImports: ['wasi_snapshot_preview1', 'wasi_snapshot_preview2', 'env'],
-            checkMemoryLimits: true,
-            allowUnsafeOperations: false,
-            maxMemoryPages: 16384, // 1GB with 64KB pages
-            maxTableSize: 10000
+            maxImports: 50,
+            maxExports: 50,
+            allowedImports: ['wasi_snapshot_preview1', 'wasi_snapshot_preview2', 'env']
         });
         this.registry = new ComponentRegistry();
         this.executionEngine = new ExecutionEngine(this.registry);
@@ -54,17 +53,19 @@ export class WasmRuntimeManager extends WasmComponentManager {
         // Configure execution engine
         this.executionEngine.setMaxConcurrentExecutions(this.config.maxConcurrentExecutions!);
 
+        // Create upload service
+        this.uploadService = new ComponentUploadService(this.mcpService);
+        
         // Create upload panel
         this.uploadPanel = new ComponentUploadPanel(
-            this.transpiler,
-            this.registry,
+            this.uploadService,
             (componentId) => this.onComponentUploadComplete(componentId),
             (error) => this.onComponentUploadError(error)
         );
 
         // Create enhanced floating palette
         this.enhancedPalette = new WasmComponentPanel(
-            this.mcpService as any, // Cast to McpClient interface
+            this.mcpService as unknown as import('../mcp/client.js').McpClient, // Cast to McpClient interface
             () => this.showUploadPanel(),
             {
                 title: 'WASM Components',
@@ -152,7 +153,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
         }
     }
 
-    async loadTranspiledComponent(componentId: string): Promise<any> {
+    async loadTranspiledComponent(componentId: string): Promise<WebAssembly.Instance> {
         console.log(`Loading transpiled component: ${componentId}`);
         
         try {
@@ -165,7 +166,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
         }
     }
 
-    async executeComponent(componentId: string, method: string, args: any[] = [], timeout?: number): Promise<ExecutionResult> {
+    async executeComponent(componentId: string, method: string, args: unknown[] = [], timeout?: number): Promise<ExecutionResult> {
         console.log(`Executing component method: ${componentId}.${method}`, { args, timeout });
 
         const context: ExecutionContext = {
@@ -213,7 +214,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
         return this.registry.listComponents();
     }
 
-    getLoadedComponents(): Map<string, any> {
+    getLoadedComponents(): Map<string, WebAssembly.Instance> {
         const loadedComponentsMetadata = this.registry.getLoadedComponents();
         const result = new Map();
         loadedComponentsMetadata.forEach((metadata) => {
@@ -236,7 +237,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
             this.registry.unloadComponent(elementId);
         } else {
             // Legacy MCP component - call parent method
-            await super.unloadComponent(elementId, componentName);
+            await super.unloadComponent(elementId);
         }
     }
 
@@ -372,7 +373,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
         this.enhancedPalette.updateDiagramComponents(wasmComponents);
     }
     
-    private generateTestHarnesses(components: any[]): Array<{
+    private generateTestHarnesses(components: import('./WasmComponentManager.js').WasmComponent[]): Array<{
         interfaceName: string;
         componentName: string;
         methods: string[];
@@ -386,16 +387,35 @@ export class WasmRuntimeManager extends WasmComponentManager {
         components.forEach(comp => {
             if (comp.metadata.exports) {
                 comp.metadata.exports.forEach((exportInterface: string) => {
+                    // Extract actual methods from component metadata
+                    const actualMethods = this.extractMethodsFromInterface(comp, exportInterface);
                     harnesses.push({
                         interfaceName: exportInterface,
                         componentName: comp.metadata.name,
-                        methods: ['test', 'execute', 'validate'] // TODO: Get actual methods from interface
+                        methods: actualMethods
                     });
                 });
             }
         });
         
         return harnesses;
+    }
+
+    private extractMethodsFromInterface(comp: import('./WasmComponentManager.js').WasmComponent, interfaceName: string): string[] {
+        // Try to extract actual method names from the interface
+        // For now, return common WASM export patterns
+        const commonMethods = ['main', 'execute', 'process', 'run', 'test'];
+        
+        // If the component has detailed interface information, use it
+        if (comp.interfaces) {
+            const matchingInterface = comp.interfaces.find(iface => iface.name === interfaceName);
+            if (matchingInterface && matchingInterface.functions) {
+                return matchingInterface.functions.map(func => func.name);
+            }
+        }
+        
+        // Fallback to common patterns
+        return commonMethods;
     }
 
     // Component lifecycle handlers from palette
@@ -411,7 +431,7 @@ export class WasmRuntimeManager extends WasmComponentManager {
         if (!componentName) throw new Error('Component name not found');
         
         // Use the existing load method from WasmComponentManager
-        await this.loadComponent(elementId, componentName as string);
+        await this.loadComponent(componentName as string);
         
         // The canvas will be updated by refreshDiagramAfterStateChange in loadComponent
         // Just update the palette display
@@ -482,14 +502,30 @@ export class WasmRuntimeManager extends WasmComponentManager {
     }
 
     // Event handlers
-    private onComponentUploadComplete(componentId: string): void {
+    private async onComponentUploadComplete(componentId: string): Promise<void> {
         console.log(`Component upload completed: ${componentId}`);
+        
+        // Refresh MCP component list since it's now uploaded to backend
+        await this.refreshMcpComponents();
         
         // Refresh any UI that shows component lists
         this.refreshComponentDisplays();
         
+        // Refresh the enhanced palette
+        await this.enhancedPalette.loadComponents();
+        
         // Show success message
-        this.showNotification(`Component uploaded successfully!`, 'success');
+        this.showNotification(`Component "${componentId}" uploaded successfully!`, 'success');
+    }
+    
+    private async refreshMcpComponents(): Promise<void> {
+        try {
+            // Trigger a component scan on the backend
+            await this.mcpService.getClient().callTool('scan_wasm_components', {});
+            console.log('Backend component scan triggered after upload');
+        } catch (error) {
+            console.error('Failed to refresh MCP components:', error);
+        }
     }
 
     private onComponentUploadError(error: string): void {
@@ -587,5 +623,27 @@ export class WasmRuntimeManager extends WasmComponentManager {
         }
         
         console.log('WASM runtime manager cleaned up');
+    }
+
+
+    async refreshComponentInterfaces(componentName: string): Promise<void> {
+        // Use MCP tool to refresh component status
+        try {
+            await this.mcpService.getClient().callTool('check_wasm_component_status', {
+                componentName
+            });
+        } catch (error) {
+            console.error('Failed to refresh component interfaces:', error);
+        }
+    }
+
+    isComponentLoaded(componentName: string): boolean {
+        // Check if component exists in the registry
+        return this.registry.hasComponent(componentName);
+    }
+
+
+    getLoadedComponent(componentName: string): import('./WasmComponentManager.js').WasmComponent | undefined {
+        return this.registry.getComponent(componentName);
     }
 }

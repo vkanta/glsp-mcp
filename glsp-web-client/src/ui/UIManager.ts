@@ -4,10 +4,43 @@ import { statusManager, ConnectionStatus, StatusListener, CombinedStatus } from 
 import { AIAssistantPanel, AIAssistantEvents } from './AIAssistantPanel.js';
 import { SidebarComponent } from './sidebar/SidebarComponent.js';
 import { ToolboxSection, createDefaultTools } from './sidebar/sections/ToolboxSection.js';
-import { PropertiesSection } from './sidebar/sections/PropertiesSection.js';
+import { PropertiesSection, Property } from './sidebar/sections/PropertiesSection.js';
 import { ComponentLibrarySection } from './sidebar/sections/ComponentLibrarySection.js';
 import { DiagramControlsSection } from './sidebar/sections/DiagramControlsSection.js';
 import { ThemeController } from './ThemeController.js';
+
+export interface WasmComponent {
+    id: string;
+    name: string;
+    category?: string;
+    description?: string;
+    exports?: unknown[];
+    imports?: unknown[];
+    type?: string;
+    path?: string;
+    interfaces?: unknown;
+    status?: string;
+    version?: string;
+}
+
+interface WitInterfaceInfo {
+    imports?: Array<{
+        name?: string;
+        functions?: Array<{
+            name: string;
+            params?: Array<{ name: string; type: string }>;
+            results?: Array<{ name: string; type: string }>;
+        }>;
+    }>;
+    exports?: Array<{
+        name?: string;
+        functions?: Array<{
+            name: string;
+            params?: Array<{ name: string; type: string }>;
+            results?: Array<{ name: string; type: string }>;
+        }>;
+    }>;
+}
 import { HeaderIconManager } from './HeaderIconManager.js';
 import { dialogManager } from './dialogs/DialogManager.js';
 import { DiagramTypeDialog } from './dialogs/specialized/DiagramTypeDialog.js';
@@ -404,10 +437,6 @@ export class UIManager {
         this.aiAssistantPanel.hide();
     }
 
-    private handleAIMessage(onCreateDiagram: (prompt: string) => void): void {
-        // This method is no longer needed as the new AI panel handles messages internally
-        // Keeping for backward compatibility but not used
-    }
 
     public addAIMessage(sender: 'AI' | 'User', content: string): void {
         this.aiAssistantPanel.addMessage({
@@ -872,14 +901,11 @@ export class UIManager {
         }
 
         // Update sidebar connection status if it exists
-        try {
-            const diagramControlsSection = this.sidebar?.getSection('diagram-controls');
-            if (diagramControlsSection) {
-                console.log('UIManager: Updating sidebar diagram controls status');
-            }
-        } catch (error) {
-            console.debug('UIManager: Sidebar not available or getSection not implemented:', error);
-        }
+        // TODO: Implement getSection method or use updateSection
+        // const diagramControlsSection = this.sidebar?.getSection('diagram-controls');
+        // if (diagramControlsSection) {
+        //     console.log('UIManager: Updating sidebar diagram controls status');
+        // }
     }
 
     public updateStatus(message: string): void {
@@ -890,13 +916,13 @@ export class UIManager {
         }
     }
 
-    public updateDiagramList(diagrams: any[], loadDiagramCallback: (diagramId: string) => void, deleteDiagramCallback?: (diagramId: string, diagramName: string) => void): void {
+    public updateDiagramList(diagrams: import('../services/DiagramService.js').DiagramMetadata[], loadDiagramCallback: (diagramId: string) => void, deleteDiagramCallback?: (diagramId: string, diagramName: string) => void): void {
         console.log('UIManager: updateDiagramList called with', diagrams.length, 'diagrams');
         const listElement = this.diagramListElement.querySelector('#diagram-list');
         console.log('UIManager: diagram list element found:', !!listElement);
         if (listElement) {
             listElement.innerHTML = '';
-            diagrams.forEach((diagram: any) => {
+            diagrams.forEach((diagram) => {
                 console.log('UIManager: Adding diagram to list:', diagram.name, diagram.id);
                 const li = document.createElement('li');
                 li.innerHTML = `
@@ -1003,7 +1029,7 @@ export class UIManager {
     }
     
     // Modern sidebar methods
-    public updateSelectedElement(elementId: string, elementType: string, properties?: any): void {
+    public updateSelectedElement(elementId: string, elementType: string, properties?: Record<string, unknown>): void {
         if (!this.propertiesSection) return;
         
         console.log('UIManager: updateSelectedElement called', { elementId, elementType, properties });
@@ -1040,7 +1066,7 @@ export class UIManager {
 
             // WASM component specific properties
             if (properties.type === 'wasm-component') {
-                const wasmProperties = [
+                const wasmProperties: Property[] = [
                     { key: 'componentName', label: 'Component Name', value: properties.componentName || 'Unknown', type: 'text', readonly: true },
                     { key: 'isLoaded', label: 'Loaded', value: properties.isLoaded ? 'Yes' : 'No', type: 'text', readonly: true },
                     { key: 'status', label: 'Status', value: properties.status || 'unknown', type: 'text', readonly: true }
@@ -1079,7 +1105,7 @@ export class UIManager {
             // Custom properties from the element
             if (properties.properties && Object.keys(properties.properties).length > 0) {
                 const customProps = Object.entries(properties.properties)
-                    .filter(([key, value]) => !['label', 'type', 'bounds'].includes(key))
+                    .filter(([key, _value]) => !['label', 'type', 'bounds'].includes(key))
                     .map(([key, value]) => ({
                         key,
                         label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
@@ -1135,7 +1161,7 @@ export class UIManager {
         }
     }
     
-    public addWasmComponentToLibrary(component: any): void {
+    public addWasmComponentToLibrary(component: WasmComponent): void {
         if (!this.componentLibrarySection) {
             console.warn('UIManager: Cannot add WASM component - componentLibrarySection not initialized');
             return;
@@ -1151,17 +1177,8 @@ export class UIManager {
             icon: this.getWasmComponentIcon(component),
             version: component.version,
             status: component.status || 'available',
-            onDragStart: (e) => {
-                console.log('WASM component drag started:', component.name);
-                // Set drag data for WASM component
-                if (e.dataTransfer) {
-                    e.dataTransfer.setData('application/wasm-component', JSON.stringify({
-                        name: component.name,
-                        type: 'wasm-component',
-                        interfaces: component.interfaces || []
-                    }));
-                }
-            },
+            path: component.path,  // Include the path
+            interfaces: component.interfaces,  // Include interfaces
             onSelect: () => {
                 console.log('WASM component selected:', component.name);
                 // Could show component details in properties panel
@@ -1169,7 +1186,7 @@ export class UIManager {
         });
     }
     
-    private categorizeWasmComponent(component: any): string {
+    private categorizeWasmComponent(component: WasmComponent): string {
         // If component already has a category, use it
         if (component.category) {
             return component.category;
@@ -1188,7 +1205,7 @@ export class UIManager {
         return 'General';
     }
     
-    private getWasmComponentIcon(component: any): string {
+    private getWasmComponentIcon(component: WasmComponent): string {
         const category = this.categorizeWasmComponent(component);
         
         switch (category) {
@@ -1203,7 +1220,7 @@ export class UIManager {
         }
     }
     
-    public updateWasmComponentsList(components: any[]): void {
+    public updateWasmComponentsList(components: WasmComponent[]): void {
         if (!this.componentLibrarySection) return;
         
         // Clear existing components
@@ -1578,11 +1595,11 @@ export class UIManager {
         }
     }
     
-    private addWitInterfacesSection(witInfo: any): void {
+    private addWitInterfacesSection(witInfo: WitInterfaceInfo): void {
         // Add imports section
         if (witInfo.imports && witInfo.imports.length > 0) {
             const importProperties = [];
-            witInfo.imports.forEach((iface: any, index: number) => {
+            witInfo.imports.forEach((iface, index: number) => {
                 importProperties.push({
                     key: `import_${index}`,
                     label: iface.name || `Import ${index + 1}`,
@@ -1593,9 +1610,9 @@ export class UIManager {
                 
                 // Add function details
                 if (iface.functions && iface.functions.length > 0) {
-                    iface.functions.forEach((func: any, funcIndex: number) => {
-                        const paramStr = func.params?.map((p: any) => `${p.name}: ${p.type}`).join(', ') || '';
-                        const resultStr = func.results?.map((r: any) => `${r.name}: ${r.type}`).join(', ') || 'void';
+                    iface.functions.forEach((func, funcIndex) => {
+                        const paramStr = func.params?.map((p) => `${p.name}: ${p.type}`).join(', ') || '';
+                        const resultStr = func.results?.map((r) => `${r.name}: ${r.type}`).join(', ') || 'void';
                         importProperties.push({
                             key: `import_${index}_func_${funcIndex}`,
                             label: `  └ ${func.name}`,
@@ -1618,7 +1635,7 @@ export class UIManager {
         // Add exports section
         if (witInfo.exports && witInfo.exports.length > 0) {
             const exportProperties = [];
-            witInfo.exports.forEach((iface: any, index: number) => {
+            witInfo.exports.forEach((iface, index) => {
                 exportProperties.push({
                     key: `export_${index}`,
                     label: iface.name || `Export ${index + 1}`,
@@ -1629,9 +1646,9 @@ export class UIManager {
                 
                 // Add function details
                 if (iface.functions && iface.functions.length > 0) {
-                    iface.functions.forEach((func: any, funcIndex: number) => {
-                        const paramStr = func.params?.map((p: any) => `${p.name}: ${p.type}`).join(', ') || '';
-                        const resultStr = func.results?.map((r: any) => `${r.name}: ${r.type}`).join(', ') || 'void';
+                    iface.functions.forEach((func, funcIndex) => {
+                        const paramStr = func.params?.map((p) => `${p.name}: ${p.type}`).join(', ') || '';
+                        const resultStr = func.results?.map((r) => `${r.name}: ${r.type}`).join(', ') || 'void';
                         exportProperties.push({
                             key: `export_${index}_func_${funcIndex}`,
                             label: `  └ ${func.name}`,
@@ -1653,7 +1670,7 @@ export class UIManager {
         
         // Add dependencies section
         if (witInfo.dependencies && witInfo.dependencies.length > 0) {
-            const depProperties = witInfo.dependencies.map((dep: any, index: number) => ({
+            const depProperties = witInfo.dependencies.map((dep, index) => ({
                 key: `dep_${index}`,
                 label: dep.package,
                 value: dep.version || 'latest',

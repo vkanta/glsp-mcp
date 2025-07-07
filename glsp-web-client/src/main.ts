@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = new AppController(canvas);
 
     // Make app globally available for HTML onclick handlers (for debugging/console access)
-    (window as any).app = app;
+    (window as { app?: import('./AppController.js').AppController }).app = app;
 
     console.log('🚀 MCP-GLSP Web Client initialized');
     
