@@ -36,7 +36,7 @@ export class WasmComponentRenderer {
         // Get component properties
         const label = element.properties?.label?.toString() || element.properties?.componentName?.toString() || 'Component';
         const componentType = element.element_type || element.type || 'wasm-component';
-        const interfaces = element.properties?.interfaces as any[] || [];
+        const interfaces = element.properties?.interfaces as import('../renderer/canvas-renderer.js').ComponentInterface[] || [];
         const description = element.properties?.description?.toString();
         const metadata = element.properties?.metadata || {};
         const filePath = element.properties?.componentPath?.toString();
@@ -176,7 +176,7 @@ export class WasmComponentRenderer {
 
     private static drawInterfaceConnectors(
         ctx: CanvasRenderingContext2D,
-        interfaces: any[],
+        interfaces: Array<{ name?: string; functions?: unknown[] }>,
         bounds: Bounds,
         side: 'left' | 'right',
         color: string,
@@ -311,7 +311,7 @@ export class WasmComponentRenderer {
         ctx: CanvasRenderingContext2D,
         componentType: string,
         bounds: Bounds,
-        _colors: any
+        _colors: unknown
     ): void {
         const badgeX = bounds.x + bounds.width - 50;
         const badgeY = bounds.y + 6;
@@ -339,12 +339,12 @@ export class WasmComponentRenderer {
             filePath?: string;
             fileSize?: number;
             dependencies: string[];
-            metadata: any;
+            metadata: Record<string, unknown>;
         },
         x: number,
         y: number,
         maxWidth: number,
-        colors: any
+        colors: ComponentColors
     ): number {
         let currentY = y;
         const lineHeight = 12;
@@ -426,7 +426,7 @@ export class WasmComponentRenderer {
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
         isLoaded: boolean,
-        colors: any
+        colors: ComponentColors
     ): void {
         const switchWidth = 36;
         const switchHeight = 18;
@@ -488,7 +488,7 @@ export class WasmComponentRenderer {
     private static drawMissingIndicator(
         ctx: CanvasRenderingContext2D,
         bounds: Bounds,
-        _colors: any
+        _colors: ComponentColors
     ): void {
         // Draw a warning triangle in the top-right corner
         const triangleSize = 12;
