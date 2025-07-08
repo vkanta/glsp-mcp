@@ -5,6 +5,7 @@
 
 import { NodeTypeConfig, EdgeTypeConfig, DEFAULT_NODE_TYPES, DEFAULT_EDGE_TYPES } from '../interaction/interaction-mode.js';
 import { WASM_NODE_TYPES, WASM_EDGE_TYPES } from './wasm-component-types.js';
+import { WIT_NODE_TYPES, WIT_EDGE_TYPES } from './wit-interface-types.js';
 
 export interface DiagramTypeConfig {
     type: string;
@@ -108,6 +109,18 @@ class DiagramTypeRegistryImpl implements DiagramTypeRegistry {
             ],
             icon: '🏭',
             defaultLayout: 'hierarchical'
+        });
+
+        // WebAssembly Interface Types (WIT) diagrams
+        this.registerType({
+            type: 'wit-interface',
+            label: 'WIT Interface Diagram',
+            description: 'WebAssembly Interface Types structure and dependencies visualization',
+            nodeTypes: WIT_NODE_TYPES,
+            edgeTypes: WIT_EDGE_TYPES,
+            icon: '🔷',
+            defaultLayout: 'hierarchical',
+            customRenderer: 'WitInterfaceRenderer'
         });
     }
 

@@ -462,24 +462,6 @@ impl WasmExecutionEngine {
         0
     }
 
-    /// Get execution progress
-    pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
-        let executions = self.executions.lock().unwrap();
-        executions.get(execution_id).map(|info| info.progress.clone())
-    }
-
-    /// Get execution result
-    pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
-        let executions = self.executions.lock().unwrap();
-        executions.get(execution_id).and_then(|info| info.result.clone())
-    }
-
-    /// List all executions
-    pub fn list_executions(&self) -> Vec<ExecutionProgress> {
-        let executions = self.executions.lock().unwrap();
-        executions.values().map(|info| info.progress.clone()).collect()
-    }
-
     /// Cancel an execution
     pub fn cancel_execution(&self, execution_id: &str) -> bool {
         let mut executions = self.executions.lock().unwrap();
@@ -538,6 +520,28 @@ impl WasmExecutionEngine {
             }
         }
         Err(anyhow!("Execution not found or no sensor bridge available"))
+    }
+    
+    /// List all executions (active and recent)
+    pub fn list_executions(&self) -> Vec<ExecutionResult> {
+        let executions = self.executions.lock().unwrap();
+        executions.values()
+            .filter_map(|info| info.result.clone())
+            .collect()
+    }
+    
+    /// Get execution progress by ID
+    pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
+        let executions = self.executions.lock().unwrap();
+        executions.get(execution_id)
+            .map(|info| info.progress.clone())
+    }
+    
+    /// Get execution result by ID  
+    pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
+        let executions = self.executions.lock().unwrap();
+        executions.get(execution_id)
+            .and_then(|info| info.result.clone())
     }
 }
 

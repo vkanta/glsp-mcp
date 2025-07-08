@@ -124,6 +124,25 @@ impl WasmFileWatcher {
         }
     }
     
+    /// List all executions (active and recent)
+    pub fn list_executions(&self) -> Vec<ExecutionResult> {
+        if let Some(engine) = &self.execution_engine {
+            engine.list_executions()
+        } else {
+            vec![]
+        }
+    }
+    
+    /// Get execution progress by ID
+    pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
+        self.execution_engine.as_ref()?.get_execution_progress(execution_id)
+    }
+    
+    /// Get execution result by ID
+    pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
+        self.execution_engine.as_ref()?.get_execution_result(execution_id)
+    }
+    
     /// Start filesystem watcher for real-time component monitoring
     pub async fn start_file_watching(&mut self) -> Result<(), anyhow::Error> {
         // Create and start the filesystem watcher
@@ -770,25 +789,6 @@ impl WasmFileWatcher {
         let component_path = std::path::Path::new(&component.path);
         
         execution_engine.execute_component(context, component_path).await
-    }
-
-    /// Get execution progress
-    pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
-        self.execution_engine.as_ref()
-            .and_then(|engine| engine.get_execution_progress(execution_id))
-    }
-
-    /// Get execution result
-    pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
-        self.execution_engine.as_ref()
-            .and_then(|engine| engine.get_execution_result(execution_id))
-    }
-
-    /// List all executions
-    pub fn list_executions(&self) -> Vec<ExecutionProgress> {
-        self.execution_engine.as_ref()
-            .map(|engine| engine.list_executions())
-            .unwrap_or_default()
     }
 
     /// Cancel an execution

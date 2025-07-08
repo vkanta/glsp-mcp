@@ -311,6 +311,14 @@
             height: 56px;
             z-index: 1000;
             flex-shrink: 0;
+            gap: 16px;
+        }
+        
+        #view-switcher-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            max-width: 600px;
         }
 
         .sidebar {
@@ -1640,6 +1648,7 @@
             <div class="brand-icon">W</div>
             <div class="brand-name">WASM Component Designer</div>
         </div>
+        <div id="view-switcher-container"></div>
         <div class="header-actions">
             <div class="theme-control">
                 <div class="theme-icon">☀️</div>

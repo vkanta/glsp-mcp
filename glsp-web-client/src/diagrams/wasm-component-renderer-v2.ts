@@ -70,17 +70,14 @@ export class WasmComponentRendererV2 {
         const interfaces = element.properties?.interfaces || [];
         const status = isMissing ? 'error' : (isLoaded ? 'loaded' : 'unloaded');
         
-        // Debug interface data
-        console.log('WasmComponentRendererV2: Rendering component', componentName);
-        console.log('WasmComponentRendererV2: Element properties:', element.properties);
-        console.log('WasmComponentRendererV2: Interfaces:', interfaces);
+        // Debug interface data (reduced verbosity)
+        // console.log('WasmComponentRendererV2: Rendering component', componentName);
         
         // Handle both interface count (number) and interface array
         let actualInterfaces: ComponentInterface[] = [];
         
         if (typeof interfaces === 'number') {
             // If interfaces is a number (count), create placeholder interfaces
-            console.log('WasmComponentRendererV2: Interface count:', interfaces);
             actualInterfaces = Array.from({ length: interfaces }, (_, i) => ({
                 name: `interface-${i + 1}`,
                 interface_type: i % 2 === 0 ? 'import' : 'export',
@@ -89,11 +86,9 @@ export class WasmComponentRendererV2 {
             }));
         } else if (Array.isArray(interfaces)) {
             // If interfaces is already an array, use it directly
-            console.log('WasmComponentRendererV2: Interface array length:', interfaces.length);
             actualInterfaces = interfaces;
         } else {
             // Fallback for other cases
-            console.log('WasmComponentRendererV2: No valid interfaces found, using empty array');
             actualInterfaces = [];
         }
 
@@ -121,8 +116,8 @@ export class WasmComponentRendererV2 {
         const width = Math.max(bounds.width, dynamicWidth);
         const height = Math.max(bounds.height, this.DEFAULT_HEIGHT, minHeightForPorts);
         
-        console.log(`WasmComponentRendererV2: Component ${componentName} - inputs: ${inputs.length}, outputs: ${outputs.length}, max: ${maxPorts}`);
-        console.log(`WasmComponentRendererV2: Height calculation - original: ${bounds.height}, default: ${this.DEFAULT_HEIGHT}, required: ${minHeightForPorts}, final: ${height}`);
+        // Height calculation completed - reduced verbosity
+        // console.log(`Component ${componentName} - inputs: ${inputs.length}, outputs: ${outputs.length}`);
         
         // Center the component if bounds are larger than needed
         const x = bounds.x + (bounds.width - width) / 2;
@@ -253,7 +248,7 @@ export class WasmComponentRendererV2 {
             wasTruncated = truncationResult.wasTruncated;
         }
         
-        console.log(`Rendering component: "${componentName}" -> "${displayName}" (truncated: ${wasTruncated}, width: ${bounds.width}, maxTextWidth: ${maxTextWidth})`);
+        // Component rendered - reduced verbosity
         
         ctx.fillText(displayName, textX, textY);
 

@@ -1,6 +1,8 @@
 use crate::mcp::protocol::{Resource, ResourceContent};
 use crate::mcp::tools::DiagramTools;
-use crate::model::ElementType;
+use crate::model::{ElementType, Position};
+use crate::database::traits::{SensorDataRepository, MetadataStore, TimeSeriesStore};
+use crate::database::dataset::DatasetManager;
 use anyhow::{Result, anyhow};
 use serde_json::{json, Value};
 
@@ -104,6 +106,39 @@ impl DiagramResources {
                 description: Some("Summary of security analysis across all components".to_string()),
                 mime_type: Some("application/json".to_string()),
             },
+            // Selection resources
+            Resource {
+                uri: "selection://list".to_string(),
+                name: "Selection List".to_string(),
+                description: Some("List of all selections across diagrams".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            // Sensor data resources (if database is enabled)
+            Resource {
+                uri: "sensor://list".to_string(),
+                name: "Sensors List".to_string(),
+                description: Some("List of all available sensors".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "dataset://list".to_string(),
+                name: "Datasets List".to_string(),
+                description: Some("List of all available sensor datasets".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            // WASM execution resources
+            Resource {
+                uri: "wasm://executions/list".to_string(),
+                name: "WASM Executions List".to_string(),
+                description: Some("List of all WASM component executions".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
+            Resource {
+                uri: "wasm://uploaded/list".to_string(),
+                name: "Uploaded Components List".to_string(),
+                description: Some("List of all uploaded WASM components".to_string()),
+                mime_type: Some("application/json".to_string()),
+            },
         ];
 
         // Add resources for individual WASM components
@@ -174,6 +209,14 @@ impl DiagramResources {
                 )),
                 mime_type: Some("application/json".to_string()),
             });
+
+            // Selection resource for each diagram
+            resources.push(Resource {
+                uri: format!("selection://current/{}", diagram.id),
+                name: format!("Selection: {}", diagram.diagram_type),
+                description: Some(format!("Current selection in {} diagram", diagram.diagram_type)),
+                mime_type: Some("application/json".to_string()),
+            });
         }
 
         resources
@@ -241,6 +284,36 @@ impl DiagramResources {
                 text: Some(self.get_wit_dependencies_graph(tools)),
                 blob: None,
             }),
+            "selection://list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_selection_list(tools)),
+                blob: None,
+            }),
+            "sensor://list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_sensors_list(tools).await?),
+                blob: None,
+            }),
+            "dataset://list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_datasets_list(tools).await?),
+                blob: None,
+            }),
+            "wasm://executions/list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_executions_list(tools)),
+                blob: None,
+            }),
+            "wasm://uploaded/list" => Ok(ResourceContent {
+                uri: uri.to_string(),
+                mime_type: Some("application/json".to_string()),
+                text: Some(self.get_uploaded_components_list(tools)),
+                blob: None,
+            }),
             _ => {
                 if uri.starts_with("diagram://model/") {
                     let diagram_id = uri.strip_prefix("diagram://model/")
@@ -270,6 +343,54 @@ impl DiagramResources {
                         }
                     } else {
                         self.get_wasm_component_details(path, tools)
+                    }
+                } else if uri.starts_with("selection://current/") {
+                    let diagram_id = uri.strip_prefix("selection://current/")
+                        .ok_or_else(|| anyhow!("Invalid selection URI: {}", uri))?;
+                    self.get_current_selection(diagram_id, tools)
+                } else if uri.starts_with("selection://element-at/") {
+                    // Parse URI like: selection://element-at/{diagramId}?x={x}&y={y}
+                    let path = uri.strip_prefix("selection://element-at/")
+                        .ok_or_else(|| anyhow!("Invalid element-at URI: {}", uri))?;
+                    self.get_element_at_position_from_uri(path, tools)
+                } else if uri.starts_with("sensor://metadata/") {
+                    let sensor_id = uri.strip_prefix("sensor://metadata/")
+                        .ok_or_else(|| anyhow!("Invalid sensor metadata URI: {}", uri))?;
+                    self.get_sensor_metadata(sensor_id, tools).await
+                } else if uri.starts_with("sensor://statistics/") {
+                    let sensor_id = uri.strip_prefix("sensor://statistics/")
+                        .ok_or_else(|| anyhow!("Invalid sensor statistics URI: {}", uri))?;
+                    self.get_sensor_statistics(sensor_id, tools).await
+                } else if uri.starts_with("sensor://time-range/") {
+                    let sensor_id = uri.strip_prefix("sensor://time-range/")
+                        .ok_or_else(|| anyhow!("Invalid sensor time-range URI: {}", uri))?;
+                    self.get_sensor_time_range(sensor_id, tools).await
+                } else if uri.starts_with("sensor://data?") {
+                    // Parse query parameters from URI
+                    self.query_sensor_data_from_uri(uri, tools).await
+                } else if uri.starts_with("sensor://gaps/") {
+                    let sensor_id = uri.strip_prefix("sensor://gaps/")
+                        .ok_or_else(|| anyhow!("Invalid sensor gaps URI: {}", uri))?;
+                    self.detect_sensor_gaps(sensor_id, tools).await
+                } else if uri.starts_with("sensor://visualization/") {
+                    let path = uri.strip_prefix("sensor://visualization/")
+                        .ok_or_else(|| anyhow!("Invalid sensor visualization URI: {}", uri))?;
+                    self.visualize_sensor_data_from_uri(path, tools).await
+                } else if uri.starts_with("dataset://info/") {
+                    let dataset_id = uri.strip_prefix("dataset://info/")
+                        .ok_or_else(|| anyhow!("Invalid dataset info URI: {}", uri))?;
+                    self.get_dataset_info(dataset_id, tools).await
+                } else if uri.starts_with("wasm://executions/") {
+                    let path = uri.strip_prefix("wasm://executions/")
+                        .ok_or_else(|| anyhow!("Invalid executions URI: {}", uri))?;
+                    if let Some((execution_id, suffix)) = path.split_once('/') {
+                        match suffix {
+                            "progress" => self.get_execution_progress(execution_id, tools),
+                            "result" => self.get_execution_result(execution_id, tools),
+                            _ => Err(anyhow::anyhow!("Unknown execution resource: {}", uri)),
+                        }
+                    } else {
+                        Err(anyhow::anyhow!("Invalid execution resource: {}", uri))
                     }
                 } else {
                     Err(anyhow::anyhow!("Resource not found: {}", uri))
@@ -957,5 +1078,365 @@ impl DiagramResources {
             ),
             blob: None,
         })
+    }
+
+    // Selection resource methods
+    fn get_selection_list(&self, tools: &DiagramTools) -> String {
+        let diagrams = tools.list_diagrams();
+        let selections: Vec<Value> = diagrams
+            .iter()
+            .map(|diagram| {
+                let selected_count = tools.get_selected_elements(&diagram.id).len();
+                json!({
+                    "diagramId": diagram.id,
+                    "diagramType": diagram.diagram_type,
+                    "selectedCount": selected_count,
+                    "uri": format!("selection://current/{}", diagram.id)
+                })
+            })
+            .collect();
+
+        json!({
+            "selections": selections,
+            "total": selections.len()
+        })
+        .to_string()
+    }
+
+    fn get_current_selection(&self, diagram_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let diagram = tools
+            .get_diagram(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found: {}", diagram_id))?;
+
+        let selected_elements = tools.get_selected_elements(diagram_id);
+        let hovered_element = tools.get_hovered_element(diagram_id);
+
+        let selected_details: Vec<Value> = selected_elements
+            .iter()
+            .filter_map(|id| diagram.elements.get(id))
+            .map(|element| {
+                json!({
+                    "id": element.id,
+                    "type": element.element_type,
+                    "label": element.properties.get("label").cloned().unwrap_or_default(),
+                    "bounds": element.bounds.as_ref().map(|b| json!({
+                        "x": b.x,
+                        "y": b.y,
+                        "width": b.width,
+                        "height": b.height
+                    }))
+                })
+            })
+            .collect();
+
+        Ok(ResourceContent {
+            uri: format!("selection://current/{diagram_id}"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(
+                json!({
+                    "diagramId": diagram_id,
+                    "selectedIds": selected_elements,
+                    "selectedElements": selected_details,
+                    "selectedCount": selected_elements.len(),
+                    "hoveredId": hovered_element
+                })
+                .to_string(),
+            ),
+            blob: None,
+        })
+    }
+
+    fn get_element_at_position_from_uri(&self, path: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        // Parse path like: {diagramId}?x={x}&y={y}
+        let (diagram_id, query) = if let Some(pos) = path.find('?') {
+            (&path[..pos], &path[pos + 1..])
+        } else {
+            return Err(anyhow!("Missing query parameters for element-at position"));
+        };
+
+        // Parse query parameters
+        let mut x = None;
+        let mut y = None;
+        for param in query.split('&') {
+            if let Some((key, value)) = param.split_once('=') {
+                match key {
+                    "x" => x = value.parse::<f64>().ok(),
+                    "y" => y = value.parse::<f64>().ok(),
+                    _ => {}
+                }
+            }
+        }
+
+        let x = x.ok_or_else(|| anyhow!("Missing x parameter"))?;
+        let y = y.ok_or_else(|| anyhow!("Missing y parameter"))?;
+
+        let element_id = tools.find_element_at_position(diagram_id, Position { x, y });
+
+        Ok(ResourceContent {
+            uri: format!("selection://element-at/{path}"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(
+                json!({
+                    "diagramId": diagram_id,
+                    "position": { "x": x, "y": y },
+                    "elementId": element_id,
+                    "found": element_id.is_some()
+                })
+                .to_string(),
+            ),
+            blob: None,
+        })
+    }
+
+    // Sensor data resource methods
+    async fn get_sensors_list(&self, tools: &DiagramTools) -> Result<String> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            // Get the database backend
+            let db = manager.backend();
+            let sensors = db.list_sensors().await?;
+            
+            Ok(json!({
+                "sensors": sensors,
+                "total": sensors.len()
+            })
+            .to_string())
+        } else {
+            Ok(json!({
+                "error": "Database not configured",
+                "sensors": [],
+                "total": 0
+            })
+            .to_string())
+        }
+    }
+
+    async fn get_sensor_metadata(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let db = manager.backend();
+            let metadata = db.get_sensor_metadata(sensor_id).await?;
+            
+            Ok(ResourceContent {
+                uri: format!("sensor://metadata/{sensor_id}"),
+                mime_type: Some("application/json".to_string()),
+                text: Some(serde_json::to_string_pretty(&metadata)?),
+                blob: None,
+            })
+        } else {
+            Err(anyhow!("Database not configured"))
+        }
+    }
+
+    async fn get_sensor_statistics(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let db = manager.backend();
+            let stats = db.get_sensor_statistics(sensor_id).await?;
+            
+            Ok(ResourceContent {
+                uri: format!("sensor://statistics/{sensor_id}"),
+                mime_type: Some("application/json".to_string()),
+                text: Some(serde_json::to_string_pretty(&stats)?),
+                blob: None,
+            })
+        } else {
+            Err(anyhow!("Database not configured"))
+        }
+    }
+
+    async fn get_sensor_time_range(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let db = manager.backend();
+            let time_range = db.get_time_range(sensor_id).await?;
+            
+            Ok(ResourceContent {
+                uri: format!("sensor://time-range/{sensor_id}"),
+                mime_type: Some("application/json".to_string()),
+                text: Some(
+                    json!({
+                        "sensorId": sensor_id,
+                        "timeRange": time_range
+                    })
+                    .to_string(),
+                ),
+                blob: None,
+            })
+        } else {
+            Err(anyhow!("Database not configured"))
+        }
+    }
+
+    async fn query_sensor_data_from_uri(&self, uri: &str, _tools: &DiagramTools) -> Result<ResourceContent> {
+        // Parse query parameters from URI
+        let _query_str = uri.strip_prefix("sensor://data?")
+            .ok_or_else(|| anyhow!("Invalid sensor data URI"))?;
+        
+        // TODO: Implement query parameter parsing and sensor data query
+        // This would parse parameters like sensorIds, startTime, endTime
+        
+        Ok(ResourceContent {
+            uri: uri.to_string(),
+            mime_type: Some("application/json".to_string()),
+            text: Some(
+                json!({
+                    "error": "Query parameter parsing not yet implemented",
+                    "uri": uri
+                })
+                .to_string(),
+            ),
+            blob: None,
+        })
+    }
+
+    async fn detect_sensor_gaps(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let db = manager.backend();
+            // Get time range first
+            let time_range = db.get_time_range(sensor_id).await?;
+            if let Some(range) = time_range {
+                // Detect gaps with 60 second threshold (60 * 1_000_000 microseconds)
+                let gaps = db.detect_gaps(sensor_id, range.start_time_us, range.end_time_us, 60_000_000).await?;
+                
+                Ok(ResourceContent {
+                    uri: format!("sensor://gaps/{sensor_id}"),
+                    mime_type: Some("application/json".to_string()),
+                    text: Some(
+                        json!({
+                            "sensorId": sensor_id,
+                            "gaps": gaps,
+                            "totalGaps": gaps.len()
+                        })
+                        .to_string(),
+                    ),
+                    blob: None,
+                })
+            } else {
+                Ok(ResourceContent {
+                    uri: format!("sensor://gaps/{sensor_id}"),
+                    mime_type: Some("application/json".to_string()),
+                    text: Some(
+                        json!({
+                            "sensorId": sensor_id,
+                            "error": "No data available for sensor",
+                            "gaps": [],
+                            "totalGaps": 0
+                        })
+                        .to_string(),
+                    ),
+                    blob: None,
+                })
+            }
+        } else {
+            Err(anyhow!("Database not configured"))
+        }
+    }
+
+    async fn visualize_sensor_data_from_uri(&self, path: &str, _tools: &DiagramTools) -> Result<ResourceContent> {
+        // Parse path like: {sensorId}?type={visualizationType}
+        let (sensor_id, _query) = if let Some(pos) = path.find('?') {
+            (&path[..pos], &path[pos + 1..])
+        } else {
+            (path, "")
+        };
+
+        // TODO: Implement visualization generation based on type parameter
+        
+        Ok(ResourceContent {
+            uri: format!("sensor://visualization/{path}"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(
+                json!({
+                    "sensorId": sensor_id,
+                    "visualization": "Visualization generation not yet implemented"
+                })
+                .to_string(),
+            ),
+            blob: None,
+        })
+    }
+
+    // Dataset resource methods
+    async fn get_datasets_list(&self, tools: &DiagramTools) -> Result<String> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let datasets = manager.list_datasets().await?;
+            
+            Ok(json!({
+                "datasets": datasets,
+                "total": datasets.len()
+            })
+            .to_string())
+        } else {
+            Ok(json!({
+                "error": "Database not configured",
+                "datasets": [],
+                "total": 0
+            })
+            .to_string())
+        }
+    }
+
+    async fn get_dataset_info(&self, dataset_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        if let Some(dataset_manager) = &tools.dataset_manager {
+            let manager = dataset_manager.lock().await;
+            let dataset = manager.get_dataset(dataset_id).await?;
+            
+            Ok(ResourceContent {
+                uri: format!("dataset://info/{dataset_id}"),
+                mime_type: Some("application/json".to_string()),
+                text: Some(serde_json::to_string_pretty(&dataset)?),
+                blob: None,
+            })
+        } else {
+            Err(anyhow!("Database not configured"))
+        }
+    }
+
+    // WASM execution resource methods
+    fn get_executions_list(&self, tools: &DiagramTools) -> String {
+        let executions = tools.list_wasm_executions_for_resource();
+        
+        json!({
+            "executions": executions,
+            "total": executions.len()
+        })
+        .to_string()
+    }
+
+    fn get_execution_progress(&self, execution_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let progress = tools.get_execution_progress_for_resource(execution_id)
+            .ok_or_else(|| anyhow!("Execution not found: {}", execution_id))?;
+        
+        Ok(ResourceContent {
+            uri: format!("wasm://executions/{execution_id}/progress"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(serde_json::to_string_pretty(&progress)?),
+            blob: None,
+        })
+    }
+
+    fn get_execution_result(&self, execution_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+        let result = tools.get_execution_result_for_resource(execution_id)
+            .ok_or_else(|| anyhow!("Execution result not found: {}", execution_id))?;
+        
+        Ok(ResourceContent {
+            uri: format!("wasm://executions/{execution_id}/result"),
+            mime_type: Some("application/json".to_string()),
+            text: Some(serde_json::to_string_pretty(&result)?),
+            blob: None,
+        })
+    }
+
+    fn get_uploaded_components_list(&self, tools: &DiagramTools) -> String {
+        let uploaded = tools.list_uploaded_components_for_resource();
+        
+        json!({
+            "components": uploaded,
+            "total": uploaded.len()
+        })
+        .to_string()
     }
 }

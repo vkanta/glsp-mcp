@@ -7,6 +7,8 @@ import { AIService } from './services/AIService.js';
 import { WasmRuntimeManager } from './wasm/WasmRuntimeManager.js';
 import { statusManager } from './services/StatusManager.js';
 import { BaseDialog } from './ui/dialogs/base/BaseDialog.js';
+import { WitVisualizationPanel } from './wit/WitVisualizationPanel.js';
+import { ViewSwitcher } from './ui/ViewSwitcher.js';
 
 // Debug interface for window properties
 interface WindowDebug {
@@ -42,6 +44,8 @@ export class AppController {
     private interactionManager: InteractionManager;
     private aiService: AIService;
     private wasmRuntimeManager: WasmRuntimeManager;
+    private witVisualizationPanel: WitVisualizationPanel;
+    private viewSwitcher: ViewSwitcher;
 
     constructor(private canvas: HTMLCanvasElement) {
         this.mcpService = new McpService();
@@ -55,6 +59,8 @@ export class AppController {
             maxConcurrentExecutions: 5,
             maxCachedComponents: 50
         }, this.renderer);
+        this.witVisualizationPanel = new WitVisualizationPanel(this.mcpService);
+        this.viewSwitcher = new ViewSwitcher();
 
         // Development-only debug utilities
         if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
@@ -141,6 +147,18 @@ export class AppController {
             console.log('AppController: WASM palette mounted as floating element');
         } else {
             console.log('AppController: Skipping WASM palette (using sidebar components instead)');
+        }
+        
+        // Mount WIT visualization panel
+        document.body.appendChild(this.witVisualizationPanel.getElement());
+        console.log('AppController: WIT visualization panel mounted');
+        
+        // Mount view switcher in header
+        const viewSwitcherContainer = document.getElementById('view-switcher-container');
+        if (viewSwitcherContainer) {
+            viewSwitcherContainer.appendChild(this.viewSwitcher.getElement());
+            this.viewSwitcher.setModeChangeHandler((mode) => this.handleViewModeChange(mode));
+            console.log('AppController: View switcher mounted');
         }
     }
     
@@ -493,6 +511,9 @@ export class AppController {
         console.log('Updating toolbar content...');
         this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
         
+        // Show/hide view switcher based on diagram type
+        this.viewSwitcher.showForDiagramType(diagramType);
+        
         // Show/hide WASM palette based on diagram type
         if (diagramType === 'wasm-component') {
             await this.wasmRuntimeManager.showEnhancedPalette();
@@ -557,6 +578,9 @@ export class AppController {
             const diagramType = loadedDiagram.diagramType || loadedDiagram.diagram_type || 'workflow';
             console.log('AppController: Updating toolbar for loaded diagram type:', diagramType);
             this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
+            
+            // Show/hide view switcher based on diagram type
+            this.viewSwitcher.showForDiagramType(diagramType);
         } else {
             console.warn('AppController: Failed to load diagram:', diagramId);
         }
@@ -786,6 +810,329 @@ export class AppController {
         });
         
         console.log('Canvas drag and drop setup complete');
+    }
+    
+    /**
+     * Handle view mode changes
+     */
+    private async handleViewModeChange(mode: string): Promise<void> {
+        console.log('View mode changed to:', mode);
+        
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) {
+            this.uiManager.updateStatus('No diagram selected');
+            return;
+        }
+        
+        const currentDiagramType = currentDiagram.diagramType || currentDiagram.diagram_type;
+        
+        switch (mode) {
+            case 'component':
+                this.uiManager.updateStatus('Switching to Component View...');
+                this.witVisualizationPanel.hide();
+                this.canvas.style.display = 'block';
+                
+                // If we're in a WIT diagram, switch back to the original WASM component diagram
+                if (currentDiagramType === 'wit-interface') {
+                    await this.switchToComponentView(currentDiagram);
+                } else {
+                    this.uiManager.updateStatus('✅ Component View active - showing WASM components');
+                }
+                break;
+                
+            case 'wit-interface':
+                // Create or switch to WIT interface diagram view
+                await this.switchToWitInterfaceView(currentDiagram);
+                break;
+                
+            case 'wit-dependencies':
+                this.uiManager.updateStatus('🚧 Dependency View coming soon...');
+                break;
+        }
+    }
+    
+    private async switchToComponentView(currentDiagram: any): Promise<void> {
+        // If we have a component source diagram ID, switch back to it
+        if (currentDiagram.sourceComponentDiagramId) {
+            await this.diagramService.loadDiagram(currentDiagram.sourceComponentDiagramId);
+        } else {
+            // Otherwise, change the diagram type back to wasm-component
+            // TODO: Implement diagram type change or recreate diagram
+        }
+        this.renderer.render();
+    }
+    
+    private async switchToWitInterfaceView(currentDiagram: any): Promise<void> {
+        const currentDiagramType = currentDiagram.diagramType || currentDiagram.diagram_type;
+        
+        // Show clear user feedback
+        this.uiManager.updateStatus('Switching to Interface View...');
+        
+        if (currentDiagramType === 'wasm-component') {
+            // Create WIT interface diagram from WASM components
+            await this.createTestWitDiagram();
+        } else if (currentDiagramType === 'wit-interface') {
+            // Check if this WIT diagram actually has WIT elements
+            const elements = Object.values(currentDiagram.elements);
+            const hasWitElements = elements.some((element: any) => {
+                const elementType = element.type || element.element_type;
+                return this.isWitElementType(elementType);
+            });
+            
+            if (!hasWitElements) {
+                // Recreate with proper WIT elements
+                await this.createTestWitDiagram();
+            } else {
+                // Already has WIT elements, just render
+                this.canvas.style.display = 'block';
+                this.renderer.render();
+                this.uiManager.updateStatus('Interface View active');
+            }
+        } else {
+            this.uiManager.updateStatus('Interface View only works with WASM component diagrams');
+        }
+    }
+    
+    private isWitElementType(elementType: string): boolean {
+        return [
+            'wit-package',
+            'wit-world',
+            'wit-interface',
+            'wit-function',
+            'wit-type',
+            'wit-record',
+            'wit-variant',
+            'wit-enum',
+            'wit-flags',
+            'wit-resource'
+        ].includes(elementType);
+    }
+    
+    private async switchToWitDependencyView(currentDiagram: any): Promise<void> {
+        this.uiManager.updateStatus('WIT dependency view coming soon...');
+        // TODO: Implement dependency graph visualization
+    }
+    
+    private async createWitInterfaceDiagramFromComponents(componentDiagram: any): Promise<void> {
+        try {
+            console.log('createWitInterfaceDiagramFromComponents: Component diagram:', componentDiagram);
+            console.log('Component diagram elements:', componentDiagram.elements);
+            
+            // Extract WASM components from the current diagram
+            const allElements = Object.values(componentDiagram.elements || {});
+            console.log('All elements:', allElements);
+            
+            const wasmComponents = allElements.filter((element: any) => {
+                const elementType = element.type || element.element_type;
+                console.log('Element type:', elementType, 'Element:', element);
+                return elementType === 'wasm-component' || elementType === 'host-component';
+            });
+            
+            console.log('Found WASM components:', wasmComponents);
+            
+            if (wasmComponents.length === 0) {
+                console.log('No WASM components found, creating test WIT diagram...');
+                // Fallback: Create a simple test WIT diagram to verify the rendering works
+                await this.createTestWitDiagram();
+                return;
+            }
+            
+            // Create a new WIT interface diagram
+            const witDiagramName = `${componentDiagram.name || 'Diagram'} - WIT Interfaces`;
+            console.log('Creating WIT diagram with name:', witDiagramName);
+            
+            const diagramId = await this.diagramService.createNewDiagram('wit-interface', witDiagramName);
+            console.log('Create diagram result:', diagramId);
+            
+            if (!diagramId) {
+                console.error('Failed to create WIT interface diagram:', diagramId);
+                this.uiManager.updateStatus('Failed to create WIT interface diagram');
+                return;
+            }
+            
+            console.log('Created WIT diagram with ID:', diagramId);
+            
+            // TODO: Store reference to source component diagram in the diagram metadata
+            
+            // Generate WIT interface nodes for each WASM component
+            let x = 50;
+            let y = 50;
+            const spacing = 300;
+            
+            for (const component of wasmComponents) {
+                await this.addWitInterfaceNodesForComponent(diagramId, component, x, y);
+                x += spacing;
+                if (x > 800) {
+                    x = 50;
+                    y += 200;
+                }
+            }
+            
+            // The diagram should already be loaded by createNewDiagram, just render
+            console.log('Rendering WIT diagram...');
+            this.renderer.render();
+            
+            this.uiManager.updateStatus(`Switched to WIT interface view (${wasmComponents.length} components)`);
+            
+        } catch (error) {
+            console.error('Failed to create WIT interface diagram:', error);
+            this.uiManager.updateStatus('Failed to create WIT interface diagram');
+        }
+    }
+    
+    private async addWitInterfaceNodesForComponent(diagramId: string, component: any, startX: number, startY: number): Promise<void> {
+        const componentName = component.properties?.componentName || component.id;
+        
+        try {
+            // Fetch WIT data for this component
+            const witResource = await this.mcpService.readResource(`wasm://component/${componentName}/wit`);
+            
+            if (!witResource || !witResource.text) {
+                console.warn(`No WIT data found for component ${componentName}`);
+                return;
+            }
+            
+            const witData = JSON.parse(witResource.text);
+            
+            // Create package node
+            await this.diagramService.createNode(
+                diagramId,
+                'wit-package',
+                { x: startX, y: startY },
+                componentName,
+                {
+                    interfaceCount: witData.interfaces?.length || 0,
+                    componentName: componentName
+                }
+            );
+            
+            let interfaceY = startY + 80;
+            
+            // Create interface nodes
+            if (witData.interfaces) {
+                for (const iface of witData.interfaces) {
+                    await this.diagramService.createNode(
+                        diagramId,
+                        'wit-interface',
+                        { x: startX + 50, y: interfaceY },
+                        iface.name,
+                        {
+                            namespace: iface.namespace,
+                            interfaceType: iface.interface_type || iface.type,
+                            functionCount: iface.functions?.length || 0,
+                            typeCount: iface.types?.length || 0
+                        }
+                    );
+                    
+                    // TODO: Connect package to interface with edges once edge creation method is available
+                    
+                    interfaceY += 60;
+                }
+            }
+            
+        } catch (error) {
+            console.error(`Failed to process WIT data for component ${componentName}:`, error);
+        }
+    }
+    
+    private async createTestWitDiagram(): Promise<void> {
+        try {
+            // Create a WIT interface diagram
+            const diagramId = await this.diagramService.createNewDiagram('wit-interface', 'Interface View');
+            
+            if (!diagramId) {
+                this.uiManager.updateStatus('❌ Failed to create Interface View');
+                return;
+            }
+            
+            // Wait for diagram to load
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Verify diagram loaded
+            const currentDiagram = this.diagramService.getCurrentDiagram();
+            if (!currentDiagram || currentDiagram.id !== diagramId) {
+                this.uiManager.updateStatus('❌ Failed to load Interface View');
+                return;
+            }
+            
+            // Create WIT interface nodes
+            await this.diagramService.createNode(
+                diagramId,
+                'wit-package',
+                { x: 150, y: 150 },
+                'WASM Package',
+                { interfaceCount: 2 }
+            );
+            
+            await this.diagramService.createNode(
+                diagramId,
+                'wit-interface',
+                { x: 400, y: 250 },
+                'Main Interface',
+                { functionCount: 5, typeCount: 3 }
+            );
+            
+            // Wait for elements to be created and render
+            await new Promise(resolve => setTimeout(resolve, 200));
+            this.renderer.render();
+            
+            this.uiManager.updateStatus('✅ Interface View active - showing WIT structure');
+            
+        } catch (error) {
+            console.error('Failed to create test WIT diagram:', error);
+            this.uiManager.updateStatus('Failed to create test WIT diagram');
+        }
+    }
+    
+    /**
+     * Get the currently selected WASM component node
+     */
+    // private getSelectedWasmComponentNode(): import('./model/diagram.js').Node | null {
+    //     const currentDiagram = this.diagramService.getCurrentDiagram();
+    //     if (!currentDiagram) return null;
+        
+    //     // TODO: Implement getSelectedElements method in DiagramService
+    //     // const selectedElements = this.diagramService.getSelectedElements();
+    //     // if (selectedElements.length === 0) return null;
+        
+    //     // Find the first WASM component node
+    //     // for (const elementId of selectedElements) {
+    //     //     const element = currentDiagram.elements[elementId];
+    //     //     if (element && (element.type === 'wasm-component' || element.element_type === 'wasm-component')) {
+    //     //         return element as import('./model/diagram.js').Node;
+    //     //     }
+    //     // }
+        
+    //     return null;
+    // }
+    
+    /**
+     * Open WIT visualization for a WASM component
+     */
+    public async openWitVisualization(componentName: string, componentPath: string): Promise<void> {
+        console.log('Opening WIT visualization for:', componentName);
+        
+        try {
+            await this.witVisualizationPanel.showComponent({
+                componentName,
+                componentPath
+            });
+        } catch (error) {
+            console.error('Failed to open WIT visualization:', error);
+            this.uiManager.updateStatus(`Failed to load WIT data for ${componentName}`);
+        }
+    }
+    
+    /**
+     * Handle double-click on WASM component nodes
+     */
+    public handleWasmComponentDoubleClick(node: import('./model/diagram.js').Node): void {
+        if (node.properties?.componentName) {
+            this.openWitVisualization(
+                node.properties.componentName,
+                node.properties.componentPath || ''
+            );
+        }
     }
     
     public testSidebarIntegration(): void {

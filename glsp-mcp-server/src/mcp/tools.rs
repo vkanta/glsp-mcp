@@ -1,5 +1,5 @@
 use crate::mcp::protocol::{CallToolParams, CallToolResult, TextContent, Tool};
-use crate::model::{DiagramModel, Edge, ElementType, Node, Position};
+use crate::model::{DiagramModel, Edge, ElementType, ModelElement, Node, Position};
 use crate::selection::SelectionMode;
 use crate::wasm::{WasmComponent, WasmFileWatcher, WasmComponentChange};
 use crate::database::{BoxedDatasetManager, SensorQuery};
@@ -39,9 +39,9 @@ use tracing::info;
 /// println!("Available MCP tools: {}", available_tools.len());
 /// ```
 pub struct DiagramTools {
-    models: HashMap<String, DiagramModel>,
-    wasm_watcher: WasmFileWatcher,
-    dataset_manager: Option<Arc<Mutex<BoxedDatasetManager>>>,
+    pub(crate) models: HashMap<String, DiagramModel>,
+    pub(crate) wasm_watcher: WasmFileWatcher,
+    pub(crate) dataset_manager: Option<Arc<Mutex<BoxedDatasetManager>>>,
 }
 
 impl Default for DiagramTools {
@@ -79,7 +79,7 @@ impl DiagramTools {
     }
 
     pub fn get_available_tools(&self) -> Vec<Tool> {
-        vec![
+        let mut tools = vec![
             Tool {
                 name: "create_diagram".to_string(),
                 description: Some("Create a new diagram model".to_string()),
@@ -831,7 +831,30 @@ impl DiagramTools {
                     "required": ["componentName"]
                 }),
             },
-        ]
+        ];
+        
+        // Filter out tools that have been converted to resources
+        let converted_to_resources = [
+            "get_selection",
+            "get_element_at_position", 
+            "check_wasm_component_status",
+            "get_execution_progress",
+            "get_execution_result",
+            "list_wasm_executions",
+            "list_uploaded_components",
+            "query_sensor_data",
+            "list_sensors",
+            "get_sensor_metadata",
+            "get_sensor_statistics",
+            "get_sensor_time_range",
+            "list_sensor_datasets",
+            "get_dataset_info",
+            "visualize_sensor_data",
+            "detect_sensor_gaps"
+        ];
+        
+        tools.retain(|tool| !converted_to_resources.contains(&tool.name.as_str()));
+        tools
     }
 
     pub async fn call_tool(&mut self, params: CallToolParams) -> Result<CallToolResult> {
@@ -847,37 +870,37 @@ impl DiagramTools {
             "select_elements" => self.select_elements(params.arguments).await,
             "select_all" => self.select_all(params.arguments).await,
             "clear_selection" => self.clear_selection(params.arguments).await,
-            "get_selection" => self.get_selection(params.arguments).await,
+            // "get_selection" => self.get_selection(params.arguments).await, // Converted to resource
             "hover_element" => self.hover_element(params.arguments).await,
-            "get_element_at_position" => self.get_element_at_position(params.arguments).await,
+            // "get_element_at_position" => self.get_element_at_position(params.arguments).await, // Converted to resource
             // WASM component tools
             "scan_wasm_components" => self.scan_wasm_components().await,
-            "check_wasm_component_status" => {
-                self.check_wasm_component_status(params.arguments).await
-            }
+            // "check_wasm_component_status" => {
+            //     self.check_wasm_component_status(params.arguments).await
+            // } // Converted to resource
             "remove_missing_component" => self.remove_missing_component(params.arguments).await,
             "load_wasm_component" => self.load_wasm_component(params.arguments).await,
             // WASM execution tools
             "execute_wasm_component" => self.execute_wasm_component(params.arguments).await,
-            "get_execution_progress" => self.get_execution_progress(params.arguments).await,
-            "get_execution_result" => self.get_execution_result(params.arguments).await,
-            "list_wasm_executions" => self.list_wasm_executions().await,
+            // "get_execution_progress" => self.get_execution_progress(params.arguments).await, // Converted to resource
+            // "get_execution_result" => self.get_execution_result(params.arguments).await, // Converted to resource
+            // "list_wasm_executions" => self.list_wasm_executions().await, // Converted to resource
             "cancel_execution" => self.cancel_execution(params.arguments).await,
             // Sensor data tools
-            "query_sensor_data" => self.query_sensor_data(params.arguments).await,
-            "list_sensors" => self.list_sensors().await,
-            "get_sensor_metadata" => self.get_sensor_metadata(params.arguments).await,
-            "get_sensor_statistics" => self.get_sensor_statistics(params.arguments).await,
-            "get_sensor_time_range" => self.get_sensor_time_range(params.arguments).await,
-            "list_sensor_datasets" => self.list_sensor_datasets(params.arguments).await,
-            "get_dataset_info" => self.get_dataset_info(params.arguments).await,
-            "set_active_dataset" => self.set_active_dataset(params.arguments).await,
-            "visualize_sensor_data" => self.visualize_sensor_data(params.arguments).await,
-            "detect_sensor_gaps" => self.detect_sensor_gaps(params.arguments).await,
+            // "query_sensor_data" => self.query_sensor_data(params.arguments).await, // Converted to resource
+            // "list_sensors" => self.list_sensors().await, // Converted to resource
+            // "get_sensor_metadata" => self.get_sensor_metadata(params.arguments).await, // Converted to resource
+            // "get_sensor_statistics" => self.get_sensor_statistics(params.arguments).await, // Converted to resource
+            // "get_sensor_time_range" => self.get_sensor_time_range(params.arguments).await, // Converted to resource
+            // "list_sensor_datasets" => self.list_sensor_datasets(params.arguments).await, // Converted to resource
+            // "get_dataset_info" => self.get_dataset_info(params.arguments).await, // Converted to resource
+            "set_active_dataset" => self.set_active_dataset(params.arguments).await, // This modifies state, keep as tool
+            // "visualize_sensor_data" => self.visualize_sensor_data(params.arguments).await, // Converted to resource
+            // "detect_sensor_gaps" => self.detect_sensor_gaps(params.arguments).await, // Converted to resource
             // Component upload tools
             "upload_wasm_component" => self.upload_wasm_component(params.arguments).await,
             "validate_wasm_component" => self.validate_wasm_component(params.arguments).await,
-            "list_uploaded_components" => self.list_uploaded_components(params.arguments).await,
+            // "list_uploaded_components" => self.list_uploaded_components(params.arguments).await, // Converted to resource
             "delete_uploaded_component" => self.delete_uploaded_component(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
@@ -1553,6 +1576,99 @@ impl DiagramTools {
     pub fn remove_missing_wasm_component(&mut self, name: &str) -> bool {
         self.wasm_watcher.remove_missing_component(name)
     }
+
+    // Selection helper methods for resources
+    pub fn get_selected_elements(&self, diagram_id: &str) -> Vec<String> {
+        self.models
+            .get(diagram_id)
+            .and_then(|model| model.selection.as_ref())
+            .map(|selection| selection.selected_elements.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_hovered_element(&self, diagram_id: &str) -> Option<String> {
+        self.models
+            .get(diagram_id)
+            .and_then(|model| model.selection.as_ref())
+            .and_then(|selection| selection.hovered_element.clone())
+    }
+
+    pub fn find_element_at_position(&self, diagram_id: &str, position: Position) -> Option<String> {
+        let diagram = self.models.get(diagram_id)?;
+        
+        // Search elements in reverse z-order (highest z-index first)
+        let mut elements_with_z: Vec<(&String, &ModelElement, i32)> = diagram.elements
+            .iter()
+            .filter(|(_, element)| element.visible)
+            .map(|(id, element)| (id, element, element.z_index.unwrap_or(0)))
+            .collect();
+        
+        elements_with_z.sort_by(|a, b| b.2.cmp(&a.2));
+        
+        for (id, element, _) in elements_with_z {
+            if let Some(bounds) = &element.bounds {
+                if position.x >= bounds.x 
+                    && position.x <= bounds.x + bounds.width
+                    && position.y >= bounds.y 
+                    && position.y <= bounds.y + bounds.height {
+                    return Some(id.clone());
+                }
+            }
+        }
+        
+        None
+    }
+
+    // WASM execution helper methods for resources
+    pub fn list_wasm_executions_for_resource(&self) -> Vec<serde_json::Value> {
+        self.wasm_watcher.list_executions()
+            .into_iter()
+            .map(|exec| json!({
+                "executionId": exec.execution_id,
+                "success": exec.success,
+                "result": exec.result,
+                "error": exec.error,
+                "executionTimeMs": exec.execution_time_ms,
+                "memoryUsageMb": exec.memory_usage_mb,
+                "completedAt": exec.completed_at,
+                "graphicsOutput": exec.graphics_output,
+                "outputData": exec.output_data.map(|d| base64::encode(&d))
+            }))
+            .collect()
+    }
+
+    pub fn list_uploaded_components_for_resource(&self) -> Vec<serde_json::Value> {
+        // TODO: Implement proper uploaded components tracking
+        // For now, return components that were dynamically added
+        vec![]
+    }
+
+    pub fn get_execution_progress_for_resource(&self, execution_id: &str) -> Option<serde_json::Value> {
+        self.wasm_watcher.get_execution_progress(execution_id)
+            .map(|progress| json!({
+                "executionId": execution_id,
+                "progress": progress.progress,
+                "message": progress.message,
+                "stage": progress.stage,
+                "timestamp": progress.timestamp
+            }))
+    }
+
+    pub fn get_execution_result_for_resource(&self, execution_id: &str) -> Option<serde_json::Value> {
+        self.wasm_watcher.get_execution_result(execution_id)
+            .map(|result| json!({
+                "executionId": result.execution_id,
+                "success": result.success,
+                "result": result.result,
+                "error": result.error,
+                "executionTimeMs": result.execution_time_ms,
+                "memoryUsageMb": result.memory_usage_mb,
+                "completedAt": result.completed_at,
+                "graphicsOutput": result.graphics_output,
+                "outputData": result.output_data.map(|d| base64::encode(&d))
+            }))
+    }
+
 
     // WASM tool handlers
     async fn scan_wasm_components(&mut self) -> Result<CallToolResult> {

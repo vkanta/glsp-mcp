@@ -7,6 +7,7 @@ import { DiagramModel, ModelElement, Node, Edge, Bounds, Position } from '../mod
 import { SelectionManager } from '../selection/selection-manager.js';
 import { InteractionMode, InteractionModeManager } from '../interaction/interaction-mode.js';
 import { WasmComponentRendererV2 } from '../diagrams/wasm-component-renderer-v2.js';
+import { getDiagramTypeConfig } from '../diagrams/diagram-type-registry.js';
 
 interface ComponentInterface {
     name: string;
@@ -891,20 +892,36 @@ export class CanvasRenderer {
     private drawNodes(): void {
         if (!this.currentDiagram) return;
 
-        Object.values(this.currentDiagram.elements).forEach(element => {
+        const elements = Object.values(this.currentDiagram.elements);
+
+        elements.forEach(element => {
             const elementType = element.type || element.element_type;
-            if (elementType === 'graph' || !element.bounds) return;
+            if (elementType === 'graph' || !element.bounds) {
+                return;
+            }
             
             this.drawNode(element as Node);
         });
     }
 
     private drawNode(node: Node): void {
-        if (!node.bounds) return;
+        // Ensure element has bounds before rendering
+        this.ensureElementBounds(node);
+        
+        if (!node.bounds) {
+            console.warn('drawNode: Skipping node without bounds:', node.id);
+            return;
+        }
 
         const isSelected = this.selectionManager.isSelected(node.id);
         const isHovered = this.selectionManager.isHovered(node.id);
-        const nodeType = node.type || node.element_type || '';
+        const nodeType = this.getElementType(node);
+
+        // Check if this is a WIT interface type
+        if (this.isWitInterfaceType(nodeType)) {
+            this.drawWitInterfaceNode(node, isSelected, isHovered);
+            return;
+        }
 
         // Check if this is a WASM component type
         if (this.isWasmComponentType(nodeType)) {
@@ -976,6 +993,171 @@ export class CanvasRenderer {
             'composition-root'
         ].includes(nodeType);
     }
+    
+    private isWitInterfaceType(nodeType: string): boolean {
+        return [
+            'wit-package',
+            'wit-world',
+            'wit-interface',
+            'wit-function',
+            'wit-type',
+            'wit-record',
+            'wit-variant',
+            'wit-enum',
+            'wit-flags',
+            'wit-resource'
+        ].includes(nodeType);
+    }
+    
+    private drawWitInterfaceNode(node: Node, isSelected: boolean, isHovered: boolean): void {
+        if (!node.bounds) return;
+        
+        const nodeType = node.type || node.element_type || '';
+        const style = this.getWitNodeStyle(nodeType);
+        
+        // Draw base shape
+        this.ctx.fillStyle = style.backgroundColor;
+        this.ctx.strokeStyle = isSelected ? '#654FF0' : (isHovered ? style.borderColor : style.borderColor);
+        this.ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1);
+        
+        // Draw rounded rectangle
+        this.drawRoundedRect(
+            node.bounds.x,
+            node.bounds.y,
+            node.bounds.width,
+            node.bounds.height,
+            6
+        );
+        
+        this.ctx.fill();
+        this.ctx.stroke();
+        
+        // Draw icon and text
+        this.drawWitNodeContent(node, nodeType, style);
+        
+        // Draw selection highlight if selected
+        if (isSelected) {
+            this.ctx.save();
+            this.ctx.strokeStyle = '#654FF0';
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([5, 5]);
+            this.drawRoundedRect(
+                node.bounds.x - 2,
+                node.bounds.y - 2,
+                node.bounds.width + 4,
+                node.bounds.height + 4,
+                8
+            );
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
+    }
+    
+    private getWitNodeStyle(nodeType: string): any {
+        const styles: { [key: string]: any } = {
+            'wit-package': {
+                backgroundColor: '#1C2333',
+                borderColor: '#3D444D',
+                textColor: '#E6EDF3',
+                icon: '📦'
+            },
+            'wit-world': {
+                backgroundColor: '#151B2C',
+                borderColor: '#3D444D',
+                textColor: '#E6EDF3',
+                icon: '🌐'
+            },
+            'wit-interface': {
+                backgroundColor: '#0F1419',
+                borderColor: '#654FF0',
+                textColor: '#E6EDF3',
+                icon: '🔷'
+            },
+            'wit-function': {
+                backgroundColor: '#0D1117',
+                borderColor: '#58A6FF',
+                textColor: '#E6EDF3',
+                icon: '🔧'
+            },
+            'wit-type': {
+                backgroundColor: '#151B2C',
+                borderColor: '#7D8590',
+                textColor: '#E6EDF3',
+                icon: '📐'
+            },
+            'wit-record': {
+                backgroundColor: '#0F1419',
+                borderColor: '#3FB950',
+                textColor: '#E6EDF3',
+                icon: '📋'
+            },
+            'wit-variant': {
+                backgroundColor: '#151B2C',
+                borderColor: '#F0B72F',
+                textColor: '#E6EDF3',
+                icon: '🔀'
+            },
+            'wit-enum': {
+                backgroundColor: '#0F1419',
+                borderColor: '#F85149',
+                textColor: '#E6EDF3',
+                icon: '📑'
+            },
+            'wit-flags': {
+                backgroundColor: '#151B2C',
+                borderColor: '#FF7B72',
+                textColor: '#E6EDF3',
+                icon: '🚩'
+            },
+            'wit-resource': {
+                backgroundColor: '#0F1419',
+                borderColor: '#A5A5A5',
+                textColor: '#E6EDF3',
+                icon: '🔗'
+            }
+        };
+        
+        return styles[nodeType] || styles['wit-interface'];
+    }
+    
+    private drawWitNodeContent(node: Node, nodeType: string, style: any): void {
+        if (!node.bounds) return;
+        
+        const icon = style.icon;
+        const name = node.properties?.name || node.id;
+        const centerX = node.bounds.x + node.bounds.width / 2;
+        const iconY = node.bounds.y + 20;
+        const textY = node.bounds.y + 40;
+        
+        // Draw icon
+        this.ctx.font = '16px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillStyle = style.textColor;
+        this.ctx.fillText(icon, centerX, iconY);
+        
+        // Draw name
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = style.textColor;
+        this.ctx.fillText(name, centerX, textY);
+        
+        // Draw additional info for specific types
+        if (nodeType === 'wit-interface') {
+            const functionCount = node.properties?.functionCount || 0;
+            const typeCount = node.properties?.typeCount || 0;
+            const infoText = `${functionCount}f, ${typeCount}t`;
+            
+            this.ctx.font = '10px Arial';
+            this.ctx.fillStyle = '#7D8590';
+            this.ctx.fillText(infoText, centerX, textY + 15);
+        } else if (nodeType === 'wit-package') {
+            const interfaceCount = node.properties?.interfaceCount || 0;
+            const infoText = `${interfaceCount} interfaces`;
+            
+            this.ctx.font = '10px Arial';
+            this.ctx.fillStyle = '#7D8590';
+            this.ctx.fillText(infoText, centerX, textY + 15);
+        }
+    }
 
     private drawEdges(): void {
         if (!this.currentDiagram) return;
@@ -1014,6 +1196,14 @@ export class CanvasRenderer {
 
         const isSelected = this.selectionManager.isSelected(edge.id);
         const isHovered = this.selectionManager.isHovered(edge.id);
+        
+        const edgeType = edge.type || edge.element_type || '';
+        
+        // Check if this is a WIT interface edge type
+        if (this.isWitEdgeType(edgeType)) {
+            this.drawWitEdge(edge, sourceElement, targetElement, isSelected, isHovered);
+            return;
+        }
 
         this.ctx.strokeStyle = isSelected || isHovered ? this.options.selectedColor : this.options.edgeColor;
         this.ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1);
@@ -1544,5 +1734,202 @@ export class CanvasRenderer {
         this.ctx.fillText('📊', centerX, centerY - 80);
         
         this.ctx.restore();
+    }
+    
+    private isWitEdgeType(edgeType: string): boolean {
+        return [
+            'wit-import',
+            'wit-export',
+            'wit-uses',
+            'wit-implements',
+            'wit-dependency',
+            'wit-contains',
+            'wit-type-ref'
+        ].includes(edgeType);
+    }
+    
+    private drawWitEdge(edge: Edge, sourceElement: ModelElement, targetElement: ModelElement, isSelected: boolean, isHovered: boolean): void {
+        const edgeType = edge.type || edge.element_type || '';
+        const style = this.getWitEdgeStyle(edgeType);
+        
+        // Calculate connection points
+        const sourceBounds = sourceElement.bounds!;
+        const targetBounds = targetElement.bounds!;
+        
+        const sourceCenter = {
+            x: sourceBounds.x + sourceBounds.width / 2,
+            y: sourceBounds.y + sourceBounds.height / 2
+        };
+        
+        const targetCenter = {
+            x: targetBounds.x + targetBounds.width / 2,
+            y: targetBounds.y + targetBounds.height / 2
+        };
+        
+        // Determine connection points on the edge of rectangles
+        const sourcePoint = this.getConnectionPoint(sourceBounds, targetCenter);
+        const targetPoint = this.getConnectionPoint(targetBounds, sourceCenter);
+        
+        // Set line style
+        this.ctx.strokeStyle = isSelected ? '#654FF0' : (isHovered ? '#8B5CF6' : style.color);
+        this.ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1.5);
+        
+        // Set line dash pattern
+        const dash = this.getLineDashPattern(style.style);
+        this.ctx.setLineDash(dash);
+        
+        // Draw line
+        this.ctx.beginPath();
+        this.ctx.moveTo(sourcePoint.x, sourcePoint.y);
+        this.ctx.lineTo(targetPoint.x, targetPoint.y);
+        this.ctx.stroke();
+        
+        // Draw arrowhead
+        this.drawWitArrowhead(sourcePoint, targetPoint, style.color, isSelected, isHovered);
+        
+        // Reset line dash
+        this.ctx.setLineDash([]);
+        
+        // Draw edge label
+        const label = edge.properties?.label || style.label;
+        if (label) {
+            const midPoint = {
+                x: (sourcePoint.x + targetPoint.x) / 2,
+                y: (sourcePoint.y + targetPoint.y) / 2
+            };
+            this.drawWitEdgeLabel(label, midPoint, style.color);
+        }
+    }
+    
+    private getWitEdgeStyle(edgeType: string): any {
+        const styles: { [key: string]: any } = {
+            'wit-import': { color: '#3B82F6', style: 'dashed', label: 'imports' },
+            'wit-export': { color: '#10B981', style: 'solid', label: 'exports' },
+            'wit-uses': { color: '#8B5CF6', style: 'dotted', label: 'uses' },
+            'wit-implements': { color: '#F59E0B', style: 'solid', label: 'implements' },
+            'wit-dependency': { color: '#6B7280', style: 'dashed', label: 'depends on' },
+            'wit-contains': { color: '#374151', style: 'solid', label: 'contains' },
+            'wit-type-ref': { color: '#EF4444', style: 'dotted', label: 'type ref' }
+        };
+        
+        return styles[edgeType] || { color: '#6B7280', style: 'solid', label: '' };
+    }
+    
+    private getLineDashPattern(style: string): number[] {
+        switch (style) {
+            case 'dashed': return [10, 5];
+            case 'dotted': return [3, 3];
+            case 'solid':
+            default: return [];
+        }
+    }
+    
+    private getConnectionPoint(bounds: Bounds, targetCenter: Position): Position {
+        const centerX = bounds.x + bounds.width / 2;
+        const centerY = bounds.y + bounds.height / 2;
+        
+        const dx = targetCenter.x - centerX;
+        const dy = targetCenter.y - centerY;
+        
+        // Calculate intersection with rectangle edges
+        const hw = bounds.width / 2;
+        const hh = bounds.height / 2;
+        
+        if (Math.abs(dx) / hw > Math.abs(dy) / hh) {
+            // Intersect with left or right edge
+            const t = hw / Math.abs(dx);
+            return {
+                x: centerX + Math.sign(dx) * hw,
+                y: centerY + dy * t
+            };
+        } else {
+            // Intersect with top or bottom edge
+            const t = hh / Math.abs(dy);
+            return {
+                x: centerX + dx * t,
+                y: centerY + Math.sign(dy) * hh
+            };
+        }
+    }
+    
+    private drawWitArrowhead(start: Position, end: Position, color: string, isSelected: boolean, isHovered: boolean): void {
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        const headLength = isSelected ? 12 : 8;
+        const headAngle = Math.PI / 6;
+        
+        this.ctx.save();
+        this.ctx.fillStyle = isSelected ? '#654FF0' : (isHovered ? '#8B5CF6' : color);
+        
+        // Draw arrowhead
+        this.ctx.beginPath();
+        this.ctx.moveTo(end.x, end.y);
+        this.ctx.lineTo(
+            end.x - headLength * Math.cos(angle - headAngle),
+            end.y - headLength * Math.sin(angle - headAngle)
+        );
+        this.ctx.lineTo(
+            end.x - headLength * Math.cos(angle + headAngle),
+            end.y - headLength * Math.sin(angle + headAngle)
+        );
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        this.ctx.restore();
+    }
+    
+    private drawWitEdgeLabel(text: string, position: Position, color: string): void {
+        this.ctx.save();
+        
+        // Draw background rectangle
+        this.ctx.font = '10px Arial';
+        const metrics = this.ctx.measureText(text);
+        const padding = 4;
+        const bgWidth = metrics.width + padding * 2;
+        const bgHeight = 16;
+        
+        this.ctx.fillStyle = 'rgba(15, 20, 25, 0.9)';
+        this.ctx.fillRect(
+            position.x - bgWidth / 2,
+            position.y - bgHeight / 2,
+            bgWidth,
+            bgHeight
+        );
+        
+        // Draw border
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(
+            position.x - bgWidth / 2,
+            position.y - bgHeight / 2,
+            bgWidth,
+            bgHeight
+        );
+        
+        // Draw text
+        this.ctx.fillStyle = color;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(text, position.x, position.y);
+        
+        this.ctx.restore();
+    }
+    
+    private getElementType(element: any): string {
+        return element.type || element.element_type || '';
+    }
+    
+    private ensureElementBounds(element: any): void {
+        if (!element.bounds && this.isWitInterfaceType(this.getElementType(element))) {
+            // Get default size from diagram type config
+            const config = getDiagramTypeConfig('wit-interface');
+            const nodeType = config?.nodeTypes.find(n => n.type === this.getElementType(element));
+            
+            element.bounds = {
+                x: element.position?.x || element.x || 100,
+                y: element.position?.y || element.y || 100,
+                width: nodeType?.defaultSize?.width || 160,
+                height: nodeType?.defaultSize?.height || 60
+            };
+        }
     }
 }
