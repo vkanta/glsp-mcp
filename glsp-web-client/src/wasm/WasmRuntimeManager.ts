@@ -291,6 +291,9 @@ export class WasmRuntimeManager extends WasmComponentManager {
         // Show the new floating panel instead of old palette
         this.enhancedPalette.show();
         
+        // Wait for next tick to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 0));
+        
         // Update client-side components
         this.refreshClientSideComponents();
         

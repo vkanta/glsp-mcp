@@ -917,8 +917,12 @@ export class CanvasRenderer {
         const isHovered = this.selectionManager.isHovered(node.id);
         const nodeType = this.getElementType(node);
 
+        // Debug: Log node type for troubleshooting
+        console.log(`Rendering node ${node.id} with type: ${nodeType}`);
+
         // Check if this is a WIT interface type
         if (this.isWitInterfaceType(nodeType)) {
+            console.log(`Using WIT renderer for node ${node.id}`);
             this.drawWitInterfaceNode(node, isSelected, isHovered);
             return;
         }

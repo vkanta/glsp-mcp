@@ -605,28 +605,34 @@ export class WasmComponentPanel extends FloatingPanel {
     }
 
     public updateClientSideComponents(components: import('../wasm/WasmComponentManager.js').WasmComponent[]): void {
-        const clientComponentsList = this.contentElement.querySelector('.client-components-list') as HTMLElement;
-        const clientCountElement = this.contentElement.querySelector('.client-component-count') as HTMLElement;
+        const transpiledComponentsList = this.contentElement.querySelector('.transpiled-components-list') as HTMLElement;
+        const transpiledCountElement = this.contentElement.querySelector('.transpiled-component-count') as HTMLElement;
+
+        // Check if elements exist before proceeding
+        if (!transpiledComponentsList) {
+            console.warn('WasmComponentPanel: transpiled-components-list element not found');
+            return;
+        }
 
         // Clear existing
-        const existingComponents = clientComponentsList.querySelectorAll('.client-component-item');
+        const existingComponents = transpiledComponentsList.querySelectorAll('.client-component-item');
         existingComponents.forEach(item => item.remove());
 
         if (components.length === 0) {
-            const emptyState = clientComponentsList.querySelector('.empty-state') as HTMLElement;
+            const emptyState = transpiledComponentsList.querySelector('.empty-state') as HTMLElement;
             if (emptyState) emptyState.style.display = 'flex';
         } else {
-            const emptyState = clientComponentsList.querySelector('.empty-state') as HTMLElement;
+            const emptyState = transpiledComponentsList.querySelector('.empty-state') as HTMLElement;
             if (emptyState) emptyState.style.display = 'none';
 
             components.forEach(component => {
                 const element = this.createClientComponentElement(component);
-                clientComponentsList.appendChild(element);
+                transpiledComponentsList.appendChild(element);
             });
         }
 
-        if (clientCountElement) {
-            clientCountElement.textContent = components.length.toString();
+        if (transpiledCountElement) {
+            transpiledCountElement.textContent = components.length.toString();
         }
     }
 
