@@ -1,21 +1,32 @@
-# 🚗 ADAS WebAssembly Components
+# 🚗 ADAS WebAssembly Components - Demo & Educational Example
 
-**Production-Ready Automotive ADAS with AI Neural Network Inference**
+**Demonstration of GLSP-MCP Capabilities Applied to Automotive ADAS Concepts**
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](./build.sh)
+[![Demo Code](https://img.shields.io/badge/Type-Demo--Code-yellow)](./build.sh)
 [![Components](https://img.shields.io/badge/components-15-blue)](#components)
 [![WASI-NN](https://img.shields.io/badge/WASI--NN-v0.2.0--rc-orange)](https://github.com/WebAssembly/wasi-nn)
 [![YOLOv5n](https://img.shields.io/badge/Model-YOLOv5n-purple)](https://github.com/ultralytics/yolov5)
 
 ## 🎯 Overview
 
-This project implements a **production-ready ADAS system** using WebAssembly components with real AI inference:
+This project demonstrates how the GLSP-MCP platform can be used to build complex systems like ADAS. **This is educational/demo code only - NOT for production use!**
 
-- **🧠 Real Neural Network Inference**: YOLOv5n ONNX model (3.8MB) embedded in WASM
-- **⚡ WASI-NN Integration**: Hardware-accelerated AI inference via standard interface
-- **🔧 Component Architecture**: 15 isolated WASM components with WIT interfaces
-- **🛡️ Automotive Safety**: ISO 26262 compliant component isolation
-- **📹 Embedded Test Data**: Real automotive video for testing
+### What This Demo Shows:
+
+- **🧠 Neural Network Integration Example**: How to embed YOLOv5n ONNX model in WASM
+- **⚡ WASI-NN Usage Pattern**: How to use hardware-accelerated AI inference
+- **🔧 Component Architecture Pattern**: Example of 15 isolated WASM components with WIT interfaces
+- **🛡️ Safety Concepts**: How ISO 26262 principles could be applied (conceptually)
+- **📹 Test Data Integration**: How to embed test data for demos
+
+### ⚠️ Important Disclaimer:
+
+This is **demonstration code** that shows GLSP-MCP concepts applied to an automotive scenario. It is:
+- ✅ Functionally working to demonstrate the concepts
+- ✅ Following ISO 26262 concepts as an educational example
+- ❌ NOT certified for automotive use
+- ❌ NOT tested for production safety requirements
+- ❌ NOT intended for any real vehicle deployment
 
 ## 🚀 Quick Start
 
@@ -96,9 +107,9 @@ fn load_model() -> Result<Graph, String> {
 
 ## 🔧 Runtime Requirements
 
-### WASI-NN Compatible Runtimes
+### WASI-NN Compatible Runtimes for Demo
 
-1. **WasmEdge** (Recommended)
+1. **WasmEdge** (Recommended for demos)
    ```bash
    brew install wasmedge  # macOS
    wasmedge --dir .:. target/wasm32-wasip2/debug/adas_object_detection_ai.wasm
@@ -111,15 +122,15 @@ fn load_model() -> Result<Graph, String> {
    ```
 
 3. **WAMR** (WebAssembly Micro Runtime)
-   - Embedded automotive ECU deployment
+   - Shows how it could work on embedded systems
 
-## 📊 Performance
+## 📊 Demo Performance Metrics
 
-When running with proper WASI-NN support:
-- **30 FPS** real-time processing
-- **<20ms** AI inference latency per frame
-- **<5ms** safety monitoring overhead
-- **96.7%** efficiency vs native execution
+When running this demo with proper WASI-NN support:
+- **30 FPS** demonstration processing rate
+- **<20ms** AI inference latency per frame (demo conditions)
+- **<5ms** safety monitoring overhead (simulated)
+- **96.7%** efficiency vs native execution (in demo environment)
 
 ## 🛠️ Development
 
@@ -154,8 +165,17 @@ wasm-tools component wit target/wasm32-wasip2/debug/adas_object_detection_ai.was
 
 Apache-2.0
 
+## 🎓 Educational Value
+
+This demo teaches:
+1. How to structure complex multi-component WASM systems
+2. How to integrate AI models using WASI-NN
+3. How safety principles from ISO 26262 can be applied conceptually
+4. How to use GLSP-MCP for domain-specific applications
+
 ## 🚨 Important Notes
 
 - Components require a **WASI-NN compatible runtime** to execute
-- The embedded YOLOv5n model is optimized for automotive use cases
-- All components follow ISO 26262 safety standards for automotive software
+- The embedded YOLOv5n model is for demonstration purposes
+- Components demonstrate ISO 26262 concepts but are **NOT certified**
+- This is **educational/demo code only** - not for production use

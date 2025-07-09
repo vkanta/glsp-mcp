@@ -10,6 +10,8 @@ This document specifies the core functional requirements for the GLSP-Rust syste
 Core System Requirements
 ------------------------
 
+Test requirement below:
+
 .. req:: System Initialization
    :id: REQ_001
    :status: implemented
@@ -444,12 +446,12 @@ Requirements Summary
 --------------------
 
 .. needflow::
-   :tags: requirement
+   :types: req
    :link_types: implements, tests
    :show_filters:
    :show_legend:
 
 .. needtable::
-   :tags: requirement
+   :types: req
    :columns: id, title, status, priority, component_type
    :style: table

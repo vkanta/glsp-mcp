@@ -12,6 +12,11 @@
 #
 import os
 import sys
+import platform
+import json
+import subprocess
+import pathlib
+import re
 sys.path.insert(0, os.path.abspath('../../glsp-mcp-server/src'))
 
 # -- Project information -----------------------------------------------------
@@ -175,7 +180,8 @@ needs_extra_options = [
     'database_backend',
     'simulation_type',
     'ui_component',
-    'risk_level'
+    'risk_level',
+    'priority'
 ]
 
 # Configure need layouts
@@ -204,15 +210,16 @@ needs_filter_data = {
     'current_date': '2024-01-01'
 }
 
-# Configure need warnings
-needs_warnings = {
-    'req_missing_title': True,
-    'req_missing_content': True,
-    'req_missing_id': True
-}
+# Configure need warnings - disable for now due to compatibility issue
+# needs_warnings = {
+#     'req_missing_title': True,
+#     'req_missing_content': True,
+#     'req_missing_id': True
+# }
 
 # Configure need role
-needs_role_need_template = '**{title}** ({id})'
+needs_role_need_template = '{title} ({id})'
+needs_role_need_max_title_length = 30
 
 # Configure need links
 needs_flow_configs = {
@@ -221,6 +228,59 @@ needs_flow_configs = {
         'allowed_filters': ['status', 'priority', 'component_type']
     }
 }
+
+# Enable sphinx-needs features
+needs_include_needs = True
+needs_debug = True
+needs_debug_no_external_calls = True
+needs_max_title_length = -1
+needs_title_optional = True
+needs_id_required = False
+# needs_id_regex = r'^[A-Z0-9_]{5,}'
+# needs_id_length = 7
+needs_file_pattern = '**/*.rst'
+
+# Allow all sphinx-needs options for all directives
+needs_allow_unsafe_options = True
+
+# Disable warnings for unknown link targets to avoid the many outgoing link warnings
+needs_warnings_always_warn = False
+
+# Configure need statuses
+needs_statuses = [
+    dict(name="open", description="Open"),
+    dict(name="in_progress", description="In Progress"),
+    dict(name="implemented", description="Implemented"),
+    dict(name="closed", description="Closed"),
+    dict(name="pending", description="Pending")
+]
+
+# Configure need tags
+needs_tags = [
+    dict(name="requirement", description="Requirement"),
+    dict(name="specification", description="Specification"),
+    dict(name="implementation", description="Implementation"),
+    dict(name="test", description="Test"),
+    dict(name="architecture", description="Architecture"),
+    dict(name="safety", description="Safety"),
+    dict(name="performance", description="Performance"),
+    dict(name="security", description="Security")
+]
+
+# Configure need table columns
+needs_table_columns = "id,title,status,priority,links"
+needs_table_style = "table"
+
+# Configure need services (optional)
+needs_services = {
+    'github': {
+        'url': 'https://github.com/glsp-rust/glsp-rust',
+        'need_url': 'https://github.com/glsp-rust/glsp-rust/issues/{{id}}'
+    }
+}
+
+# Start with simple needs configuration
+# needs_extra_links will be added later
 
 # -- Options for PlantUML ---------------------------------------------------
 
@@ -251,6 +311,65 @@ def setup_plantuml():
             return 'java -jar /usr/bin/plantuml.jar'
 
 plantuml = setup_plantuml()
+
+# Allow customization through environment variables
+plantuml_output_format = os.environ.get('PLANTUML_FORMAT', 'svg')
+
+# Regular expression for finding requirement IDs
+REQ_RE = re.compile(r"SW-REQ-ID\\s*:\\s*(REQ_\\w+)", re.I)
+
+# Initialize source_suffix before attempting to modify it
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
+
+# Ensure myst_parser is configured for .md files
+if isinstance(source_suffix, dict):
+    if '.md' not in source_suffix:
+        source_suffix['.md'] = 'markdown'
+elif isinstance(source_suffix, list):
+    if '.md' not in source_suffix:
+        source_suffix.append('.md')
+else:
+    source_suffix = {
+        '.rst': 'restructuredtext',
+        '.md': 'markdown',
+    }
+
+# Dynamic function to extract requirement IDs from a file
+def extract_reqs(app, need, needs, *args, **kwargs):
+    """Return all REQ_xxx IDs that occur in the file given via :file:."""
+    relative_file_path_from_doc_source = need.get("file")
+    if not relative_file_path_from_doc_source:
+        return ""
+
+    absolute_src_file_path = (pathlib.Path(app.confdir) / relative_file_path_from_doc_source).resolve()
+    
+    try:
+        text = absolute_src_file_path.read_text(errors="ignore")
+        ids  = REQ_RE.findall(text)
+        return ";".join(sorted(set(ids)))
+    except FileNotFoundError:
+        print(f"WARNING: [extract_reqs] File not found: {absolute_src_file_path}")
+        return ""
+    except Exception as e:
+        print(f"ERROR: [extract_reqs] Could not read file {absolute_src_file_path}: {e}")
+        return ""
+
+# Configuration to make specific strings in RST linkable
+needs_string_links = {
+    "req_inline": {
+        "regex": r"(?P<value>REQ_\w+)",
+        "link_url": "#{{value}}",
+        "link_name": "{{value}}",
+        "options": [],
+    },
+}
+
+# Move setup function to the end and make it simpler
+def setup(app):
+    return {'version': '0.1', 'parallel_read_safe': True}
 
 # -- Options for MyST Parser -----------------------------------------------
 
@@ -347,4 +466,10 @@ html_context = {
     'github_repo': 'glsp-rust',
     'github_version': 'main',
     'conf_py_path': '/docs/source/',
+}
+
+# Configure custom templates for sphinx-needs
+needs_templates = {
+    'req_template': '**Requirement**: {{content}}\n\n**Rationale**: {{rationale}}\n\n**Verification**: {{verification}}',
+    'safety_template': '**Safety Requirement**: {{content}}\n\n**Safety Impact**: {{safety_impact}}\n\n**Verification**: {{verification}}',
 }

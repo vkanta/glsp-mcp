@@ -1,8 +1,10 @@
-# ADAS Standardized Component Architecture
+# ADAS Standardized Component Architecture - Demo/Educational Example
+
+> **⚠️ IMPORTANT**: This is demonstration code showing how GLSP-MCP concepts can be applied to automotive systems. This is NOT production-ready code and should NOT be used in real vehicles. It serves as an educational example only.
 
 ## Overview
 
-This project implements a standardized ADAS (Advanced Driver Assistance Systems) component architecture using WebAssembly Component Model and WIT (WebAssembly Interface Types) interfaces. The architecture provides modular, interoperable components with standardized interfaces for sensor data, AI processing, vehicle control, and system management.
+This project demonstrates a standardized ADAS (Advanced Driver Assistance Systems) component architecture using WebAssembly Component Model and WIT (WebAssembly Interface Types) interfaces. The architecture shows how to create modular, interoperable components with standardized interfaces for sensor data, AI processing, vehicle control, and system management.
 
 ## Architecture Principles
 

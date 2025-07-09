@@ -1,7 +1,10 @@
 Simulation Requirements
 ======================
 
-This document specifies the simulation requirements for the GLSP-Rust system, defining the requirements for time-driven scenarios, sensor data simulation, and testing frameworks.
+This document specifies the simulation requirements for the GLSP-Rust system, defining the requirements for time-driven scenarios, data simulation, and testing frameworks.
+
+.. note::
+   Domain-specific simulation examples (e.g., sensor simulations for automotive, robotics, or industrial applications) can be found in the workspace directory. This document focuses on generic simulation capabilities applicable to any domain.
 
 .. contents::
    :local:
@@ -15,7 +18,7 @@ Simulation Engine Requirements
    :status: implemented
    :priority: high
    :simulation_type: time_driven
-   :rationale: Time-driven simulation enables realistic ADAS testing
+   :rationale: Time-driven simulation enables realistic testing of time-dependent systems
    :verification: Time-driven simulation tests
 
    The system shall provide time-driven simulation capabilities with deterministic execution and configurable time steps.
@@ -28,7 +31,7 @@ Simulation Engine Requirements
    :rationale: Scenario execution enables comprehensive testing
    :verification: Scenario execution tests
 
-   The system shall execute complex automotive scenarios with multiple actors, events, and conditions.
+   The system shall execute complex scenarios with multiple actors, events, and conditions.
 
 .. sim_req:: Real-Time Execution
    :id: SIM_003
@@ -60,74 +63,44 @@ Simulation Engine Requirements
 
    The system shall provide an event system for triggering actions and state changes during simulation.
 
-Sensor Data Simulation Requirements
+Data Source Simulation Requirements
 -----------------------------------
 
-.. sim_req:: Camera Simulation
+.. sim_req:: Generic Data Source Simulation
    :id: SIM_006
    :status: implemented
    :priority: high
-   :simulation_type: camera_simulation
-   :rationale: Camera simulation enables vision algorithm testing
-   :verification: Camera simulation tests
+   :simulation_type: data_source_simulation
+   :rationale: Data source simulation enables testing with synthetic data
+   :verification: Data source simulation tests
 
-   The system shall simulate camera sensors with realistic image generation, lighting conditions, and camera parameters.
+   The system shall simulate various data sources with configurable parameters, noise models, and data generation patterns.
 
-.. sim_req:: LiDAR Simulation
+.. sim_req:: Multi-Source Data Synchronization
    :id: SIM_007
    :status: implemented
    :priority: high
-   :simulation_type: lidar_simulation
-   :rationale: LiDAR simulation enables point cloud processing testing
-   :verification: LiDAR simulation tests
+   :simulation_type: data_synchronization
+   :rationale: Multi-source synchronization enables complex system testing
+   :verification: Data synchronization tests
 
-   The system shall simulate LiDAR sensors with accurate point cloud generation, noise modeling, and range limitations.
-
-.. sim_req:: Radar Simulation
-   :id: SIM_008
-   :status: implemented
-   :priority: high
-   :simulation_type: radar_simulation
-   :rationale: Radar simulation enables radar processing testing
-   :verification: Radar simulation tests
-
-   The system shall simulate radar sensors with Doppler effects, multipath reflections, and weather conditions.
-
-.. sim_req:: Ultrasonic Simulation
-   :id: SIM_009
-   :status: implemented
-   :priority: high
-   :simulation_type: ultrasonic_simulation
-   :rationale: Ultrasonic simulation enables close-range detection testing
-   :verification: Ultrasonic simulation tests
-
-   The system shall simulate ultrasonic sensors with accurate distance measurements and surface reflection modeling.
-
-.. sim_req:: Sensor Fusion Simulation
-   :id: SIM_010
-   :status: implemented
-   :priority: high
-   :simulation_type: sensor_fusion
-   :rationale: Sensor fusion simulation enables multi-sensor testing
-   :verification: Sensor fusion simulation tests
-
-   The system shall simulate sensor fusion scenarios with synchronized multi-sensor data and realistic sensor interactions.
+   The system shall support synchronized data generation from multiple sources with configurable timing and correlation.
 
 Environment Simulation Requirements
 -----------------------------------
 
 .. sim_req:: 3D Environment Modeling
-   :id: SIM_011
+   :id: SIM_008
    :status: implemented
    :priority: high
    :simulation_type: environment_modeling
    :rationale: 3D environment modeling enables realistic simulation
    :verification: 3D environment modeling tests
 
-   The system shall provide 3D environment modeling with roads, buildings, vehicles, and pedestrians.
+   The system shall provide 3D environment modeling with configurable objects, terrains, and entities.
 
 .. sim_req:: Weather Simulation
-   :id: SIM_012
+   :id: SIM_009
    :status: implemented
    :priority: medium
    :simulation_type: weather_simulation
@@ -137,7 +110,7 @@ Environment Simulation Requirements
    The system shall simulate weather conditions including rain, snow, fog, and varying visibility.
 
 .. sim_req:: Lighting Simulation
-   :id: SIM_013
+   :id: SIM_010
    :status: implemented
    :priority: medium
    :simulation_type: lighting_simulation
@@ -146,41 +119,32 @@ Environment Simulation Requirements
 
    The system shall simulate lighting conditions including day/night cycles, shadows, and artificial lighting.
 
-.. sim_req:: Traffic Simulation
-   :id: SIM_014
-   :status: implemented
-   :priority: high
-   :simulation_type: traffic_simulation
-   :rationale: Traffic simulation enables realistic driving scenarios
-   :verification: Traffic simulation tests
-
-   The system shall simulate traffic scenarios with multiple vehicles, pedestrians, and traffic rules.
 
 .. sim_req:: Physics Simulation
-   :id: SIM_015
+   :id: SIM_011
    :status: implemented
    :priority: high
    :simulation_type: physics_simulation
-   :rationale: Physics simulation enables realistic vehicle dynamics
+   :rationale: Physics simulation enables realistic object dynamics
    :verification: Physics simulation tests
 
-   The system shall provide physics simulation with accurate vehicle dynamics, collision detection, and material properties.
+   The system shall provide physics simulation with accurate object dynamics, collision detection, and material properties.
 
 Data Pipeline Requirements
 --------------------------
 
 .. sim_req:: Data Generation Pipeline
-   :id: SIM_016
+   :id: SIM_012
    :status: implemented
    :priority: high
    :simulation_type: data_generation
    :rationale: Data generation pipeline enables automated testing
    :verification: Data generation pipeline tests
 
-   The system shall provide data generation pipelines for creating synthetic sensor data and ground truth information.
+   The system shall provide data generation pipelines for creating synthetic data and ground truth information.
 
 .. sim_req:: Data Processing Pipeline
-   :id: SIM_017
+   :id: SIM_013
    :status: implemented
    :priority: high
    :simulation_type: data_processing
@@ -190,7 +154,7 @@ Data Pipeline Requirements
    The system shall provide data processing pipelines for filtering, transforming, and analyzing simulation data.
 
 .. sim_req:: Data Validation Pipeline
-   :id: SIM_018
+   :id: SIM_014
    :status: implemented
    :priority: high
    :simulation_type: data_validation
@@ -200,7 +164,7 @@ Data Pipeline Requirements
    The system shall provide data validation pipelines for checking data integrity and consistency.
 
 .. sim_req:: Data Export Pipeline
-   :id: SIM_019
+   :id: SIM_015
    :status: implemented
    :priority: medium
    :simulation_type: data_export
@@ -210,7 +174,7 @@ Data Pipeline Requirements
    The system shall provide data export pipelines for exporting simulation results in various formats.
 
 .. sim_req:: Real-Time Data Streaming
-   :id: SIM_020
+   :id: SIM_016
    :status: implemented
    :priority: high
    :simulation_type: data_streaming
@@ -223,7 +187,7 @@ Resource Management Requirements
 --------------------------------
 
 .. sim_req:: Memory Management
-   :id: SIM_021
+   :id: SIM_017
    :status: implemented
    :priority: high
    :simulation_type: memory_management
@@ -233,7 +197,7 @@ Resource Management Requirements
    The system shall provide efficient memory management with configurable memory limits and garbage collection.
 
 .. sim_req:: CPU Resource Management
-   :id: SIM_022
+   :id: SIM_018
    :status: implemented
    :priority: high
    :simulation_type: cpu_management
@@ -243,7 +207,7 @@ Resource Management Requirements
    The system shall provide CPU resource management with priority-based scheduling and load balancing.
 
 .. sim_req:: GPU Resource Management
-   :id: SIM_023
+   :id: SIM_019
    :status: implemented
    :priority: high
    :simulation_type: gpu_management
@@ -253,7 +217,7 @@ Resource Management Requirements
    The system shall provide GPU resource management for accelerated graphics rendering and AI processing.
 
 .. sim_req:: Storage Resource Management
-   :id: SIM_024
+   :id: SIM_020
    :status: implemented
    :priority: high
    :simulation_type: storage_management
@@ -263,7 +227,7 @@ Resource Management Requirements
    The system shall provide storage resource management with configurable storage limits and cleanup policies.
 
 .. sim_req:: Network Resource Management
-   :id: SIM_025
+   :id: SIM_021
    :status: implemented
    :priority: medium
    :simulation_type: network_management
@@ -276,7 +240,7 @@ Testing Framework Requirements
 ------------------------------
 
 .. sim_req:: Unit Testing Framework
-   :id: SIM_026
+   :id: SIM_022
    :status: implemented
    :priority: high
    :simulation_type: unit_testing
@@ -286,7 +250,7 @@ Testing Framework Requirements
    The system shall provide a comprehensive unit testing framework for simulation components.
 
 .. sim_req:: Integration Testing Framework
-   :id: SIM_027
+   :id: SIM_023
    :status: implemented
    :priority: high
    :simulation_type: integration_testing
@@ -296,7 +260,7 @@ Testing Framework Requirements
    The system shall provide integration testing framework for multi-component simulation scenarios.
 
 .. sim_req:: Performance Testing Framework
-   :id: SIM_028
+   :id: SIM_024
    :status: implemented
    :priority: high
    :simulation_type: performance_testing
@@ -306,7 +270,7 @@ Testing Framework Requirements
    The system shall provide performance testing framework with benchmarking and profiling capabilities.
 
 .. sim_req:: Regression Testing Framework
-   :id: SIM_029
+   :id: SIM_025
    :status: implemented
    :priority: high
    :simulation_type: regression_testing
@@ -316,7 +280,7 @@ Testing Framework Requirements
    The system shall provide regression testing framework with automated test execution and result comparison.
 
 .. sim_req:: Automated Testing Pipeline
-   :id: SIM_030
+   :id: SIM_026
    :status: implemented
    :priority: high
    :simulation_type: automated_testing
@@ -329,7 +293,7 @@ Validation Requirements
 -----------------------
 
 .. sim_req:: Simulation Validation
-   :id: SIM_031
+   :id: SIM_027
    :status: implemented
    :priority: high
    :simulation_type: simulation_validation
@@ -338,18 +302,18 @@ Validation Requirements
 
    The system shall provide simulation validation with ground truth comparison and statistical analysis.
 
-.. sim_req:: Sensor Model Validation
-   :id: SIM_032
+.. sim_req:: Model Validation
+   :id: SIM_028
    :status: implemented
    :priority: high
-   :simulation_type: sensor_validation
-   :rationale: Sensor model validation ensures sensor accuracy
-   :verification: Sensor model validation tests
+   :simulation_type: model_validation
+   :rationale: Model validation ensures simulation accuracy
+   :verification: Model validation tests
 
-   The system shall provide sensor model validation with real-world data comparison and calibration.
+   The system shall provide model validation with real-world data comparison and calibration.
 
 .. sim_req:: Algorithm Validation
-   :id: SIM_033
+   :id: SIM_029
    :status: implemented
    :priority: high
    :simulation_type: algorithm_validation
@@ -359,7 +323,7 @@ Validation Requirements
    The system shall provide algorithm validation with performance metrics and accuracy measurements.
 
 .. sim_req:: System Validation
-   :id: SIM_034
+   :id: SIM_030
    :status: implemented
    :priority: high
    :simulation_type: system_validation
@@ -369,7 +333,7 @@ Validation Requirements
    The system shall provide system validation with end-to-end testing and requirement verification.
 
 .. sim_req:: Compliance Validation
-   :id: SIM_035
+   :id: SIM_031
    :status: implemented
    :priority: high
    :simulation_type: compliance_validation
@@ -382,7 +346,7 @@ Performance Requirements
 ------------------------
 
 .. sim_req:: Simulation Performance
-   :id: SIM_036
+   :id: SIM_032
    :status: implemented
    :priority: high
    :simulation_type: performance
@@ -392,17 +356,17 @@ Performance Requirements
    The system shall achieve real-time performance with deterministic execution times and bounded latency.
 
 .. sim_req:: Scalability
-   :id: SIM_037
+   :id: SIM_033
    :status: implemented
    :priority: high
    :simulation_type: scalability
    :rationale: Scalability enables complex scenarios
    :verification: Scalability tests
 
-   The system shall scale to support complex scenarios with thousands of entities and sensors.
+   The system shall scale to support complex scenarios with thousands of entities and data sources.
 
 .. sim_req:: Throughput
-   :id: SIM_038
+   :id: SIM_034
    :status: implemented
    :priority: high
    :simulation_type: throughput
@@ -412,7 +376,7 @@ Performance Requirements
    The system shall achieve high throughput for batch simulation processing with parallel execution.
 
 .. sim_req:: Latency
-   :id: SIM_039
+   :id: SIM_035
    :status: implemented
    :priority: high
    :simulation_type: latency
@@ -422,7 +386,7 @@ Performance Requirements
    The system shall achieve low latency for interactive simulation with sub-100ms response times.
 
 .. sim_req:: Resource Efficiency
-   :id: SIM_040
+   :id: SIM_036
    :status: implemented
    :priority: high
    :simulation_type: resource_efficiency

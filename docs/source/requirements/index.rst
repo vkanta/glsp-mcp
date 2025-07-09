@@ -31,7 +31,7 @@ All requirements in this documentation follow a traceability matrix linking:
 - **Component Requirements** → **Interface Specifications** → **Integration** → **Testing**
 
 .. needfilter::
-   :tags: requirement
+   :types: req
    :status: open,in_progress,implemented
    :layout: table
    :columns: id, title, status, priority, component_type
@@ -55,15 +55,14 @@ Requirements Categories
 Requirements Summary
 --------------------
 
-.. needpie::
-   :labels: Functional, MCP Protocol, WASM Components, AI Integration, Database, Simulation, UI/Frontend, Safety
-   :legend:
+.. note::
+   This section will contain requirement statistics and pie charts once all requirements are fully processed.
 
 Requirements Status Overview
 ----------------------------
 
 .. needflow::
-   :tags: requirement
+   :types: req
    :link_types: implements, tests, validates
    :show_filters:
    :show_legend:
@@ -72,7 +71,7 @@ Quality Metrics
 ---------------
 
 .. needtable::
-   :tags: requirement
+   :types: req
    :columns: id, title, status, verification, rationale
    :style: table
 
