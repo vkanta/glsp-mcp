@@ -1065,29 +1065,32 @@ export class CanvasRenderer {
     }
     
     private getWitNodeStyle(nodeType: string): any {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDarkTheme = currentTheme === 'dark';
+        
         const styles: { [key: string]: any } = {
             'wit-package': {
-                backgroundColor: '#1C2333',
-                borderColor: '#3D444D',
-                textColor: '#E6EDF3',
+                backgroundColor: isDarkTheme ? '#1C2333' : '#F6F8FA',
+                borderColor: isDarkTheme ? '#3D444D' : '#D0D7DE',
+                textColor: isDarkTheme ? '#E6EDF3' : '#1F2328',
                 icon: '📦'
             },
             'wit-world': {
-                backgroundColor: '#151B2C',
-                borderColor: '#3D444D',
-                textColor: '#E6EDF3',
+                backgroundColor: isDarkTheme ? '#151B2C' : '#FFFFFF',
+                borderColor: isDarkTheme ? '#3D444D' : '#D0D7DE',
+                textColor: isDarkTheme ? '#E6EDF3' : '#1F2328',
                 icon: '🌐'
             },
             'wit-interface': {
-                backgroundColor: '#0F1419',
-                borderColor: '#654FF0',
-                textColor: '#E6EDF3',
+                backgroundColor: isDarkTheme ? '#0F1419' : '#F6F8FA',
+                borderColor: isDarkTheme ? '#654FF0' : '#6639BA',
+                textColor: isDarkTheme ? '#E6EDF3' : '#1F2328',
                 icon: '🔷'
             },
             'wit-function': {
-                backgroundColor: '#0D1117',
-                borderColor: '#58A6FF',
-                textColor: '#E6EDF3',
+                backgroundColor: isDarkTheme ? '#0D1117' : '#F1F8FF',
+                borderColor: isDarkTheme ? '#58A6FF' : '#0969DA',
+                textColor: isDarkTheme ? '#E6EDF3' : '#1F2328',
                 icon: '🔧'
             },
             'wit-type': {
