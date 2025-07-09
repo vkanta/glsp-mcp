@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "glsp-mcp-server",
+    "xtask",
 ]
 resolver = "2"
 
