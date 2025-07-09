@@ -139,6 +139,8 @@ export class ViewSwitcher {
     private switchMode(modeId: string): void {
         if (modeId === this.currentMode) return;
         
+        console.log(`ViewSwitcher: Switching from ${this.currentMode} to ${modeId}`);
+        
         this.currentMode = modeId;
         
         // Update button states
@@ -158,8 +160,9 @@ export class ViewSwitcher {
             }, 300);
         }
         
-        // Notify listener
+        // Notify listener (AppController.handleViewModeChange)
         if (this.onModeChange) {
+            console.log(`ViewSwitcher: Notifying mode change handler for ${modeId}`);
             this.onModeChange(modeId);
         }
     }

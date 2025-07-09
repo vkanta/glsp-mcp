@@ -9,6 +9,8 @@ import { statusManager } from './services/StatusManager.js';
 import { BaseDialog } from './ui/dialogs/base/BaseDialog.js';
 import { WitVisualizationPanel } from './wit/WitVisualizationPanel.js';
 import { ViewSwitcher } from './ui/ViewSwitcher.js';
+import { ViewModeManager } from './ui/ViewModeManager.js';
+import { WasmViewTransformer } from './ui/WasmViewTransformer.js';
 
 // Debug interface for window properties
 interface WindowDebug {
@@ -46,6 +48,7 @@ export class AppController {
     private wasmRuntimeManager: WasmRuntimeManager;
     private witVisualizationPanel: WitVisualizationPanel;
     private viewSwitcher: ViewSwitcher;
+    private viewModeManager: ViewModeManager;
 
     constructor(private canvas: HTMLCanvasElement) {
         this.mcpService = new McpService();
@@ -61,6 +64,10 @@ export class AppController {
         }, this.renderer);
         this.witVisualizationPanel = new WitVisualizationPanel(this.mcpService);
         this.viewSwitcher = new ViewSwitcher();
+        this.viewModeManager = new ViewModeManager(this.diagramService, this.renderer);
+        
+        // Register the WASM view transformer
+        this.viewModeManager.registerTransformer('wasm-component', new WasmViewTransformer());
 
         // Development-only debug utilities
         if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
@@ -94,6 +101,7 @@ export class AppController {
         }
 
         this.mountUI();
+        this.setupViewModeManager();
 
         this.initialize();
     }
@@ -503,8 +511,10 @@ export class AppController {
         }
     }
 
+    // This is the ORIGINAL handleDiagramTypeChange method that was incorrectly
+    // handling view mode changes. It should now only handle actual diagram type changes.
     private async handleDiagramTypeChange(diagramType: string): Promise<void> {
-        console.log('=== DIAGRAM TYPE CHANGE ===');
+        console.log('=== ACTUAL DIAGRAM TYPE CHANGE ===');
         console.log('Diagram type changed to:', diagramType);
         
         // Update the toolbar to reflect the new diagram type
@@ -523,8 +533,8 @@ export class AppController {
             console.log('WASM palette hidden for non-wasm diagram type');
         }
         
-        // Create a new diagram of the selected type
-        this.createNewDiagramOfType(diagramType);
+        // Call the existing createNewDiagramOfType method
+        await this.createNewDiagramOfType(diagramType);
     }
 
     private async createNewDiagramOfType(diagramType: string): Promise<void> {
@@ -813,10 +823,10 @@ export class AppController {
     }
     
     /**
-     * Handle view mode changes
+     * Handle view mode changes - NEW: Uses ViewModeManager for proper view transformation
      */
     private async handleViewModeChange(mode: string): Promise<void> {
-        console.log('View mode changed to:', mode);
+        console.log('AppController: View mode change requested to:', mode);
         
         const currentDiagram = this.diagramService.getCurrentDiagram();
         if (!currentDiagram) {
@@ -824,42 +834,90 @@ export class AppController {
             return;
         }
         
-        const currentDiagramType = currentDiagram.diagramType || currentDiagram.diagram_type;
+        // Show user feedback
+        this.uiManager.updateStatus(`Switching to ${mode} view...`);
         
+        // Use ViewModeManager to handle the transformation
+        const success = await this.viewModeManager.switchViewMode(mode);
+        
+        if (success) {
+            // Update UI state based on successful view mode change
+            this.updateUIForViewMode(mode);
+            this.uiManager.updateStatus(`✅ ${this.getViewModeLabel(mode)} active`);
+        } else {
+            // Handle failure
+            const currentMode = this.viewModeManager.getCurrentViewMode();
+            this.uiManager.updateStatus(`❌ Failed to switch to ${mode} view - staying in ${currentMode}`);
+            
+            // Reset view switcher to current mode
+            this.viewSwitcher.setMode(currentMode);
+        }
+    }
+    
+    /**
+     * Update UI elements based on current view mode
+     */
+    private updateUIForViewMode(mode: string): void {
+        // Hide/show panels based on view mode
         switch (mode) {
             case 'component':
-                this.uiManager.updateStatus('Switching to Component View...');
                 this.witVisualizationPanel.hide();
                 this.canvas.style.display = 'block';
-                
-                // If we're in a WIT diagram, switch back to the original WASM component diagram
-                if (currentDiagramType === 'wit-interface') {
-                    await this.switchToComponentView(currentDiagram);
-                } else {
-                    this.uiManager.updateStatus('✅ Component View active - showing WASM components');
-                }
                 break;
                 
             case 'wit-interface':
-                // Create or switch to WIT interface diagram view
-                await this.switchToWitInterfaceView(currentDiagram);
+                this.witVisualizationPanel.hide(); // We use canvas rendering now
+                this.canvas.style.display = 'block';
                 break;
                 
             case 'wit-dependencies':
-                this.uiManager.updateStatus('🚧 Dependency View coming soon...');
+                this.witVisualizationPanel.hide();
+                this.canvas.style.display = 'block';
                 break;
         }
     }
     
-    private async switchToComponentView(currentDiagram: any): Promise<void> {
-        // If we have a component source diagram ID, switch back to it
-        if (currentDiagram.sourceComponentDiagramId) {
-            await this.diagramService.loadDiagram(currentDiagram.sourceComponentDiagramId);
-        } else {
-            // Otherwise, change the diagram type back to wasm-component
-            // TODO: Implement diagram type change or recreate diagram
+    /**
+     * Get user-friendly label for view mode
+     */
+    private getViewModeLabel(mode: string): string {
+        const config = this.viewModeManager.getViewModeConfig(mode);
+        return config ? config.label : mode;
+    }
+    
+    /**
+     * Handle actual diagram type changes (different from view mode changes)
+     */
+    private async handleDiagramTypeChange(newType: string): Promise<void> {
+        console.log('AppController: Diagram type change requested to:', newType);
+        
+        const currentDiagram = this.diagramService.getCurrentDiagram();
+        if (!currentDiagram) {
+            // No current diagram, create new one
+            await this.createNewDiagramOfType(newType);
+            return;
         }
-        this.renderer.render();
+        
+        const currentType = currentDiagram.diagramType || currentDiagram.diagram_type;
+        if (currentType === newType) {
+            // Same type, no change needed
+            return;
+        }
+        
+        // Show user confirmation for diagram type change
+        const userConfirmed = await this.confirmDiagramTypeChange(currentType, newType);
+        if (userConfirmed) {
+            await this.createNewDiagramOfType(newType);
+        }
+    }
+    
+    /**
+     * Confirm diagram type change with user
+     */
+    private async confirmDiagramTypeChange(currentType: string, newType: string): Promise<boolean> {
+        // For now, just log - in a real implementation, show a dialog
+        console.log(`Confirming diagram type change from ${currentType} to ${newType}`);
+        return true; // Auto-confirm for now
     }
     
     private async switchToWitInterfaceView(currentDiagram: any): Promise<void> {
@@ -1154,5 +1212,26 @@ export class AppController {
         // Debug AI panel callback
         console.log('AI Panel events check:', this.uiManager.getAIPanelElement());
         console.log('Header icon manager:', this.uiManager.getHeaderIconManager());
+    }
+    
+    /**
+     * Set up ViewModeManager listeners and integration
+     */
+    private setupViewModeManager(): void {
+        // Listen for view mode changes to update ViewSwitcher
+        this.viewModeManager.addViewModeListener((newMode: string) => {
+            this.viewSwitcher.setMode(newMode);
+        });
+        
+        // Set up diagram change listener (will be added to DiagramService)
+        // For now, we'll call this manually when diagrams change
+        console.log('ViewModeManager setup complete');
+    }
+    
+    /**
+     * Get available view modes for current diagram
+     */
+    public getAvailableViewModes(): string[] {
+        return this.viewModeManager.getAvailableViewModes().map(mode => mode.id);
     }
 }

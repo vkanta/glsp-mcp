@@ -118,11 +118,20 @@ export class DiagramControlsSection {
             select.appendChild(option);
         });
         
-        // Event handler
+        // Event handler - Only handle ACTUAL diagram type changes
         select.addEventListener('change', (e) => {
             const newType = (e.target as HTMLSelectElement).value;
-            this.currentDiagramType = newType;
-            this.onDiagramTypeChange?.(newType);
+            const currentType = this.currentDiagramType;
+            
+            // Only proceed if it's a real diagram type change
+            if (newType !== currentType) {
+                this.currentDiagramType = newType;
+                console.log(`DiagramControlsSection: Actual diagram type change from ${currentType} to ${newType}`);
+                
+                // This should only be called for true diagram type changes (workflow -> bpmn)
+                // NOT for view mode changes (component -> wit-interface)
+                this.onDiagramTypeChange?.(newType);
+            }
         });
         
         select.addEventListener('focus', () => {

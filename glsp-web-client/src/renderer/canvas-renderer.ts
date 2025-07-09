@@ -81,6 +81,7 @@ export class CanvasRenderer {
     private scrollBounds?: { minX: number; minY: number; maxX: number; maxY: number };
     private mcpClient?: McpClient;
     private showInterfaceNames: boolean = false;
+    private currentViewMode: string = 'component';
 
     constructor(canvas: HTMLCanvasElement, options: RenderOptions = {}) {
         this.canvas = canvas;
@@ -1934,6 +1935,61 @@ export class CanvasRenderer {
                 width: nodeType?.defaultSize?.width || 160,
                 height: nodeType?.defaultSize?.height || 60
             };
+        }
+    }
+
+    /**
+     * Set the current view mode for rendering context
+     */
+    public setViewMode(viewMode: string): void {
+        this.currentViewMode = viewMode;
+        console.log(`CanvasRenderer: View mode set to ${viewMode}`);
+    }
+
+    /**
+     * Get the current view mode
+     */
+    public getViewMode(): string {
+        return this.currentViewMode;
+    }
+
+    /**
+     * Check if current view mode is WIT-based
+     */
+    private isWitViewMode(): boolean {
+        return this.currentViewMode === 'wit-interface' || this.currentViewMode === 'wit-dependencies';
+    }
+
+    /**
+     * Get view mode specific rendering hints
+     */
+    private getViewModeRenderingHints(): Record<string, boolean> {
+        switch (this.currentViewMode) {
+            case 'component':
+                return {
+                    showComponents: true,
+                    showInterfaces: true,
+                    showConnections: true,
+                    showInterfaceNames: this.showInterfaceNames
+                };
+            case 'wit-interface':
+                return {
+                    showPackages: true,
+                    showInterfaces: true,
+                    showFunctions: true,
+                    showTypes: true,
+                    emphasizeStructure: true
+                };
+            case 'wit-dependencies':
+                return {
+                    showDependencies: true,
+                    showExporters: true,
+                    showImporters: true,
+                    groupByInterface: true,
+                    highlightDependencies: true
+                };
+            default:
+                return {};
         }
     }
 }
