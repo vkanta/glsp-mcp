@@ -1025,8 +1025,9 @@ export class CanvasRenderer {
         this.ctx.strokeStyle = isSelected ? '#654FF0' : (isHovered ? style.borderColor : style.borderColor);
         this.ctx.lineWidth = isSelected ? 3 : (isHovered ? 2 : 1);
         
-        // Draw rounded rectangle
-        this.drawRoundedRect(
+        // Draw rounded rectangle using built-in canvas API
+        this.ctx.beginPath();
+        this.ctx.roundRect(
             node.bounds.x,
             node.bounds.y,
             node.bounds.width,
@@ -1046,7 +1047,8 @@ export class CanvasRenderer {
             this.ctx.strokeStyle = '#654FF0';
             this.ctx.lineWidth = 2;
             this.ctx.setLineDash([5, 5]);
-            this.drawRoundedRect(
+            this.ctx.beginPath();
+            this.ctx.roundRect(
                 node.bounds.x - 2,
                 node.bounds.y - 2,
                 node.bounds.width + 4,
