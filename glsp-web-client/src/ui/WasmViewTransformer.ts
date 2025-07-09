@@ -403,6 +403,7 @@ export class WasmViewTransformer implements ViewTransformer {
             
             if (elementType === 'wasm-component') {
                 const node = element as Node;
+                console.log('Extracting component:', node.label, 'Properties:', node.properties);
                 const component: WasmComponentData = {
                     id: node.id,
                     name: node.label || `Component ${node.id}`,
@@ -426,12 +427,51 @@ export class WasmViewTransformer implements ViewTransformer {
     private extractComponentInterfaces(component: Node): ComponentInterface[] {
         const interfaces: ComponentInterface[] = [];
         
+        console.log('Extracting interfaces from component:', component.label);
+        console.log('Component properties:', JSON.stringify(component.properties, null, 2));
+        
+        // Check for various possible interface property names
+        const interfaceData = component.properties?.interfaces || 
+                            component.properties?.imports || 
+                            component.properties?.exports ||
+                            component.properties?.wit_interfaces;
+        
+        // Also check for specific import/export arrays
+        if (component.properties?.importInterfaces || component.properties?.exportInterfaces) {
+            // Handle separate import/export arrays
+            if (component.properties.importInterfaces) {
+                const imports = Array.isArray(component.properties.importInterfaces) 
+                    ? component.properties.importInterfaces 
+                    : [];
+                imports.forEach((iface: any) => {
+                    interfaces.push({
+                        name: typeof iface === 'string' ? iface : iface.name || 'unknown',
+                        type: 'import',
+                        functions: []
+                    });
+                });
+            }
+            if (component.properties.exportInterfaces) {
+                const exports = Array.isArray(component.properties.exportInterfaces) 
+                    ? component.properties.exportInterfaces 
+                    : [];
+                exports.forEach((iface: any) => {
+                    interfaces.push({
+                        name: typeof iface === 'string' ? iface : iface.name || 'unknown',
+                        type: 'export',  
+                        functions: []
+                    });
+                });
+            }
+            return interfaces;
+        }
+        
         // Try to extract interfaces from component properties
-        if (component.properties?.interfaces) {
-            if (Array.isArray(component.properties.interfaces)) {
+        if (interfaceData) {
+            if (Array.isArray(interfaceData)) {
                 // If interfaces is already an array of interface objects
-                return component.properties.interfaces as ComponentInterface[];
-            } else if (typeof component.properties.interfaces === 'number') {
+                return interfaceData as ComponentInterface[];
+            } else if (typeof interfaceData === 'number') {
                 // If interfaces is a count, create mock interfaces
                 const count = component.properties.interfaces;
                 for (let i = 0; i < count; i++) {
