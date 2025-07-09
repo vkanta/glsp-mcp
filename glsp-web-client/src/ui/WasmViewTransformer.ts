@@ -164,6 +164,7 @@ export class WasmViewTransformer implements ViewTransformer {
             component.interfaces.forEach((iface, ifaceIndex) => {
                 const interfaceY = baseY + 100 + (ifaceIndex * 150);
                 
+                
                 const interfaceNode: Node = {
                     id: `wit-interface-${nodeIdCounter++}`,
                     type: 'wit-interface',

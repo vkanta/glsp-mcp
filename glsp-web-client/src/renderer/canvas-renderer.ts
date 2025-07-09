@@ -1135,7 +1135,7 @@ export class CanvasRenderer {
         if (!node.bounds) return;
         
         const icon = style.icon;
-        const name = node.properties?.name || node.id;
+        const name = node.label || node.properties?.name || node.id;
         const centerX = node.bounds.x + node.bounds.width / 2;
         const iconY = node.bounds.y + 20;
         const textY = node.bounds.y + 40;
