@@ -1068,6 +1068,7 @@ export class CanvasRenderer {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const isDarkTheme = currentTheme === 'dark';
         
+        
         const styles: { [key: string]: any } = {
             'wit-package': {
                 backgroundColor: isDarkTheme ? '#1C2333' : '#F6F8FA',
@@ -1312,26 +1313,47 @@ export class CanvasRenderer {
     }
 
     private drawEdgeLabel(text: string, position: Position): void {
-        this.ctx.fillStyle = this.options.backgroundColor;
-        this.ctx.strokeStyle = this.options.backgroundColor;
-        this.ctx.lineWidth = 3;
+        this.ctx.save();
+        
+        // Set up font and text properties
         this.ctx.font = '10px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        // Draw background
+        // Calculate background dimensions
         const metrics = this.ctx.measureText(text);
-        const padding = 2;
+        const padding = 4;
+        const bgWidth = metrics.width + padding * 2;
+        const bgHeight = 14;
+
+        // Draw background rectangle with theme-appropriate colors
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDarkTheme = currentTheme === 'dark';
+        
+        // Use contrasting background that works in both themes
+        this.ctx.fillStyle = isDarkTheme ? 'rgba(45, 55, 72, 0.9)' : 'rgba(255, 255, 255, 0.9)';
         this.ctx.fillRect(
-            position.x - metrics.width / 2 - padding,
-            position.y - 6 - padding,
-            metrics.width + padding * 2,
-            12 + padding * 2
+            position.x - bgWidth / 2,
+            position.y - bgHeight / 2,
+            bgWidth,
+            bgHeight
         );
 
-        // Draw text
-        this.ctx.fillStyle = this.options.textColor;
+        // Draw border for better visibility
+        this.ctx.strokeStyle = isDarkTheme ? '#4A5568' : '#E2E8F0';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(
+            position.x - bgWidth / 2,
+            position.y - bgHeight / 2,
+            bgWidth,
+            bgHeight
+        );
+
+        // Draw text with contrasting color
+        this.ctx.fillStyle = isDarkTheme ? '#E2E8F0' : '#2D3748';
         this.ctx.fillText(text, position.x, position.y);
+        
+        this.ctx.restore();
     }
 
     private drawArrowhead(to: Position, from: Position): void {
@@ -1904,7 +1926,11 @@ export class CanvasRenderer {
         const bgWidth = metrics.width + padding * 2;
         const bgHeight = 16;
         
-        this.ctx.fillStyle = 'rgba(15, 20, 25, 0.9)';
+        // Use theme-appropriate background colors
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDarkTheme = currentTheme === 'dark';
+        
+        this.ctx.fillStyle = isDarkTheme ? 'rgba(45, 55, 72, 0.9)' : 'rgba(255, 255, 255, 0.9)';
         this.ctx.fillRect(
             position.x - bgWidth / 2,
             position.y - bgHeight / 2,
@@ -1912,8 +1938,8 @@ export class CanvasRenderer {
             bgHeight
         );
         
-        // Draw border
-        this.ctx.strokeStyle = color;
+        // Draw border with theme-appropriate color
+        this.ctx.strokeStyle = isDarkTheme ? '#4A5568' : '#E2E8F0';
         this.ctx.lineWidth = 1;
         this.ctx.strokeRect(
             position.x - bgWidth / 2,
@@ -1922,8 +1948,8 @@ export class CanvasRenderer {
             bgHeight
         );
         
-        // Draw text
-        this.ctx.fillStyle = color;
+        // Draw text with contrasting color
+        this.ctx.fillStyle = isDarkTheme ? '#E2E8F0' : '#2D3748';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(text, position.x, position.y);
@@ -1973,6 +1999,7 @@ export class CanvasRenderer {
         this.options.edgeColor = isDarkTheme ? '#7D8590' : '#666666';
         this.options.textColor = isDarkTheme ? '#E6EDF3' : '#333333';
         this.options.gridColor = isDarkTheme ? '#1C2333' : '#f0f0f0';
+        
         
         // Re-render with new theme
         this.render();

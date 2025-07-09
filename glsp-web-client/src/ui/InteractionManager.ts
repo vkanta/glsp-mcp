@@ -6,6 +6,7 @@ import { statusManager } from '../services/StatusManager.js';
 import { McpService } from '../services/McpService.js';
 import { InterfaceConnectionDialog, InterfaceConnectionOption } from './dialogs/specialized/InterfaceConnectionDialog.js';
 import { InterfaceCompatibilityChecker, WitInterface } from '../diagrams/interface-compatibility.js';
+import { ViewModeManager } from './ViewModeManager.js';
 
 declare global {
     interface Window {
@@ -20,6 +21,7 @@ export class InteractionManager {
     private mcpService: McpService;
     private wasmComponentManager?: WasmComponentManager;
     private uiManager?: UIManager;
+    private viewModeManager?: ViewModeManager;
     private currentMode: string = 'select';
     private currentNodeType: string = '';
     private currentEdgeType: string = '';
@@ -124,6 +126,11 @@ export class InteractionManager {
     // Set the UI manager reference for updating properties panel
     public setUIManager(uiManager: UIManager): void {
         this.uiManager = uiManager;
+    }
+
+    // Set the view mode manager reference for checking current view mode
+    public setViewModeManager(viewModeManager: ViewModeManager): void {
+        this.viewModeManager = viewModeManager;
     }
 
     private async handleRendererInteraction(event: InteractionEvent): Promise<void> {
@@ -966,6 +973,15 @@ function sleep(ms) {
         // Clear any existing timeout
         if (this.autoSaveTimeout) {
             clearTimeout(this.autoSaveTimeout);
+        }
+
+        // Check if we're in interface view mode - skip auto-save since it's a transformed view
+        if (this.viewModeManager) {
+            const currentViewMode = this.viewModeManager.getCurrentViewMode();
+            if (currentViewMode === 'wit-interface' || currentViewMode === 'wit-dependencies') {
+                console.log(`Skipping auto-save in ${currentViewMode} mode - this is a transformed view`);
+                return;
+            }
         }
 
         // Mark that an auto-save is pending

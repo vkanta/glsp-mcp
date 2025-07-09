@@ -312,6 +312,7 @@ export class AppController {
             this.interactionManager.setupEventHandlers();
             this.interactionManager.setWasmComponentManager(this.wasmRuntimeManager);
             this.interactionManager.setUIManager(this.uiManager);
+            this.interactionManager.setViewModeManager(this.viewModeManager);
             // Setup drag and drop for WASM components
             this.setupCanvasDragAndDrop();
 
