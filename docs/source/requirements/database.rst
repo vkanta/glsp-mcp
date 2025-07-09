@@ -272,6 +272,61 @@ Data Model Requirements
 
    The system shall define data models for sensor data including timestamps, values, and metadata.
 
+Sensor Data Management Requirements
+-----------------------------------
+
+.. db_req:: Dataset Manager Interface
+   :id: DB_041
+   :status: implemented
+   :priority: critical
+   :database_backend: all
+   :links: SIM_043
+   :rationale: Dataset manager provides unified sensor data access
+   :verification: Dataset manager tests
+
+   The system shall provide a dataset manager interface that abstracts sensor data storage and retrieval across all database backends with support for dataset creation, deletion, and metadata management.
+
+.. db_req:: Sensor Bridge Integration
+   :id: DB_042
+   :status: implemented
+   :priority: high
+   :database_backend: influxdb
+   :links: SIM_043, WASM_046
+   :rationale: Sensor bridge enables real-time data streaming to WASM components
+   :verification: Sensor bridge integration tests
+
+   The system shall provide sensor data bridge capabilities that stream time-series data from the database to WASM components with configurable buffering, synchronization, and playback controls.
+
+.. db_req:: Time-Series Query Optimization
+   :id: DB_043
+   :status: implemented
+   :priority: high
+   :database_backend: influxdb
+   :rationale: Optimized queries enable real-time sensor data processing
+   :verification: Query optimization tests
+
+   The system shall optimize time-series queries with downsampling, aggregation, and window functions supporting sub-second query response times for millions of data points.
+
+.. db_req:: Multi-Sensor Synchronization
+   :id: DB_044
+   :status: implemented
+   :priority: high
+   :database_backend: all
+   :rationale: Synchronized sensor data enables coherent multi-sensor processing
+   :verification: Synchronization tests
+
+   The system shall support synchronized retrieval of data from multiple sensors with temporal alignment and interpolation capabilities.
+
+.. db_req:: Sensor Metadata Management
+   :id: DB_045
+   :status: implemented
+   :priority: medium
+   :database_backend: postgresql
+   :rationale: Metadata enables sensor discovery and configuration
+   :verification: Metadata management tests
+
+   The system shall store and manage sensor metadata including sensor types, units, sampling rates, calibration data, and quality indicators.
+
 Performance Requirements
 ------------------------
 

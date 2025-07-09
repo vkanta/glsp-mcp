@@ -1,10 +1,10 @@
 Simulation Requirements
 ======================
 
-This document specifies the simulation requirements for the GLSP-Rust system, defining the requirements for time-driven scenarios, data simulation, and testing frameworks.
+This document specifies the simulation requirements for the GLSP-Rust system, defining the requirements for time-driven scenarios, data simulation, pipeline execution, and testing frameworks.
 
 .. note::
-   Domain-specific simulation examples (e.g., sensor simulations for automotive, robotics, or industrial applications) can be found in the workspace directory. This document focuses on generic simulation capabilities applicable to any domain.
+   Domain-specific simulation examples (e.g., sensor simulations for automotive, robotics, or industrial applications) can be found in the workspace directory. This document focuses on the core simulation capabilities that are **already implemented** in the platform.
 
 .. contents::
    :local:
@@ -341,6 +341,95 @@ Validation Requirements
    :verification: Compliance validation tests
 
    The system shall provide compliance validation with safety standards and regulatory requirements.
+
+Pipeline Execution Requirements
+-------------------------------
+
+.. sim_req:: Pipeline Engine
+   :id: SIM_037
+   :status: implemented
+   :priority: critical
+   :simulation_type: pipeline_execution
+   :links: WASM_046
+   :rationale: Pipeline execution enables complex component compositions
+   :verification: Pipeline execution tests
+
+   The system shall provide a pipeline execution engine that supports sequential and parallel execution of WASM components with data flow management.
+
+.. sim_req:: Pipeline Configuration
+   :id: SIM_038
+   :status: implemented
+   :priority: high
+   :simulation_type: pipeline_configuration
+   :rationale: Declarative pipeline configuration enables flexible compositions
+   :verification: Pipeline configuration tests
+
+   The system shall support declarative pipeline configuration including stages, connections, dependencies, and parallel execution groups.
+
+.. sim_req:: Inter-Component Data Flow
+   :id: SIM_039
+   :status: implemented
+   :priority: high
+   :simulation_type: data_flow
+   :rationale: Data flow management enables component communication
+   :verification: Data flow tests
+
+   The system shall provide data flow connections between pipeline stages with configurable mappings and optional transformations.
+
+.. sim_req:: Pipeline Orchestration
+   :id: SIM_040
+   :status: implemented
+   :priority: high
+   :simulation_type: orchestration
+   :links: WASM_047
+   :rationale: Orchestration manages complex execution patterns
+   :verification: Orchestration tests
+
+   The system shall orchestrate pipeline execution with dependency resolution, parallel group scheduling, and resource allocation.
+
+Component Composition Requirements
+----------------------------------
+
+.. sim_req:: Simulation Scenarios
+   :id: SIM_041
+   :status: implemented
+   :priority: high
+   :simulation_type: scenario_management
+   :rationale: Scenarios enable complex multi-pipeline simulations
+   :verification: Scenario execution tests
+
+   The system shall support simulation scenarios containing multiple related pipelines with inter-pipeline dependencies and shared sensor data.
+
+.. sim_req:: Scenario Triggers
+   :id: SIM_042
+   :status: implemented
+   :priority: high
+   :simulation_type: scenario_triggers
+   :rationale: Triggers enable conditional scenario execution
+   :verification: Trigger condition tests
+
+   The system shall support scenario triggers including time-based, event-based, and condition-based activation.
+
+.. sim_req:: Sensor Data Bridge
+   :id: SIM_043
+   :status: implemented
+   :priority: critical
+   :simulation_type: sensor_bridge
+   :links: DB_015
+   :rationale: Sensor bridge connects database sensor data to simulations
+   :verification: Sensor bridge tests
+
+   The system shall provide a sensor data bridge that streams time-series data from the database to WASM components during simulation execution.
+
+.. sim_req:: Simulation Timing Control
+   :id: SIM_044
+   :status: implemented
+   :priority: high
+   :simulation_type: timing_control
+   :rationale: Timing control enables deterministic simulation
+   :verification: Timing control tests
+
+   The system shall provide timing control with configurable playback speed, synchronization modes, and frame rate targets.
 
 Performance Requirements
 ------------------------

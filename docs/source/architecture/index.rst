@@ -261,9 +261,9 @@ Documentation Structure
    01_system_design/index
    02_mcp_protocol/index
    03_wasm_components/index
+   04_simulation/index
    04_ai_integration/index
    05_database_layer/index
-   06_simulation_engine/index
    07_deployment/index
    08_testing_framework/index
 
