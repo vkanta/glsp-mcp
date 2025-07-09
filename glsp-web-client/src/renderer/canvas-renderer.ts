@@ -93,14 +93,17 @@ export class CanvasRenderer {
         this.selectionManager = new SelectionManager();
         this.modeManager = new InteractionModeManager();
 
+        // Check if dark theme is active
+        const isDarkTheme = document.body.classList.contains('theme-dark');
+        
         this.options = {
-            backgroundColor: '#ffffff',
+            backgroundColor: isDarkTheme ? '#0D1117' : '#ffffff',
             nodeColor: '#e1f5fe',
-            edgeColor: '#666666',
-            textColor: '#333333',
+            edgeColor: isDarkTheme ? '#7D8590' : '#666666',
+            textColor: isDarkTheme ? '#E6EDF3' : '#333333',
             selectedColor: '#2196f3',
             gridEnabled: true,
-            gridColor: '#f0f0f0',
+            gridColor: isDarkTheme ? '#1C2333' : '#f0f0f0',
             scale: 1.0,
             offset: { x: 0, y: 0 },
             ...options
@@ -1956,6 +1959,18 @@ export class CanvasRenderer {
      */
     public getViewMode(): string {
         return this.currentViewMode;
+    }
+    
+    public updateTheme(): void {
+        const isDarkTheme = document.body.classList.contains('theme-dark');
+        
+        this.options.backgroundColor = isDarkTheme ? '#0D1117' : '#ffffff';
+        this.options.edgeColor = isDarkTheme ? '#7D8590' : '#666666';
+        this.options.textColor = isDarkTheme ? '#E6EDF3' : '#333333';
+        this.options.gridColor = isDarkTheme ? '#1C2333' : '#f0f0f0';
+        
+        // Re-render with new theme
+        this.render();
     }
 
     /**
