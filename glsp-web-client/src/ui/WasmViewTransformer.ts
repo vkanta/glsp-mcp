@@ -130,6 +130,9 @@ export class WasmViewTransformer implements ViewTransformer {
         const elements = Object.values(diagram.elements);
         const wasmComponents = this.extractWasmComponents(elements);
         const witElements: ModelElement[] = [];
+        
+        console.log('WasmViewTransformer: Transforming to interface view');
+        console.log('Found WASM components:', wasmComponents.length, wasmComponents);
 
         let nodeIdCounter = 1;
         let edgeIdCounter = 1;
@@ -138,6 +141,8 @@ export class WasmViewTransformer implements ViewTransformer {
         wasmComponents.forEach((component, index) => {
             const baseX = 150 + (index * 300);
             const baseY = 150;
+            
+            console.log(`Processing component ${component.name}:`, component.interfaces);
 
             // Create package node for each component
             const packageNode: Node = {
@@ -232,6 +237,9 @@ export class WasmViewTransformer implements ViewTransformer {
             });
         });
 
+        console.log(`WasmViewTransformer: Created ${witElements.length} WIT elements`);
+        console.log('WIT elements:', witElements);
+        
         return {
             success: true,
             transformedElements: witElements,

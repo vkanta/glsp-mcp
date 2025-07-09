@@ -35,6 +35,7 @@ export class ViewModeManager {
     private renderer: CanvasRenderer;
     private transformers: Map<string, ViewTransformer> = new Map();
     private viewModeListeners: Array<(mode: string) => void> = [];
+    private lastTransformationResult?: ViewTransformationResult;
     
     // Available view modes
     private readonly viewModes: ViewMode[] = [
@@ -102,6 +103,23 @@ export class ViewModeManager {
      * Switch to a different view mode without creating a new diagram
      */
     public async switchViewMode(targetMode: string): Promise<boolean> {
+        // Special case: switching back to component view
+        if (targetMode === 'component' && this.currentViewMode !== 'component' && this.lastTransformationResult) {
+            console.log('ViewModeManager: Restoring original component view');
+            
+            // Get the original diagram from the service (which maintains the original state)
+            const originalDiagram = this.diagramService.getCurrentDiagram();
+            if (originalDiagram) {
+                this.renderer.setDiagram(originalDiagram);
+                this.currentViewMode = 'component';
+                this.renderer.setViewMode('component');
+                this.renderer.render();
+                this.notifyViewModeChanged('component', this.currentViewMode);
+                this.lastTransformationResult = undefined;
+                return true;
+            }
+        }
+        
         const currentDiagram = this.diagramService.getCurrentDiagram();
         if (!currentDiagram) {
             console.warn('ViewModeManager: No current diagram to switch views');
@@ -157,8 +175,30 @@ export class ViewModeManager {
             const previousMode = this.currentViewMode;
             this.currentViewMode = targetMode;
 
+            // Apply the transformed elements to the diagram if provided
+            if (result.transformedElements) {
+                console.log(`ViewModeManager: Applying ${result.transformedElements.length} transformed elements`);
+                
+                // Create a new diagram with transformed elements
+                const transformedDiagram = {
+                    ...currentDiagram,
+                    elements: {}
+                };
+                
+                // Convert array to elements map
+                result.transformedElements.forEach(element => {
+                    transformedDiagram.elements[element.id] = element;
+                });
+                
+                // Update the renderer with the transformed diagram
+                this.renderer.setDiagram(transformedDiagram);
+            }
+
             // Update the renderer with view mode context
             this.renderer.setViewMode(targetMode);
+            
+            // Store transformation result for potential restoration
+            this.lastTransformationResult = result;
             
             // Re-render with new view mode
             this.renderer.render();

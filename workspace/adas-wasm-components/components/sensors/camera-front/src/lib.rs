@@ -1,24 +1,17 @@
 // Camera Front ECU Component Implementation
-use component_metadata::embed_metadata;
+// Using the new rust_wasm_component_bindgen API
 
-// Embed metadata into the WASM binary
-embed_metadata!();
-
-wit_bindgen::generate!({
-    world: "camera-front",
-});
+// The bindings are generated as a separate crate based on the BUILD target name
+use camera_front_ecu_bindings::Guest;
 
 struct Component;
 
 impl Guest for Component {
     fn process_frame() -> String {
-        // Get component metadata to demonstrate it's available
-        let metadata = get_component_metadata().unwrap_or_else(|_| {
-            panic!("Failed to load component metadata");
-        });
-        
-        format!("Camera Front ECU v{} - Frame processed", metadata.version)
+        // For now, return a simple string until we add metadata support
+        format!("Camera Front ECU - Frame processed")
     }
 }
 
-export!(Component);
+// Export the component using the generated macro
+camera_front_ecu_bindings::export!(Component);
