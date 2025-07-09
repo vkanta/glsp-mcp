@@ -168,6 +168,12 @@ export class AppController {
             this.viewSwitcher.setModeChangeHandler((mode) => this.handleViewModeChange(mode));
             console.log('AppController: View switcher mounted');
         }
+        
+        // Listen for theme changes to update canvas
+        window.addEventListener('themeChanged', () => {
+            this.renderer.updateTheme();
+            console.log('AppController: Canvas theme updated');
+        });
     }
     
     private async loadWasmComponentsToSidebar(): Promise<void> {

@@ -94,7 +94,8 @@ export class CanvasRenderer {
         this.modeManager = new InteractionModeManager();
 
         // Check if dark theme is active
-        const isDarkTheme = document.body.classList.contains('theme-dark');
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDarkTheme = currentTheme === 'dark';
         
         this.options = {
             backgroundColor: isDarkTheme ? '#0D1117' : '#ffffff',
@@ -1962,7 +1963,8 @@ export class CanvasRenderer {
     }
     
     public updateTheme(): void {
-        const isDarkTheme = document.body.classList.contains('theme-dark');
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const isDarkTheme = currentTheme === 'dark';
         
         this.options.backgroundColor = isDarkTheme ? '#0D1117' : '#ffffff';
         this.options.edgeColor = isDarkTheme ? '#7D8590' : '#666666';
