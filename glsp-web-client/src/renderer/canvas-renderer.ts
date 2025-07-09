@@ -1178,7 +1178,10 @@ export class CanvasRenderer {
                           elementType === 'dependency' ||
                           elementType === 'sequence-flow' ||
                           elementType === 'message-flow' ||
-                          elementType === 'conditional-flow';
+                          elementType === 'conditional-flow' ||
+                          elementType.startsWith('wit-') && (elementType.includes('contains') || 
+                                                              elementType.includes('import') || 
+                                                              elementType.includes('export'));
             
             if (!isEdge) return;
             
@@ -1188,8 +1191,8 @@ export class CanvasRenderer {
 
     private drawEdge(edge: Edge): void {
         // Handle both direct properties and properties object
-        const sourceId = edge.sourceId || edge.properties?.sourceId;
-        const targetId = edge.targetId || edge.properties?.targetId;
+        const sourceId = edge.source || edge.sourceId || edge.properties?.sourceId;
+        const targetId = edge.target || edge.targetId || edge.properties?.targetId;
         
         if (!sourceId || !targetId) {
             console.warn('Edge missing sourceId or targetId:', edge);
