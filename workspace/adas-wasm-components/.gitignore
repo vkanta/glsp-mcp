@@ -85,6 +85,9 @@ Thumbs.db
 /tmp/
 .cache/
 
+# Temporary wac repository (excluded from commits)
+temp-wac-repo/
+
 # Logs
 *.log
 /logs/

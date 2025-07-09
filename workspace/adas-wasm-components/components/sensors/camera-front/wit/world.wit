@@ -1,5 +1,3 @@
-package adas:camera-front;
-
 world camera-front {
     export process-frame: func() -> string;
 }

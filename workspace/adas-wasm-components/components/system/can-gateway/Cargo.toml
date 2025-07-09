@@ -10,11 +10,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-wit-bindgen = "0.33"
+wit-bindgen = { workspace = true }
 
 # Configuration for building WASM components
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
+# Profile configuration inherited from workspace

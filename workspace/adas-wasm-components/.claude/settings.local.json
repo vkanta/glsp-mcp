@@ -23,7 +23,10 @@
       "Bash(chmod:*)",
       "Bash(./restore-wit.sh:*)",
       "Bash(rustc:*)",
-      "Bash(./run-live-demo)"
+      "Bash(./run-live-demo)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(./build-composed.sh:*)",
+      "mcp__fetch__imageFetch"
     ],
     "deny": []
   }

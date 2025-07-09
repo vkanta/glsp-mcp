@@ -13,16 +13,12 @@ crate-type = ["cdylib"]
 package = "adas:behavior-prediction"
 
 [dependencies]
-wit-bindgen = "0.33"
-ndarray = "0.15"
-lazy_static = "1.4"
-bytemuck = "1.13"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+wit-bindgen = { workspace = true }
+ndarray = { workspace = true }
+lazy_static = { workspace = true }
+bytemuck = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Configuration for building WASM components
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
+# Profile configuration inherited from workspace

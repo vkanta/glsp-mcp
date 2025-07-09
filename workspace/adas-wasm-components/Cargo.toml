@@ -52,6 +52,19 @@ members = [
 # Shared dependencies for all components
 [workspace.dependencies]
 wit-bindgen = "0.33"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+component-metadata = { path = "component-metadata" }
+
+# WASM-compatible dependencies
+crossbeam-channel = "0.5"
+lazy_static = "1.4"
+log = "0.4"
+
+# Image processing (WASM-compatible features)
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
+ndarray = "0.15"
+bytemuck = "1.13"
 
 # Profile settings for all workspace members
 [profile.release]

@@ -511,31 +511,6 @@ export class AppController {
         }
     }
 
-    // This is the ORIGINAL handleDiagramTypeChange method that was incorrectly
-    // handling view mode changes. It should now only handle actual diagram type changes.
-    private async handleDiagramTypeChange(diagramType: string): Promise<void> {
-        console.log('=== ACTUAL DIAGRAM TYPE CHANGE ===');
-        console.log('Diagram type changed to:', diagramType);
-        
-        // Update the toolbar to reflect the new diagram type
-        console.log('Updating toolbar content...');
-        this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), diagramType);
-        
-        // Show/hide view switcher based on diagram type
-        this.viewSwitcher.showForDiagramType(diagramType);
-        
-        // Show/hide WASM palette based on diagram type
-        if (diagramType === 'wasm-component') {
-            await this.wasmRuntimeManager.showEnhancedPalette();
-            console.log('Enhanced WASM palette shown for wasm-component diagram type');
-        } else {
-            this.wasmRuntimeManager.hidePalette();
-            console.log('WASM palette hidden for non-wasm diagram type');
-        }
-        
-        // Call the existing createNewDiagramOfType method
-        await this.createNewDiagramOfType(diagramType);
-    }
 
     private async createNewDiagramOfType(diagramType: string): Promise<void> {
         try {
@@ -890,6 +865,22 @@ export class AppController {
      */
     private async handleDiagramTypeChange(newType: string): Promise<void> {
         console.log('AppController: Diagram type change requested to:', newType);
+        
+        // Update the toolbar to reflect the new diagram type
+        console.log('Updating toolbar content...');
+        this.uiManager.updateToolbarContent(this.uiManager.getToolbarElement(), newType);
+        
+        // Show/hide view switcher based on diagram type
+        this.viewSwitcher.showForDiagramType(newType);
+        
+        // Show/hide WASM palette based on diagram type
+        if (newType === 'wasm-component') {
+            await this.wasmRuntimeManager.showEnhancedPalette();
+            console.log('Enhanced WASM palette shown for wasm-component diagram type');
+        } else {
+            this.wasmRuntimeManager.hidePalette();
+            console.log('WASM palette hidden for non-wasm diagram type');
+        }
         
         const currentDiagram = this.diagramService.getCurrentDiagram();
         if (!currentDiagram) {

@@ -4,7 +4,9 @@ use component_metadata::embed_metadata;
 // Embed metadata into the WASM binary
 embed_metadata!();
 
-wit_bindgen::generate!();
+wit_bindgen::generate!({
+    world: "camera-front",
+});
 
 struct Component;
 

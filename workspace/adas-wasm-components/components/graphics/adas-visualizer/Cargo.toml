@@ -12,17 +12,13 @@ crate-type = ["cdylib"]
 package = "adas:graphics-visualizer"
 
 [dependencies]
-wit-bindgen = "0.33"
+wit-bindgen = { workspace = true }
 # Note: wasi-gfx bindings would be added when available
 # wasi-gfx = "0.1.0"  # Future dependency
-bytemuck = "1.13"
-image = { version = "0.24", default-features = false, features = ["png"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+bytemuck = { workspace = true }
+image = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Configuration for building WASM components
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
+# Profile configuration inherited from workspace

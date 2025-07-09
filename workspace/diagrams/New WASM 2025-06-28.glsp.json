@@ -2,2914 +2,1411 @@
   "id": "63c02063-8b46-4cd6-a8eb-abbe28f0950c",
   "name": "New WASM 2025-06-28",
   "diagram_type": "wasm-component",
-  "revision": 105,
+  "revision": 274,
   "created_at": "2025-06-28T12:07:26.320304Z",
   "updated_at": "2025-06-28T12:07:26.320307Z",
   "nodes": [
     {
-      "id": "c9334637-1d15-407d-a953-559dc400e3f9",
+      "id": "77406d4d-5a73-4cf0-9ce4-b6b58a9514d6",
       "node_type": "wasm-component",
-      "label": "adas_object_detection_ai",
+      "label": "adas_camera_front_ecu",
       "properties": {
-        "importsCount": 12,
-        "description": "ADAS component: adas_object_detection_ai",
-        "exportsCount": 5,
-        "witInfo": {
-          "componentName": "adas_object_detection_ai",
-          "dependencies": [
-            {
-              "interfaces": [
-                "types"
-              ],
-              "package": "adas:common-types",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "error",
-                "streams"
-              ],
-              "package": "wasi:io",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "environment",
-                "exit",
-                "stdin",
-                "stdout",
-                "stderr"
-              ],
-              "package": "wasi:cli",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "monotonic-clock",
-                "wall-clock"
-              ],
-              "package": "wasi:clocks",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "types",
-                "preopens"
-              ],
-              "package": "wasi:filesystem",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "ai-control"
-              ],
-              "package": "adas:control",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "perception-data",
-                "planning-data"
-              ],
-              "package": "adas:data",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "health-monitoring",
-                "performance-monitoring"
-              ],
-              "package": "adas:diagnostics",
-              "version": null
-            }
-          ],
-          "exports": [
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "load-model",
-                  "params": [
-                    {
-                      "name": "config",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "start-inference",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "stop-inference",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "update-config",
-                  "params": [
-                    {
-                      "name": "config",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-status",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-performance",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "ai-control",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timing-constraints"
-                },
-                {
-                  "definition": "Enum { cases: [\"classification\", \"detection\", \"segmentation\", \"tracking\", \"prediction\", \"custom\"] }",
-                  "name": "model-type"
-                },
-                {
-                  "definition": "Enum { cases: [\"cpu\", \"gpu\", \"npu\", \"auto\"] }",
-                  "name": "inference-backend"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"model-path\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"model-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"inference-backend\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence-threshold\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timing\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "ai-config"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "ai-status"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "perception-data",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "bounding-box3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "object-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Enum { cases: [\"new\", \"stable\", \"unstable\", \"lost\"] }",
-                  "name": "tracking-state"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"object-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"object-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"bounding-box\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"tracking-state\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "perceived-object"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"heading\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"yaw-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "ego-vehicle-state"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"objects\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"ego-state\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "scene-model"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "planning-data",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"heading\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"curvature\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"time-offset\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "trajectory-point"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"trajectory-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"waypoints\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"total-length\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"total-duration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"cost\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"feasibility\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "planned-trajectory"
-                },
-                {
-                  "definition": "Enum { cases: [\"follow-lane\", \"lane-change-left\", \"lane-change-right\", \"merge\", \"turn-left\", \"turn-right\", \"stop\", \"emergency-stop\"] }",
-                  "name": "maneuver-type"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"selected-trajectory\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"maneuver-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"reason\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "planning-decision"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-health",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "run-diagnostic",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-last-diagnostic",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "health-monitoring",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "test-result"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"subsystem-name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"status\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"details\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }] }",
-                  "name": "subsystem-health"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"test-name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"test-result\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"details\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"execution-time-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "test-execution"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"test-results\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"overall-score\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"recommendations\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "diagnostic-result"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"component-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"overall-health\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"subsystem-health\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"last-diagnostic\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "health-report"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-performance",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-performance-history",
-                  "params": [
-                    {
-                      "name": "duration-seconds",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "reset-counters",
-                  "params": [],
-                  "results": []
-                }
-              ],
-              "name": "performance-monitoring",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"value\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"unit\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"description\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }] }",
-                  "name": "metric"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"cpu-cores-used\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"memory-allocated-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"memory-peak-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"disk-io-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"network-io-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"gpu-utilization\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"gpu-memory-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
-                  "name": "resource-usage"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"base-metrics\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"component-specific\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"resource-usage\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "extended-performance"
-                }
-              ],
-              "version": null
-            }
-          ],
-          "filePath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_object_detection_ai.wasm",
-          "imports": [
-            {
-              "functions": [],
-              "name": "types",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Enum { cases: [\"ok\", \"warning\", \"error\", \"critical\", \"offline\", \"degraded\"] }",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"latency-avg-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"latency-max-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"cpu-utilization\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"memory-usage-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"throughput-hz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"error-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Enum { cases: [\"soft\", \"firm\", \"hard\"] }",
-                  "name": "deadline-type"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"max-latency-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"max-jitter-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"update-frequency-hz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"deadline-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "timing-constraints"
-                },
-                {
-                  "definition": "Enum { cases: [\"local\", \"utm\", \"wgs84\", \"map\", \"camera\", \"lidar\"] }",
-                  "name": "coordinate-frame"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"coordinate-frame\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"vx\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"vy\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"vz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"speed\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }] }",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"ax\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"ay\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"az\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"magnitude\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"length\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"width\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"height\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "dimensions3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"w\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "quaternion"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"center\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"dimensions\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"orientation\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "bounding-box3d"
-                },
-                {
-                  "definition": "Enum { cases: [\"unknown\", \"vehicle\", \"car\", \"truck\", \"bus\", \"motorcycle\", \"bicycle\", \"emergency-vehicle\", \"construction-vehicle\", \"pedestrian\", \"cyclist\", \"traffic-sign\", \"traffic-light\", \"road-marking\", \"construction-cone\", \"barrier\", \"pole\", \"debris\", \"animal\", \"stationary-object\"] }",
-                  "name": "object-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Enum { cases: [\"passed\", \"failed\", \"error\", \"timeout\", \"not-run\"] }",
-                  "name": "test-result"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-environment",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "environment",
-              "namespace": null,
-              "package": null,
-              "types": [],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "exit",
-                  "params": [
-                    {
-                      "name": "status",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": []
-                }
-              ],
-              "name": "exit",
-              "namespace": null,
-              "package": null,
-              "types": [],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "error",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "error"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.check-write",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.write",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "contents",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.blocking-write-and-flush",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "contents",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.blocking-flush",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "streams",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "error"
-                },
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "output-stream"
-                },
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "input-stream"
-                },
-                {
-                  "definition": "Variant { cases: [WitVariantCase { name: \"last-operation-failed\", payload: Some(WitType { name: \"anonymous\", type_def: Primitive(\"custom\") }) }, WitVariantCase { name: \"closed\", payload: None }] }",
-                  "name": "stream-error"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stdin",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stdin",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "input-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stdout",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stdout",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stderr",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stderr",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "now",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "monotonic-clock",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "instant"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "now",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "wall-clock",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Record { fields: [WitParam { name: \"seconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"nanoseconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
-                  "name": "datetime"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.write-via-stream",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "offset",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.append-via-stream",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.get-type",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.stat",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "filesystem-error-code",
-                  "params": [
-                    {
-                      "name": "err",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "types",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "descriptor"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "error"
-                },
-                {
-                  "definition": "Enum { cases: [\"access\", \"would-block\", \"already\", \"bad-descriptor\", \"busy\", \"deadlock\", \"quota\", \"exist\", \"file-too-large\", \"illegal-byte-sequence\", \"in-progress\", \"interrupted\", \"invalid\", \"io\", \"is-directory\", \"loop\", \"too-many-links\", \"message-size\", \"name-too-long\", \"no-device\", \"no-entry\", \"no-lock\", \"insufficient-memory\", \"insufficient-space\", \"not-directory\", \"not-empty\", \"not-recoverable\", \"unsupported\", \"no-tty\", \"no-such-device\", \"overflow\", \"not-permitted\", \"pipe\", \"read-only\", \"invalid-seek\", \"text-file-busy\", \"cross-device\"] }",
-                  "name": "error-code"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "filesize"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                },
-                {
-                  "definition": "Enum { cases: [\"unknown\", \"block-device\", \"character-device\", \"directory\", \"fifo\", \"symbolic-link\", \"regular-file\", \"socket\"] }",
-                  "name": "descriptor-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "link-count"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "datetime"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"link-count\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"size\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-access-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-modification-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"status-change-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "descriptor-stat"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-directories",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "preopens",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "descriptor"
-                }
-              ],
-              "version": null
-            }
-          ],
-          "summary": {
-            "dependenciesCount": 8,
-            "exportsCount": 5,
-            "importsCount": 12,
-            "totalFunctions": 29,
-            "typesCount": 71
-          },
-          "worldName": "root"
-        },
-        "componentPath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_object_detection_ai.wasm",
-        "componentName": "adas_object_detection_ai",
-        "dependenciesCount": 8,
         "interfaces": [
           {
-            "direction": "input",
-            "functions": [],
-            "interface_type": "import",
-            "name": "types",
-            "type": "import"
-          },
-          {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-environment",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "environment",
-            "type": "import"
+            "name": "environment"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "exit",
                 "params": [
                   {
                     "name": "status",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": []
+                "returns": []
               }
             ],
             "interface_type": "import",
-            "name": "exit",
-            "type": "import"
+            "name": "exit"
           },
           {
-            "direction": "input",
             "functions": [],
             "interface_type": "import",
-            "name": "error",
-            "type": "import"
+            "name": "error"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "[method]output-stream.check-write",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.write",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "contents",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.blocking-write-and-flush",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "contents",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.blocking-flush",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "streams",
-            "type": "import"
+            "name": "streams"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stdin",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stdin",
-            "type": "import"
+            "name": "stdin"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stdout",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stdout",
-            "type": "import"
+            "name": "stdout"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stderr",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stderr",
-            "type": "import"
+            "name": "stderr"
           },
           {
-            "direction": "input",
-            "functions": [
-              {
-                "isAsync": false,
-                "name": "now",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              }
-            ],
+            "functions": [],
             "interface_type": "import",
-            "name": "monotonic-clock",
-            "type": "import"
+            "name": "wall-clock"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
-                "name": "now",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              }
-            ],
-            "interface_type": "import",
-            "name": "wall-clock",
-            "type": "import"
-          },
-          {
-            "direction": "input",
-            "functions": [
-              {
-                "isAsync": false,
                 "name": "[method]descriptor.write-via-stream",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "offset",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.append-via-stream",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.get-type",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.stat",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "filesystem-error-code",
                 "params": [
                   {
                     "name": "err",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "types",
-            "type": "import"
+            "name": "types"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-directories",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "preopens",
-            "type": "import"
+            "name": "preopens"
           },
           {
-            "direction": "output",
             "functions": [
               {
-                "isAsync": false,
-                "name": "load-model",
+                "name": "get-random-bytes",
                 "params": [
                   {
-                    "name": "config",
-                    "type": "anonymous"
+                    "name": "len",
+                    "param_type": "u64"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
-              },
+              }
+            ],
+            "interface_type": "import",
+            "name": "random"
+          },
+          {
+            "functions": [
               {
-                "isAsync": false,
-                "name": "start-inference",
+                "name": "process-frame",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "stop-inference",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "update-config",
-                "params": [
-                  {
-                    "name": "config",
-                    "type": "anonymous"
-                  }
-                ],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-status",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-performance",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
+                    "param_type": "string"
                   }
                 ]
               }
             ],
             "interface_type": "export",
-            "name": "ai-control",
-            "type": "export"
-          },
-          {
-            "direction": "output",
-            "functions": [],
-            "interface_type": "export",
-            "name": "perception-data",
-            "type": "export"
-          },
-          {
-            "direction": "output",
-            "functions": [],
-            "interface_type": "export",
-            "name": "planning-data",
-            "type": "export"
-          },
-          {
-            "direction": "output",
-            "functions": [
-              {
-                "isAsync": false,
-                "name": "get-health",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "run-diagnostic",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-last-diagnostic",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              }
-            ],
-            "interface_type": "export",
-            "name": "health-monitoring",
-            "type": "export"
-          },
-          {
-            "direction": "output",
-            "functions": [
-              {
-                "isAsync": false,
-                "name": "get-performance",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-performance-history",
-                "params": [
-                  {
-                    "name": "duration-seconds",
-                    "type": "anonymous"
-                  }
-                ],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "reset-counters",
-                "params": [],
-                "results": []
-              }
-            ],
-            "interface_type": "export",
-            "name": "performance-monitoring",
-            "type": "export"
+            "name": "process-frame"
           }
         ],
-        "totalFunctions": 29,
-        "label": "adas_object_detection_ai",
-        "status": "available"
+        "componentPath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_camera_front_ecu.wasm",
+        "label": "adas_camera_front_ecu",
+        "status": "unloaded",
+        "category": "Vision",
+        "componentName": "adas_camera_front_ecu"
       }
     },
     {
-      "id": "80146ca9-c29d-4b06-8273-1c55a8abf3b3",
+      "id": "5e14d16b-6fd8-4fd4-91b1-c4821a3ce43b",
       "node_type": "wasm-component",
-      "label": "adas_object_detection_ai",
+      "label": "adas_planning_decision",
       "properties": {
-        "componentName": "adas_object_detection_ai",
+        "componentPath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_planning_decision.wasm",
+        "label": "adas_planning_decision",
+        "componentName": "adas_planning_decision",
         "interfaces": [
           {
-            "direction": "input",
             "functions": [],
             "interface_type": "import",
-            "name": "types",
-            "type": "import"
+            "name": "types"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-environment",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "environment",
-            "type": "import"
+            "name": "environment"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "exit",
                 "params": [
                   {
                     "name": "status",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": []
+                "returns": []
               }
             ],
             "interface_type": "import",
-            "name": "exit",
-            "type": "import"
+            "name": "exit"
           },
           {
-            "direction": "input",
             "functions": [],
             "interface_type": "import",
-            "name": "error",
-            "type": "import"
+            "name": "error"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "[method]output-stream.check-write",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.write",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "contents",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.blocking-write-and-flush",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "contents",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]output-stream.blocking-flush",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "streams",
-            "type": "import"
+            "name": "streams"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stdin",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stdin",
-            "type": "import"
+            "name": "stdin"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stdout",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stdout",
-            "type": "import"
+            "name": "stdout"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-stderr",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "stderr",
-            "type": "import"
+            "name": "stderr"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "now",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "monotonic-clock",
-            "type": "import"
+            "name": "monotonic-clock"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "now",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "wall-clock",
-            "type": "import"
+            "name": "wall-clock"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "[method]descriptor.write-via-stream",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   },
                   {
                     "name": "offset",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.append-via-stream",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.get-type",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "[method]descriptor.stat",
                 "params": [
                   {
                     "name": "self",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "filesystem-error-code",
                 "params": [
                   {
                     "name": "err",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "types",
-            "type": "import"
+            "name": "types"
           },
           {
-            "direction": "input",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-directories",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "import",
-            "name": "preopens",
-            "type": "import"
+            "name": "preopens"
           },
           {
-            "direction": "output",
-            "functions": [
-              {
-                "isAsync": false,
-                "name": "load-model",
-                "params": [
-                  {
-                    "name": "config",
-                    "type": "anonymous"
-                  }
-                ],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "start-inference",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "stop-inference",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "update-config",
-                "params": [
-                  {
-                    "name": "config",
-                    "type": "anonymous"
-                  }
-                ],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-status",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              },
-              {
-                "isAsync": false,
-                "name": "get-performance",
-                "params": [],
-                "results": [
-                  {
-                    "name": "result",
-                    "type": "anonymous"
-                  }
-                ]
-              }
-            ],
-            "interface_type": "export",
-            "name": "ai-control",
-            "type": "export"
-          },
-          {
-            "direction": "output",
             "functions": [],
             "interface_type": "export",
-            "name": "perception-data",
-            "type": "export"
+            "name": "planning-data"
           },
           {
-            "direction": "output",
-            "functions": [],
-            "interface_type": "export",
-            "name": "planning-data",
-            "type": "export"
-          },
-          {
-            "direction": "output",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-health",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "run-diagnostic",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "get-last-diagnostic",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               }
             ],
             "interface_type": "export",
-            "name": "health-monitoring",
-            "type": "export"
+            "name": "health-monitoring"
           },
           {
-            "direction": "output",
             "functions": [
               {
-                "isAsync": false,
                 "name": "get-performance",
                 "params": [],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "get-performance-history",
                 "params": [
                   {
                     "name": "duration-seconds",
-                    "type": "anonymous"
+                    "param_type": "u32"
                   }
                 ],
-                "results": [
+                "returns": [
                   {
                     "name": "result",
-                    "type": "anonymous"
+                    "param_type": "custom"
                   }
                 ]
               },
               {
-                "isAsync": false,
                 "name": "reset-counters",
                 "params": [],
-                "results": []
+                "returns": []
               }
             ],
             "interface_type": "export",
-            "name": "performance-monitoring",
-            "type": "export"
+            "name": "performance-monitoring"
           }
         ],
-        "importsCount": 12,
-        "status": "available",
-        "description": "ADAS component: adas_object_detection_ai",
-        "exportsCount": 5,
-        "dependenciesCount": 8,
-        "totalFunctions": 29,
-        "componentPath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_object_detection_ai.wasm",
-        "witInfo": {
-          "componentName": "adas_object_detection_ai",
-          "dependencies": [
-            {
-              "interfaces": [
-                "types"
-              ],
-              "package": "adas:common-types",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "error",
-                "streams"
-              ],
-              "package": "wasi:io",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "environment",
-                "exit",
-                "stdin",
-                "stdout",
-                "stderr"
-              ],
-              "package": "wasi:cli",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "monotonic-clock",
-                "wall-clock"
-              ],
-              "package": "wasi:clocks",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "types",
-                "preopens"
-              ],
-              "package": "wasi:filesystem",
-              "version": "0.2.3"
-            },
-            {
-              "interfaces": [
-                "ai-control"
-              ],
-              "package": "adas:control",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "perception-data",
-                "planning-data"
-              ],
-              "package": "adas:data",
-              "version": null
-            },
-            {
-              "interfaces": [
-                "health-monitoring",
-                "performance-monitoring"
-              ],
-              "package": "adas:diagnostics",
-              "version": null
-            }
-          ],
-          "exports": [
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "load-model",
-                  "params": [
-                    {
-                      "name": "config",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "start-inference",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "stop-inference",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "update-config",
-                  "params": [
-                    {
-                      "name": "config",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-status",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-performance",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "ai-control",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timing-constraints"
-                },
-                {
-                  "definition": "Enum { cases: [\"classification\", \"detection\", \"segmentation\", \"tracking\", \"prediction\", \"custom\"] }",
-                  "name": "model-type"
-                },
-                {
-                  "definition": "Enum { cases: [\"cpu\", \"gpu\", \"npu\", \"auto\"] }",
-                  "name": "inference-backend"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"model-path\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"model-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"inference-backend\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence-threshold\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timing\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "ai-config"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "ai-status"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "perception-data",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "bounding-box3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "object-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Enum { cases: [\"new\", \"stable\", \"unstable\", \"lost\"] }",
-                  "name": "tracking-state"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"object-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"object-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"bounding-box\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"tracking-state\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "perceived-object"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"heading\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"yaw-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "ego-vehicle-state"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"objects\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"ego-state\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "scene-model"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "planning-data",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"position\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"velocity\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"acceleration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"heading\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"curvature\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"time-offset\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "trajectory-point"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"trajectory-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"waypoints\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"total-length\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"total-duration\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"cost\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"feasibility\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "planned-trajectory"
-                },
-                {
-                  "definition": "Enum { cases: [\"follow-lane\", \"lane-change-left\", \"lane-change-right\", \"merge\", \"turn-left\", \"turn-right\", \"stop\", \"emergency-stop\"] }",
-                  "name": "maneuver-type"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"selected-trajectory\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"maneuver-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"reason\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"confidence\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "planning-decision"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-health",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "run-diagnostic",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-last-diagnostic",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "health-monitoring",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "test-result"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"subsystem-name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"status\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"details\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }] }",
-                  "name": "subsystem-health"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"test-name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"test-result\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"details\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"execution-time-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "test-execution"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"test-results\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"overall-score\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"recommendations\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "diagnostic-result"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"component-id\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"overall-health\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"subsystem-health\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"last-diagnostic\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "health-report"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-performance",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "get-performance-history",
-                  "params": [
-                    {
-                      "name": "duration-seconds",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "reset-counters",
-                  "params": [],
-                  "results": []
-                }
-              ],
-              "name": "performance-monitoring",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"name\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"value\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"unit\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }, WitParam { name: \"description\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"string\") } }] }",
-                  "name": "metric"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"cpu-cores-used\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"memory-allocated-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"memory-peak-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"disk-io-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"network-io-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"gpu-utilization\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"gpu-memory-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
-                  "name": "resource-usage"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"base-metrics\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"component-specific\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"resource-usage\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "extended-performance"
-                }
-              ],
-              "version": null
-            }
-          ],
-          "filePath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/adas_object_detection_ai.wasm",
-          "imports": [
-            {
-              "functions": [],
-              "name": "types",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Enum { cases: [\"ok\", \"warning\", \"error\", \"critical\", \"offline\", \"degraded\"] }",
-                  "name": "health-status"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"latency-avg-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"latency-max-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"cpu-utilization\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"memory-usage-mb\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"throughput-hz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"error-rate\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "performance-metrics"
-                },
-                {
-                  "definition": "Enum { cases: [\"soft\", \"firm\", \"hard\"] }",
-                  "name": "deadline-type"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"max-latency-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"max-jitter-ms\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }, WitParam { name: \"update-frequency-hz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"deadline-type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "timing-constraints"
-                },
-                {
-                  "definition": "Enum { cases: [\"local\", \"utm\", \"wgs84\", \"map\", \"camera\", \"lidar\"] }",
-                  "name": "coordinate-frame"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"coordinate-frame\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "position3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"vx\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"vy\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"vz\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }, WitParam { name: \"speed\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f64\") } }] }",
-                  "name": "velocity3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"ax\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"ay\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"az\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"magnitude\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "acceleration3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"length\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"width\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"height\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "dimensions3d"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"x\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"y\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"z\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }, WitParam { name: \"w\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"f32\") } }] }",
-                  "name": "quaternion"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"center\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"dimensions\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"orientation\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "bounding-box3d"
-                },
-                {
-                  "definition": "Enum { cases: [\"unknown\", \"vehicle\", \"car\", \"truck\", \"bus\", \"motorcycle\", \"bicycle\", \"emergency-vehicle\", \"construction-vehicle\", \"pedestrian\", \"cyclist\", \"traffic-sign\", \"traffic-light\", \"road-marking\", \"construction-cone\", \"barrier\", \"pole\", \"debris\", \"animal\", \"stationary-object\"] }",
-                  "name": "object-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "timestamp"
-                },
-                {
-                  "definition": "Enum { cases: [\"passed\", \"failed\", \"error\", \"timeout\", \"not-run\"] }",
-                  "name": "test-result"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-environment",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "environment",
-              "namespace": null,
-              "package": null,
-              "types": [],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "exit",
-                  "params": [
-                    {
-                      "name": "status",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": []
-                }
-              ],
-              "name": "exit",
-              "namespace": null,
-              "package": null,
-              "types": [],
-              "version": null
-            },
-            {
-              "functions": [],
-              "name": "error",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "error"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.check-write",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.write",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "contents",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.blocking-write-and-flush",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "contents",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]output-stream.blocking-flush",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "streams",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "error"
-                },
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "output-stream"
-                },
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "input-stream"
-                },
-                {
-                  "definition": "Variant { cases: [WitVariantCase { name: \"last-operation-failed\", payload: Some(WitType { name: \"anonymous\", type_def: Primitive(\"custom\") }) }, WitVariantCase { name: \"closed\", payload: None }] }",
-                  "name": "stream-error"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stdin",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stdin",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "input-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stdout",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stdout",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-stderr",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "stderr",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "now",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "monotonic-clock",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "instant"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "now",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "wall-clock",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Record { fields: [WitParam { name: \"seconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u64\") } }, WitParam { name: \"nanoseconds\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"u32\") } }] }",
-                  "name": "datetime"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.write-via-stream",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    },
-                    {
-                      "name": "offset",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.append-via-stream",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.get-type",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "[method]descriptor.stat",
-                  "params": [
-                    {
-                      "name": "self",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                },
-                {
-                  "isAsync": false,
-                  "name": "filesystem-error-code",
-                  "params": [
-                    {
-                      "name": "err",
-                      "type": "anonymous"
-                    }
-                  ],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "types",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Resource { methods: [] }",
-                  "name": "descriptor"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "error"
-                },
-                {
-                  "definition": "Enum { cases: [\"access\", \"would-block\", \"already\", \"bad-descriptor\", \"busy\", \"deadlock\", \"quota\", \"exist\", \"file-too-large\", \"illegal-byte-sequence\", \"in-progress\", \"interrupted\", \"invalid\", \"io\", \"is-directory\", \"loop\", \"too-many-links\", \"message-size\", \"name-too-long\", \"no-device\", \"no-entry\", \"no-lock\", \"insufficient-memory\", \"insufficient-space\", \"not-directory\", \"not-empty\", \"not-recoverable\", \"unsupported\", \"no-tty\", \"no-such-device\", \"overflow\", \"not-permitted\", \"pipe\", \"read-only\", \"invalid-seek\", \"text-file-busy\", \"cross-device\"] }",
-                  "name": "error-code"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "filesize"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "output-stream"
-                },
-                {
-                  "definition": "Enum { cases: [\"unknown\", \"block-device\", \"character-device\", \"directory\", \"fifo\", \"symbolic-link\", \"regular-file\", \"socket\"] }",
-                  "name": "descriptor-type"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "link-count"
-                },
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "datetime"
-                },
-                {
-                  "definition": "Record { fields: [WitParam { name: \"type\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"link-count\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"size\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-access-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"data-modification-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }, WitParam { name: \"status-change-timestamp\", param_type: WitType { name: \"anonymous\", type_def: Primitive(\"custom\") } }] }",
-                  "name": "descriptor-stat"
-                }
-              ],
-              "version": null
-            },
-            {
-              "functions": [
-                {
-                  "isAsync": false,
-                  "name": "get-directories",
-                  "params": [],
-                  "results": [
-                    {
-                      "name": "result",
-                      "type": "anonymous"
-                    }
-                  ]
-                }
-              ],
-              "name": "preopens",
-              "namespace": null,
-              "package": null,
-              "types": [
-                {
-                  "definition": "Primitive(\"unknown\")",
-                  "name": "descriptor"
-                }
-              ],
-              "version": null
-            }
-          ],
-          "summary": {
-            "dependenciesCount": 8,
-            "exportsCount": 5,
-            "importsCount": 12,
-            "totalFunctions": 29,
-            "typesCount": 71
+        "category": "Automotive",
+        "status": "unloaded"
+      }
+    },
+    {
+      "id": "bf9d7dd2-ab72-429a-8956-97fc56068e54",
+      "node_type": "wasm-component",
+      "label": "adas_can_gateway",
+      "properties": {
+        "status": "unloaded",
+        "interfaces": [
+          {
+            "functions": [],
+            "interface_type": "import",
+            "name": "types"
           },
-          "worldName": "root"
-        },
-        "label": "adas_object_detection_ai"
+          {
+            "functions": [
+              {
+                "name": "get-environment",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "environment"
+          },
+          {
+            "functions": [
+              {
+                "name": "exit",
+                "params": [
+                  {
+                    "name": "status",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": []
+              }
+            ],
+            "interface_type": "import",
+            "name": "exit"
+          },
+          {
+            "functions": [],
+            "interface_type": "import",
+            "name": "error"
+          },
+          {
+            "functions": [
+              {
+                "name": "[method]output-stream.check-write",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.write",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "contents",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.blocking-write-and-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "contents",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.blocking-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "streams"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stdin",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdin"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stdout",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdout"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stderr",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stderr"
+          },
+          {
+            "functions": [
+              {
+                "name": "now",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "monotonic-clock"
+          },
+          {
+            "functions": [
+              {
+                "name": "now",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "wall-clock"
+          },
+          {
+            "functions": [
+              {
+                "name": "[method]descriptor.write-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "offset",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.append-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.get-type",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.stat",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "filesystem-error-code",
+                "params": [
+                  {
+                    "name": "err",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "types"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-directories",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "preopens"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-health",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "run-diagnostic",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "get-last-diagnostic",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "export",
+            "name": "health-monitoring"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-performance",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "get-performance-history",
+                "params": [
+                  {
+                    "name": "duration-seconds",
+                    "param_type": "u32"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "reset-counters",
+                "params": [],
+                "returns": []
+              }
+            ],
+            "interface_type": "export",
+            "name": "performance-monitoring"
+          }
+        ],
+        "category": "Automotive",
+        "componentName": "adas_can_gateway",
+        "componentPath": "../workspace/adas-wasm-components/target/wasm32-wasip2/release/deps/adas_can_gateway.wasm",
+        "label": "adas_can_gateway"
+      }
+    },
+    {
+      "id": "198410f9-187f-4eb8-b8b3-dac8a7abd151",
+      "node_type": "wasm-component",
+      "label": "adas_camera_front_ecu-component",
+      "properties": {
+        "label": "adas_camera_front_ecu-component",
+        "componentName": "adas_camera_front_ecu-component",
+        "status": "unloaded",
+        "category": "Vision",
+        "interfaces": [
+          {
+            "functions": [
+              {
+                "name": "get-environment",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "environment"
+          },
+          {
+            "functions": [
+              {
+                "name": "exit",
+                "params": [
+                  {
+                    "name": "status",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": []
+              }
+            ],
+            "interface_type": "import",
+            "name": "exit"
+          },
+          {
+            "functions": [],
+            "interface_type": "import",
+            "name": "error"
+          },
+          {
+            "functions": [
+              {
+                "name": "[method]output-stream.check-write",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.write",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "contents",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.blocking-write-and-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "contents",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]output-stream.blocking-flush",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "streams"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stdin",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdin"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stdout",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stdout"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-stderr",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "stderr"
+          },
+          {
+            "functions": [],
+            "interface_type": "import",
+            "name": "wall-clock"
+          },
+          {
+            "functions": [
+              {
+                "name": "[method]descriptor.write-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  },
+                  {
+                    "name": "offset",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.append-via-stream",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.get-type",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "[method]descriptor.stat",
+                "params": [
+                  {
+                    "name": "self",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              },
+              {
+                "name": "filesystem-error-code",
+                "params": [
+                  {
+                    "name": "err",
+                    "param_type": "custom"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "types"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-directories",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "preopens"
+          },
+          {
+            "functions": [
+              {
+                "name": "get-random-bytes",
+                "params": [
+                  {
+                    "name": "len",
+                    "param_type": "u64"
+                  }
+                ],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "custom"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "import",
+            "name": "random"
+          },
+          {
+            "functions": [
+              {
+                "name": "process-frame",
+                "params": [],
+                "returns": [
+                  {
+                    "name": "result",
+                    "param_type": "string"
+                  }
+                ]
+              }
+            ],
+            "interface_type": "export",
+            "name": "process-frame"
+          }
+        ],
+        "componentPath": "../workspace/adas-wasm-components/target/wac-temp/adas_camera_front_ecu-component.wasm"
       }
     }
   ],
