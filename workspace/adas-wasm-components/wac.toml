@@ -1,0 +1,200 @@
+[package]
+name = "adas-complete-system"
+version = "0.1.0"
+description = "Complete ADAS system with wac composition - Fixed Execution Order pipeline"
+authors = ["ADAS Team"]
+
+[world]
+name = "adas-complete-system"
+path = "wit/worlds/adas-complete-system.wit"
+
+# All ADAS components organized by functional layers
+[components]
+
+# === SENSOR LAYER ===
+# Physical sensor ECUs that provide raw sensor data
+camera-front = { path = "target/wasm32-wasip2/release/adas_camera_front_ecu.wasm" }
+camera-surround = { path = "target/wasm32-wasip2/release/adas_camera_surround_ecu.wasm" }
+radar-front = { path = "target/wasm32-wasip2/release/adas_radar_front_ecu.wasm" }
+radar-corner = { path = "target/wasm32-wasip2/release/adas_radar_corner_ecu.wasm" }
+lidar = { path = "target/wasm32-wasip2/release/adas_lidar_ecu.wasm" }
+ultrasonic = { path = "target/wasm32-wasip2/release/adas_ultrasonic_ecu.wasm" }
+
+# === AI PROCESSING LAYER ===
+# AI components using WASI-NN for neural network inference
+object-detection = { path = "target/wasm32-wasip2/release/adas_object_detection_ai.wasm" }
+behavior-prediction = { path = "target/wasm32-wasip2/release/adas_behavior_prediction_ai.wasm" }
+
+# === FUSION & PERCEPTION LAYER ===
+# Data fusion and perception processing
+sensor-fusion = { path = "target/wasm32-wasip2/release/adas_sensor_fusion_ecu.wasm" }
+perception-fusion = { path = "target/wasm32-wasip2/release/adas_perception_fusion.wasm" }
+tracking-prediction = { path = "target/wasm32-wasip2/release/adas_tracking_prediction_ai.wasm" }
+
+# === CONTROL LAYER ===
+# Planning and vehicle control
+planning-decision = { path = "target/wasm32-wasip2/release/adas_planning_decision.wasm" }
+vehicle-control = { path = "target/wasm32-wasip2/release/adas_vehicle_control_ecu.wasm" }
+
+# === INPUT LAYER ===
+# Video stream input for testing and simulation
+video-decoder = { path = "target/wasm32-wasip2/release/adas_video_decoder.wasm" }
+
+# === INTEGRATION LAYER ===
+# Pipeline integration components
+video-ai-pipeline = { path = "target/wasm32-wasip2/release/adas_video_ai_pipeline.wasm" }
+
+# === SYSTEM LAYER ===
+# System monitoring and communication
+safety-monitor = { path = "target/wasm32-wasip2/release/adas_safety_monitor.wasm" }
+can-gateway = { path = "target/wasm32-wasip2/release/adas_can_gateway.wasm" }
+hmi-interface = { path = "target/wasm32-wasip2/release/adas_hmi_interface.wasm" }
+domain-controller = { path = "target/wasm32-wasip2/release/adas_domain_controller.wasm" }
+feo-demo = { path = "target/wasm32-wasip2/release/adas_feo_demo.wasm" }
+
+# === ORCHESTRATION LAYER ===
+# Central orchestration and coordination
+orchestrator = { path = "target/wasm32-wasip2/release/adas_orchestrator.wasm" }
+
+# Fixed Execution Order (FEO) composition configuration
+[composition]
+# The composition follows automotive FEO pattern:
+# Phase 1: Sensor Data Collection
+# Phase 2: AI Processing & Perception
+# Phase 3: Planning & Decision
+# Phase 4: Control & Actuation
+# Phase 5: System Monitoring
+
+# === PHASE 1: SENSOR DATA COLLECTION ===
+# All sensors feed into sensor fusion component
+sensor-data-flow = [
+    "camera-front.sensor-data -> sensor-fusion.sensor-data-input",
+    "camera-surround.sensor-data -> sensor-fusion.sensor-data-input",
+    "radar-front.sensor-data -> sensor-fusion.sensor-data-input", 
+    "radar-corner.sensor-data -> sensor-fusion.sensor-data-input",
+    "lidar.sensor-data -> sensor-fusion.sensor-data-input",
+    "ultrasonic.sensor-data -> sensor-fusion.sensor-data-input"
+]
+
+# === PHASE 2: AI PROCESSING & PERCEPTION ===
+# Sensor fusion feeds AI components, results go to perception fusion
+ai-processing-flow = [
+    "sensor-fusion.sensor-data -> object-detection.sensor-data-input",
+    "sensor-fusion.sensor-data -> behavior-prediction.sensor-data-input",
+    "object-detection.perception-data -> perception-fusion.perception-data-input",
+    "behavior-prediction.prediction-data -> perception-fusion.prediction-data-input",
+    "perception-fusion.perception-data -> tracking-prediction.perception-data-input"
+]
+
+# === PHASE 3: PLANNING & DECISION ===
+# Perception results feed planning and decision components
+planning-flow = [
+    "perception-fusion.perception-data -> planning-decision.perception-data-input",
+    "tracking-prediction.prediction-data -> planning-decision.prediction-data-input"
+]
+
+# === PHASE 4: CONTROL & ACTUATION ===
+# Planning results feed vehicle control
+control-flow = [
+    "planning-decision.planning-data -> vehicle-control.planning-data-input"
+]
+
+# === PHASE 5: SYSTEM MONITORING ===
+# Safety monitoring receives inputs from all critical components
+monitoring-flow = [
+    "vehicle-control.control-data -> safety-monitor.control-data-input",
+    "safety-monitor.safety-data -> can-gateway.safety-data-input",
+    "can-gateway.can-data -> hmi-interface.can-data-input",
+    "hmi-interface.hmi-data -> domain-controller.hmi-data-input"
+]
+
+# === ORCHESTRATION COORDINATION ===
+# Central orchestrator coordinates all components via FEO
+orchestration-flow = [
+    "orchestrator.execution-control -> domain-controller.execution-control-input",
+    "orchestrator.resource-management -> domain-controller.resource-management-input",
+    "orchestrator.data-flow -> domain-controller.data-flow-input"
+]
+
+# === SPECIALIZED PIPELINES ===
+# Video-AI pipeline for demonstration and testing
+video-ai-flow = [
+    "video-decoder.video-data -> video-ai-pipeline.video-data-input",
+    "video-ai-pipeline.video-data -> object-detection.video-data-input",
+    "object-detection.detection-data -> video-ai-pipeline.detection-data-input"
+]
+
+# === DIAGNOSTIC FLOWS ===
+# All components report health and performance to orchestrator
+diagnostics-flow = [
+    "*.health-monitoring -> orchestrator.health-monitoring-input",
+    "*.performance-monitoring -> orchestrator.performance-monitoring-input"
+]
+
+# FEO execution phases configuration
+[feo]
+# Fixed execution order phases as defined in orchestration interface
+phases = [
+    "sensor-collection",     # Phase 1: Collect sensor data
+    "ai-processing",         # Phase 2: AI inference and perception
+    "planning-decision",     # Phase 3: Path planning and decision making
+    "control-actuation",     # Phase 4: Vehicle control commands
+    "system-monitoring"      # Phase 5: Safety and system monitoring
+]
+
+# Timing constraints for real-time automotive requirements
+timing = [
+    { phase = "sensor-collection", max_duration_ms = 5 },
+    { phase = "ai-processing", max_duration_ms = 20 },
+    { phase = "planning-decision", max_duration_ms = 10 },
+    { phase = "control-actuation", max_duration_ms = 5 },
+    { phase = "system-monitoring", max_duration_ms = 10 }
+]
+
+# Total cycle time target: 50ms (20 Hz)
+cycle_time_ms = 50
+safety_margin_ms = 10
+
+# Resource allocation for components
+[resources]
+# AI components require more memory for neural networks
+object-detection = { memory_mb = 512, cpu_cores = 2 }
+behavior-prediction = { memory_mb = 256, cpu_cores = 1 }
+
+# Sensor fusion requires high throughput
+sensor-fusion = { memory_mb = 128, cpu_cores = 2 }
+perception-fusion = { memory_mb = 128, cpu_cores = 1 }
+
+# Safety monitor requires highest priority
+safety-monitor = { memory_mb = 64, cpu_cores = 1, priority = "highest" }
+
+# Other components use standard allocation
+default = { memory_mb = 32, cpu_cores = 1, priority = "normal" }
+
+# Build configuration for wac composition
+[build]
+# Target for automotive deployment
+target = "wasm32-wasip2"
+optimize = true
+strip_debug = false  # Keep debug info for safety-critical automotive use
+
+# Required WASI features
+wasi_features = [
+    "experimental-wasi-nn",    # For AI components
+    "wasi-clocks",            # For timing and scheduling
+    "wasi-random",            # For AI randomization
+    "wasi-io"                 # For data I/O
+]
+
+# Validation settings
+[validation]
+# Strict validation for automotive safety
+strict_interfaces = true
+validate_timing = true
+validate_resources = true
+validate_safety = true
+
+# Component interaction validation
+validate_data_flow = true
+validate_execution_order = true
+validate_error_handling = true

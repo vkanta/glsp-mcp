@@ -1,0 +1,22 @@
+package adas:feo-demo@0.1.0;
+
+/// FEO (Fixed Execution Order) demonstration component world
+/// Shows how components execute in deterministic order
+world feo-demo-component {
+    // Import orchestration interfaces
+    import adas:orchestration/execution-control;
+    import adas:orchestration/data-flow;
+    import adas:orchestration/resource-management;
+    
+    // Import common types
+    import adas:common-types/types;
+    
+    // Import data interfaces for coordination
+    import adas:data/sensor-data;
+    import adas:data/perception-data;
+    
+    // Export system control interface
+    export adas:control/system-control;
+    export adas:diagnostics/health-monitoring;
+    export adas:diagnostics/performance-monitoring;
+}

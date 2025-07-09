@@ -1,0 +1,51 @@
+"""Camera Surround ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for camera component
+wit_library(
+    name = "camera_surround_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:camera-surround",
+)
+
+# Build camera surround component
+rust_wasm_component(
+    name = "camera_surround_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":camera_surround_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log", 
+    ],
+    crate_features = [
+        "adas-camera",
+        "sensor-interface",
+        "surround-view",
+    ],
+)
+
+# Test the camera component
+rust_wasm_component_test(
+    name = "camera_surround_test",
+    component = ":camera_surround_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_camera_surround_ecu", 
+    actual = ":camera_surround_ecu_main",
+    visibility = ["//visibility:public"],
+)

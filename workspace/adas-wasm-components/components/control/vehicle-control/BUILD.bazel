@@ -1,0 +1,59 @@
+"""Vehicle Control ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for control component
+wit_library(
+    name = "vehicle_control_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:vehicle-control",
+)
+
+# Build vehicle control component
+rust_wasm_component(
+    name = "vehicle_control_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":vehicle_control_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:pid",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-control",
+        "actuator-control",
+        "pid-controller",
+        "safety-critical",
+    ],
+    # Safety-critical control components need highest optimization
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "panic=abort",
+        "-C", "debug-assertions=off",
+    ],
+)
+
+# Test the control component
+rust_wasm_component_test(
+    name = "vehicle_control_test",
+    component = ":vehicle_control_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_vehicle_control_ecu", 
+    actual = ":vehicle_control_ecu_main",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,63 @@
+"""ADAS Visualizer Graphics Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for graphics component
+wit_library(
+    name = "adas_visualizer_interfaces",
+    srcs = ["wit/world.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:visualizer",
+)
+
+# Build graphics visualizer component
+rust_wasm_component(
+    name = "adas_visualizer_ecu",
+    srcs = [
+        "src/lib.rs",
+        "src/frame_buffer.rs",
+        "src/graphics_context.rs",
+        "src/overlay_renderer.rs",
+    ],
+    wit_bindgen = ":adas_visualizer_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:wgpu",
+        # "@crates//:image",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-graphics",
+        "visualization",
+        "overlay-rendering",
+        "frame-buffer",
+    ],
+    # Graphics components need GPU optimization
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "target-feature=+simd128",
+    ],
+)
+
+# Test the graphics component
+rust_wasm_component_test(
+    name = "adas_visualizer_test",
+    component = ":adas_visualizer_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_graphics_visualizer_ecu", 
+    actual = ":adas_visualizer_ecu_main",
+    visibility = ["//visibility:public"],
+)

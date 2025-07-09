@@ -1,0 +1,51 @@
+"""Ultrasonic ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for ultrasonic component
+wit_library(
+    name = "ultrasonic_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:ultrasonic",
+)
+
+# Build ultrasonic component
+rust_wasm_component(
+    name = "ultrasonic_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":ultrasonic_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log", 
+    ],
+    crate_features = [
+        "adas-ultrasonic",
+        "sensor-interface",
+        "proximity-detection",
+    ],
+)
+
+# Test the ultrasonic component
+rust_wasm_component_test(
+    name = "ultrasonic_test",
+    component = ":ultrasonic_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_ultrasonic_ecu", 
+    actual = ":ultrasonic_ecu_main",
+    visibility = ["//visibility:public"],
+)

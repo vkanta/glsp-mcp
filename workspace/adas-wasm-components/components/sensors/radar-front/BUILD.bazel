@@ -1,0 +1,51 @@
+"""Radar Front ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for radar component
+wit_library(
+    name = "radar_front_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:radar-front",
+)
+
+# Build radar front component
+rust_wasm_component(
+    name = "radar_front_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":radar_front_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log", 
+    ],
+    crate_features = [
+        "adas-radar",
+        "sensor-interface",
+        "doppler-processing",
+    ],
+)
+
+# Test the radar component
+rust_wasm_component_test(
+    name = "radar_front_test",
+    component = ":radar_front_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_radar_front_ecu", 
+    actual = ":radar_front_ecu_main",
+    visibility = ["//visibility:public"],
+)

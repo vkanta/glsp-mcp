@@ -1,0 +1,58 @@
+"""Tracking Prediction Fusion Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for fusion component
+wit_library(
+    name = "tracking_prediction_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:tracking-prediction",
+)
+
+# Build tracking prediction component
+rust_wasm_component(
+    name = "tracking_prediction_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":tracking_prediction_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:nalgebra",
+        # "@crates//:ndarray",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-fusion",
+        "object-tracking",
+        "motion-prediction",
+        "trajectory-estimation",
+    ],
+    # Tracking/prediction needs optimized math
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "target-feature=+simd128",
+    ],
+)
+
+# Test the fusion component
+rust_wasm_component_test(
+    name = "tracking_prediction_test",
+    component = ":tracking_prediction_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_tracking_prediction_ecu", 
+    actual = ":tracking_prediction_ecu_main",
+    visibility = ["//visibility:public"],
+)

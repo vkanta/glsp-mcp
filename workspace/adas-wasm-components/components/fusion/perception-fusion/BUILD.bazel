@@ -1,0 +1,57 @@
+"""Perception Fusion Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for fusion component
+wit_library(
+    name = "perception_fusion_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:perception-fusion",
+)
+
+# Build perception fusion component
+rust_wasm_component(
+    name = "perception_fusion_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":perception_fusion_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:nalgebra",
+        # "@crates//:ndarray",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-fusion",
+        "perception-processing",
+        "object-tracking",
+        "scene-understanding",
+    ],
+    # Perception fusion needs balanced performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+    ],
+)
+
+# Test the fusion component
+rust_wasm_component_test(
+    name = "perception_fusion_test",
+    component = ":perception_fusion_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_perception_fusion_ecu", 
+    actual = ":perception_fusion_ecu_main",
+    visibility = ["//visibility:public"],
+)

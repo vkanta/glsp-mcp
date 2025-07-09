@@ -1,0 +1,37 @@
+[package]
+name = "adas-wasmtime-host"
+version = "0.1.0"
+edition = "2021"
+description = "Wasmtime host application for ADAS complete system"
+
+[dependencies]
+# Wasmtime with component model and WASI support
+wasmtime = { version = "25.0", features = ["component-model", "async"] }
+wasmtime-wasi = "25.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization and configuration
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Logging and error handling
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time and utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+
+# Command line interface
+clap = { version = "4.0", features = ["derive"] }
+
+# Performance monitoring
+sysinfo = "0.30"
+
+[dev-dependencies]
+tempfile = "3.0"

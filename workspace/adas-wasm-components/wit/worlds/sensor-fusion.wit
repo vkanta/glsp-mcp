@@ -1,0 +1,22 @@
+package adas:sensor-fusion@0.1.0;
+
+/// Sensor fusion component world
+/// Combines data from multiple sensors using Kalman filtering
+world sensor-fusion-component {
+    // Import orchestration interfaces
+    import adas:orchestration/execution-control;
+    import adas:orchestration/data-flow;
+    import adas:orchestration/resource-management;
+    
+    // Import common types
+    import adas:common-types/types;
+    
+    // Import sensor data interfaces
+    import adas:data/sensor-data;
+    
+    // Export fusion control and data interfaces
+    export adas:control/sensor-control;
+    export adas:data/sensor-data as fusion-data;
+    export adas:diagnostics/health-monitoring;
+    export adas:diagnostics/performance-monitoring;
+}

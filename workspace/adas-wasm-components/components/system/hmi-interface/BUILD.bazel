@@ -1,0 +1,56 @@
+"""HMI Interface System Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for system component
+wit_library(
+    name = "hmi_interface_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:hmi-interface",
+)
+
+# Build HMI interface component
+rust_wasm_component(
+    name = "hmi_interface_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":hmi_interface_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-system",
+        "human-interface",
+        "display-control",
+        "user-interaction",
+    ],
+    # HMI components need responsive performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+    ],
+)
+
+# Test the system component
+rust_wasm_component_test(
+    name = "hmi_interface_test",
+    component = ":hmi_interface_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_hmi_interface_ecu", 
+    actual = ":hmi_interface_ecu_main",
+    visibility = ["//visibility:public"],
+)

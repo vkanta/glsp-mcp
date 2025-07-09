@@ -1,0 +1,63 @@
+"""Object Detection AI Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for AI component
+wit_library(
+    name = "object_detection_interfaces", 
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control",
+        "//:adas_data", 
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:object-detection",
+)
+
+# Build AI component with WASI-NN support
+rust_wasm_component(
+    name = "object_detection_ai",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":object_detection_interfaces",
+    profiles = ["debug", "release", "optimized"],
+    deps = [
+        # Add AI-specific dependencies
+        # "@crates//:ndarray",
+        # "@crates//:image",
+    ],
+    crate_features = [
+        "wasi-nn",
+        "object-detection",
+        "yolov5",
+    ],
+    # AI components need more optimization
+    rustc_flags = [
+        "-C", "opt-level=3",
+        "-C", "target-cpu=native",
+    ],
+)
+
+# Test the AI component  
+rust_wasm_component_test(
+    name = "object_detection_test",
+    component = ":object_detection_ai",
+)
+
+# Export model files
+filegroup(
+    name = "models",
+    srcs = ["models/yolov5n.onnx"],
+    visibility = ["//visibility:public"],
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_object_detection_ai",
+    actual = ":object_detection_ai_main", 
+    visibility = ["//visibility:public"],
+)

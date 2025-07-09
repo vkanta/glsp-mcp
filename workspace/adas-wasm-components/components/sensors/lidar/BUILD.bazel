@@ -1,0 +1,56 @@
+"""Lidar ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for lidar component
+wit_library(
+    name = "lidar_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:lidar",
+)
+
+# Build lidar component
+rust_wasm_component(
+    name = "lidar_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":lidar_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:nalgebra", 
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-lidar",
+        "sensor-interface",
+        "point-cloud",
+    ],
+    # Lidar processing can be computation-intensive
+    rustc_flags = [
+        "-C", "opt-level=2",
+    ],
+)
+
+# Test the lidar component
+rust_wasm_component_test(
+    name = "lidar_test",
+    component = ":lidar_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_lidar_ecu", 
+    actual = ":lidar_ecu_main",
+    visibility = ["//visibility:public"],
+)

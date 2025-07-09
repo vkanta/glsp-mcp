@@ -1,0 +1,51 @@
+"""Radar Corner ECU Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for radar component
+wit_library(
+    name = "radar_corner_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:radar-corner",
+)
+
+# Build radar corner component
+rust_wasm_component(
+    name = "radar_corner_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":radar_corner_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log", 
+    ],
+    crate_features = [
+        "adas-radar",
+        "sensor-interface",
+        "corner-detection",
+    ],
+)
+
+# Test the radar component
+rust_wasm_component_test(
+    name = "radar_corner_test",
+    component = ":radar_corner_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_radar_corner_ecu", 
+    actual = ":radar_corner_ecu_main",
+    visibility = ["//visibility:public"],
+)

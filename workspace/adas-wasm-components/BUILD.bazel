@@ -1,0 +1,106 @@
+"""Root BUILD file for ADAS WebAssembly Components"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//wac:defs.bzl", "wac_compose")
+
+package(default_visibility = ["//visibility:public"])
+
+# Export metadata and configuration files
+exports_files([
+    "wac.toml",
+    "wac-working.toml", 
+    "adas-system.wac",
+    "adas-working.wac",
+    "adas-simple.wac",
+])
+
+# Core ADAS interfaces
+wit_library(
+    name = "adas_common_types",
+    srcs = ["wit/interfaces/adas-common-types/types.wit"],
+    package_name = "adas:common-types",
+)
+
+wit_library(
+    name = "adas_control",
+    srcs = [
+        "wit/interfaces/adas-control/control.wit",
+        "wit/interfaces/adas-control/graphics.wit",
+    ],
+    deps = [":adas_common_types"],
+    package_name = "adas:control",
+)
+
+wit_library(
+    name = "adas_data",
+    srcs = [
+        "wit/interfaces/adas-data/data.wit", 
+        "wit/interfaces/adas-data/data-flow.wit",
+    ],
+    deps = [":adas_common_types"],
+    package_name = "adas:data",
+)
+
+wit_library(
+    name = "adas_diagnostics",
+    srcs = [
+        "wit/interfaces/adas-diagnostics/diagnostics.wit",
+        "wit/interfaces/adas-diagnostics/component-info.wit",
+    ],
+    deps = [":adas_common_types"],
+    package_name = "adas:diagnostics",
+)
+
+wit_library(
+    name = "adas_orchestration",
+    srcs = ["wit/interfaces/adas-orchestration/orchestration.wit"],
+    deps = [":adas_common_types"],
+    package_name = "adas:orchestration",
+)
+
+# Complete ADAS system composition using rules_wasm_component
+wac_compose(
+    name = "adas_complete_system",
+    components = {
+        # Sensor Layer (FEO Phase 1)
+        "camera-front": "//components/sensors/camera-front:camera_front_ecu",
+        "camera-surround": "//components/sensors/camera-surround:camera_surround_ecu",
+        "lidar": "//components/sensors/lidar:lidar_ecu",
+        "radar-front": "//components/sensors/radar-front:radar_front_ecu",
+        "radar-corner": "//components/sensors/radar-corner:radar_corner_ecu",
+        "ultrasonic": "//components/sensors/ultrasonic:ultrasonic_ecu",
+        
+        # Input/Processing Layer (FEO Phase 2)
+        "video-decoder": "//components/input/video-decoder:video_decoder_ecu",
+        
+        # AI Processing Layer (FEO Phase 3)
+        "object-detection": "//components/ai/object-detection:object_detection_ai",
+        "behavior-prediction": "//components/ai/behavior-prediction:behavior_prediction_ai",
+        
+        # Fusion Layer (FEO Phase 4)
+        "sensor-fusion": "//components/fusion/sensor-fusion:sensor_fusion_ecu",
+        "perception-fusion": "//components/fusion/perception-fusion:perception_fusion_ecu",
+        "tracking-prediction": "//components/fusion/tracking-prediction:tracking_prediction_ecu",
+        
+        # Control Layer (FEO Phase 5)
+        "planning-decision": "//components/control/planning-decision:planning_decision_ecu",
+        "vehicle-control": "//components/control/vehicle-control:vehicle_control_ecu",
+        
+        # System Layer (FEO Phase 6)
+        "safety-monitor": "//components/system/safety-monitor:safety_monitor_ecu",
+        "domain-controller": "//components/system/domain-controller:domain_controller_ecu",
+        "can-gateway": "//components/system/can-gateway:can_gateway_ecu",
+        "hmi-interface": "//components/system/hmi-interface:hmi_interface_ecu",
+        "feo-demo": "//components/system/feo-demo:feo_demo_ecu",
+        
+        # Integration Layer (FEO Phase 7)
+        "video-ai-pipeline": "//components/integration/video-ai-pipeline:video_ai_pipeline_ecu",
+        "adas-visualizer": "//components/graphics/adas-visualizer:adas_visualizer_ecu",
+        
+        # Orchestration Layer (FEO Phase 8)
+        "orchestrator": "//components/orchestrator:adas_orchestrator_ecu",
+    },
+    composition_file = "adas-system.wac",
+    profile = "release",
+    use_symlinks = True,
+)

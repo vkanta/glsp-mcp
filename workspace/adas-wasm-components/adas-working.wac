@@ -1,0 +1,19 @@
+package adas:working-system@0.1.0;
+
+// Instantiate ADAS components that build successfully
+let camera = new root:component from "target/wac-temp/adas_camera_front_ecu-component.wasm" { ... };
+let radar = new root:component from "target/wac-temp/adas_radar_front_ecu-component.wasm" { ... };
+let ai = new root:component from "target/wac-temp/adas_behavior_prediction_ai-component.wasm" { ... };
+let planner = new root:component from "target/wac-temp/adas_planning_decision-component.wasm" { ... };
+let pipeline = new root:component from "target/wac-temp/adas_video_ai_pipeline-component.wasm" { ... };
+let safety = new root:component from "target/wac-temp/adas_safety_monitor-component.wasm" { ... };
+let gateway = new root:component from "target/wac-temp/adas_can_gateway-component.wasm" { ... };
+
+// Export all components for now (simplified composition)
+export camera...;
+export radar...;
+export ai...;
+export planner...;
+export pipeline...;
+export safety...;
+export gateway...;

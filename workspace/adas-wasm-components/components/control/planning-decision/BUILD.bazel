@@ -1,0 +1,58 @@
+"""Planning Decision Control Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for control component
+wit_library(
+    name = "planning_decision_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:planning-decision",
+)
+
+# Build planning decision component
+rust_wasm_component(
+    name = "planning_decision_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":planning_decision_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:nalgebra", 
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-control",
+        "planning-algorithm",
+        "decision-tree",
+        "real-time",
+    ],
+    # Control components need deterministic performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "panic=abort",
+    ],
+)
+
+# Test the control component
+rust_wasm_component_test(
+    name = "planning_decision_test",
+    component = ":planning_decision_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_planning_decision_ecu", 
+    actual = ":planning_decision_ecu_main",
+    visibility = ["//visibility:public"],
+)

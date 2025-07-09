@@ -1,0 +1,57 @@
+"""CAN Gateway System Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for system component
+wit_library(
+    name = "can_gateway_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:can-gateway",
+)
+
+# Build CAN gateway component
+rust_wasm_component(
+    name = "can_gateway_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":can_gateway_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:socketcan",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-system",
+        "can-communication",
+        "message-routing",
+        "protocol-translation",
+    ],
+    # Network components need reliable performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+    ],
+)
+
+# Test the system component
+rust_wasm_component_test(
+    name = "can_gateway_test",
+    component = ":can_gateway_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_can_gateway_ecu", 
+    actual = ":can_gateway_ecu_main",
+    visibility = ["//visibility:public"],
+)

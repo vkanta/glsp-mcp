@@ -1,0 +1,56 @@
+"""FEO Demo System Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for system component
+wit_library(
+    name = "feo_demo_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:feo-demo",
+)
+
+# Build FEO demo component
+rust_wasm_component(
+    name = "feo_demo_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":feo_demo_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:serde",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-system",
+        "feo-orchestration",
+        "demo-mode",
+        "fixed-execution-order",
+    ],
+    # Demo components need standard performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+    ],
+)
+
+# Test the system component
+rust_wasm_component_test(
+    name = "feo_demo_test",
+    component = ":feo_demo_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_feo_demo_ecu", 
+    actual = ":feo_demo_ecu_main",
+    visibility = ["//visibility:public"],
+)

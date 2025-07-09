@@ -1,0 +1,58 @@
+"""Sensor Fusion Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for fusion component
+wit_library(
+    name = "sensor_fusion_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:sensor-fusion",
+)
+
+# Build sensor fusion component
+rust_wasm_component(
+    name = "sensor_fusion_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":sensor_fusion_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:nalgebra",
+        # "@crates//:ndarray",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-fusion",
+        "kalman-filter",
+        "multi-sensor",
+        "data-association",
+    ],
+    # Fusion components need mathematical optimization
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "target-feature=+simd128",
+    ],
+)
+
+# Test the fusion component
+rust_wasm_component_test(
+    name = "sensor_fusion_test",
+    component = ":sensor_fusion_ecu",
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_sensor_fusion_ecu", 
+    actual = ":sensor_fusion_ecu_main",
+    visibility = ["//visibility:public"],
+)

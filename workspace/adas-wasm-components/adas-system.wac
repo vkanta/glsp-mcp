@@ -1,0 +1,9 @@
+package adas:complete-system@0.1.0;
+
+// Instantiate working ADAS components
+let camera = new camera-front:component { ... };
+let safety = new safety-monitor:component { ... };
+
+// Export key components with proper naming
+export camera as camera-sensor;
+export safety as safety-monitor;

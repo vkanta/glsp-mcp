@@ -1,0 +1,6 @@
+package adas:simple-system@0.1.0;
+
+// Simple test composition with one component
+let camera = new root:component { ... };
+
+export camera...;

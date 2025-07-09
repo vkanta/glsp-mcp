@@ -1,0 +1,66 @@
+"""Video Decoder Input Component - Bazel Build"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# WIT interfaces for input component
+wit_library(
+    name = "video_decoder_interfaces",
+    srcs = ["wit/component.wit"],
+    deps = [
+        "//:adas_common_types",
+        "//:adas_control", 
+        "//:adas_data",
+        "//:adas_diagnostics",
+        "//:adas_orchestration",
+    ],
+    package_name = "adas:video-decoder",
+)
+
+# Build video decoder component
+rust_wasm_component(
+    name = "video_decoder_ecu",
+    srcs = ["src/lib.rs"],
+    wit_bindgen = ":video_decoder_interfaces",
+    profiles = ["debug", "release"],
+    deps = [
+        # Add Rust dependencies here
+        # "@crates//:h264-reader",
+        # "@crates//:image",
+        # "@crates//:log",
+    ],
+    crate_features = [
+        "adas-input",
+        "video-decoding",
+        "h264-support",
+        "frame-extraction",
+    ],
+    # Video decoding needs optimized performance
+    rustc_flags = [
+        "-C", "opt-level=2",
+        "-C", "target-feature=+simd128",
+    ],
+)
+
+# Export test video file
+filegroup(
+    name = "test_video",
+    srcs = ["models/driving_video_320x200.mp4"],
+    visibility = ["//visibility:public"],
+)
+
+# Test the input component
+rust_wasm_component_test(
+    name = "video_decoder_test",
+    component = ":video_decoder_ecu",
+    data = [":test_video"],
+)
+
+# For compatibility with existing system
+alias(
+    name = "adas_video_decoder_ecu", 
+    actual = ":video_decoder_ecu_main",
+    visibility = ["//visibility:public"],
+)
