@@ -124,23 +124,72 @@ export class WasmViewTransformer implements ViewTransformer {
     }
 
     /**
-     * Transform to WIT interface view
+     * Calculate adaptive layout parameters based on content complexity
+     */
+    private calculateLayoutParameters(components: WasmComponentData[]): {
+        packageWidth: number;
+        packageHeight: number;
+        interfaceWidth: number;
+        interfaceHeight: number;
+        functionWidth: number;
+        functionHeight: number;
+        horizontalSpacing: number;
+        verticalGroupSpacing: number;
+        interfaceVerticalSpacing: number;
+        functionVerticalSpacing: number;
+        functionHorizontalOffset: number;
+    } {
+        const maxFunctionsPerInterface = Math.max(
+            ...components.flatMap(c => c.interfaces.map(i => i.functions?.length || 0))
+        );
+        const maxInterfacesPerComponent = Math.max(
+            ...components.map(c => c.interfaces.length)
+        );
+        
+        // Adaptive sizing based on content complexity
+        const complexityFactor = Math.min(maxFunctionsPerInterface / 5, 2);
+        const densityFactor = Math.min(maxInterfacesPerComponent / 3, 1.5);
+        
+        return {
+            packageWidth: 280 + (densityFactor * 40),
+            packageHeight: 80,
+            interfaceWidth: 220 + (complexityFactor * 20),
+            interfaceHeight: 100 + (complexityFactor * 20),
+            functionWidth: 180 + (complexityFactor * 15),
+            functionHeight: 50,
+            horizontalSpacing: 400 + (densityFactor * 100),
+            verticalGroupSpacing: 200,
+            interfaceVerticalSpacing: 140 + (complexityFactor * 20),
+            functionVerticalSpacing: 70,
+            functionHorizontalOffset: 300 + (complexityFactor * 50)
+        };
+    }
+
+    /**
+     * Transform to WIT interface view with improved hierarchical layout
      */
     private transformToInterfaceView(diagram: DiagramModel): ViewTransformationResult {
         const elements = Object.values(diagram.elements);
         const wasmComponents = this.extractWasmComponents(elements);
         const witElements: ModelElement[] = [];
         
-
         let nodeIdCounter = 1;
         let edgeIdCounter = 1;
 
-        // Transform each WASM component into WIT interface representation
-        wasmComponents.forEach((component, index) => {
-            const baseX = 150 + (index * 300);
-            const baseY = 150;
-            
+        // Calculate adaptive layout parameters based on content complexity
+        const layout = this.calculateLayoutParameters(wasmComponents);
+        
+        let currentX = 100;
+        let maxY = 100;
 
+        // Transform each WASM component into WIT interface representation
+        wasmComponents.forEach((component, componentIndex) => {
+            const componentStartY = maxY;
+            
+            // Separate import and export interfaces for better visual grouping
+            const importInterfaces = component.interfaces.filter(iface => iface.type === 'import');
+            const exportInterfaces = component.interfaces.filter(iface => iface.type === 'export');
+            
             // Create package node for each component
             const packageNode: Node = {
                 id: `wit-package-${nodeIdCounter++}`,
@@ -148,94 +197,164 @@ export class WasmViewTransformer implements ViewTransformer {
                 element_type: 'wit-package',
                 label: `${component.name} Package`,
                 bounds: {
-                    x: baseX,
-                    y: baseY,
-                    width: 200,
-                    height: 60
+                    x: currentX,
+                    y: componentStartY,
+                    width: layout.packageWidth,
+                    height: layout.packageHeight
                 },
                 properties: {
                     componentId: component.id,
-                    interfaceCount: component.interfaces.length
+                    interfaceCount: component.interfaces.length,
+                    importCount: importInterfaces.length,
+                    exportCount: exportInterfaces.length
                 }
             };
             witElements.push(packageNode);
 
-            // Create interface nodes for each interface
-            component.interfaces.forEach((iface, ifaceIndex) => {
-                const interfaceY = baseY + 100 + (ifaceIndex * 150);
+            let interfaceY = componentStartY + layout.packageHeight + 40;
+            
+            // Create import interfaces group
+            if (importInterfaces.length > 0) {
+                const importGroupY = interfaceY;
                 
-                
-                const interfaceNode: Node = {
-                    id: `wit-interface-${nodeIdCounter++}`,
-                    type: 'wit-interface',
-                    element_type: 'wit-interface',
-                    label: iface.name,
-                    bounds: {
-                        x: baseX,
-                        y: interfaceY,
-                        width: 160,
-                        height: 120
-                    },
-                    properties: {
-                        componentId: component.id,
-                        interfaceType: iface.type,
-                        functionCount: iface.functions?.length || 0,
-                        typeCount: iface.types?.length || 0,
-                        functions: iface.functions || [],
-                        types: iface.types || []
-                    }
-                };
-                witElements.push(interfaceNode);
+                importInterfaces.forEach((iface, ifaceIndex) => {
+                    const interfaceNode = this.createInterfaceNode(
+                        nodeIdCounter++, 
+                        iface, 
+                        component.id, 
+                        currentX, 
+                        interfaceY,
+                        layout.interfaceWidth,
+                        layout.interfaceHeight
+                    );
+                    witElements.push(interfaceNode);
 
-                // Create edge from package to interface
-                const packageEdge: Edge = {
-                    id: `wit-contains-${edgeIdCounter++}`,
-                    type: 'wit-contains',
-                    element_type: 'wit-contains',
-                    source: packageNode.id,
-                    target: interfaceNode.id,
-                    label: iface.type === 'export' ? 'exports' : 'imports'
-                };
-                witElements.push(packageEdge);
-
-                // Create function nodes if detailed view is needed
-                iface.functions?.forEach((func, funcIndex) => {
-                    const functionY = interfaceY + 140 + (funcIndex * 80);
-                    
-                    const functionNode: Node = {
-                        id: `wit-function-${nodeIdCounter++}`,
-                        type: 'wit-function',
-                        element_type: 'wit-function',
-                        label: func.name,
-                        bounds: {
-                            x: baseX + 200,
-                            y: functionY,
-                            width: 160,
-                            height: 60
-                        },
-                        properties: {
-                            interfaceId: interfaceNode.id,
-                            parameters: func.parameters || [],
-                            returnType: func.returnType || 'void'
-                        }
-                    };
-                    witElements.push(functionNode);
-
-                    // Create edge from interface to function
-                    const functionEdge: Edge = {
-                        id: `wit-contains-func-${edgeIdCounter++}`,
+                    // Create edge from package to interface
+                    const packageEdge: Edge = {
+                        id: `wit-contains-${edgeIdCounter++}`,
                         type: 'wit-contains',
                         element_type: 'wit-contains',
-                        source: interfaceNode.id,
-                        target: functionNode.id,
-                        label: 'contains'
+                        sourceId: packageNode.id,
+                        targetId: interfaceNode.id,
+                        label: 'imports'
                     };
-                    witElements.push(functionEdge);
+                    witElements.push(packageEdge);
+
+                    // Create function nodes with improved positioning
+                    const functionElements = this.createFunctionNodes(
+                        iface, 
+                        interfaceNode, 
+                        nodeIdCounter, 
+                        edgeIdCounter,
+                        currentX + layout.functionHorizontalOffset,
+                        interfaceY,
+                        layout.functionWidth,
+                        layout.functionHeight,
+                        layout.functionVerticalSpacing
+                    );
+                    
+                    nodeIdCounter += functionElements.nodes.length;
+                    edgeIdCounter += functionElements.edges.length;
+                    witElements.push(...functionElements.nodes, ...functionElements.edges);
+
+                    // Create type nodes if interface has types
+                    if (iface.types && iface.types.length > 0) {
+                        const typeElements = this.createTypeNodes(
+                            iface,
+                            interfaceNode,
+                            nodeIdCounter,
+                            edgeIdCounter,
+                            currentX + layout.functionHorizontalOffset + 200,
+                            interfaceY,
+                            layout.functionWidth,
+                            layout.functionHeight,
+                            layout.functionVerticalSpacing
+                        );
+                        
+                        nodeIdCounter += typeElements.nodes.length;
+                        edgeIdCounter += typeElements.edges.length;
+                        witElements.push(...typeElements.nodes, ...typeElements.edges);
+                    }
+                    
+                    interfaceY += layout.interfaceVerticalSpacing + (iface.functions?.length || 0) * layout.functionVerticalSpacing;
                 });
-            });
+            }
+            
+            // Add spacing between import and export groups
+            if (importInterfaces.length > 0 && exportInterfaces.length > 0) {
+                interfaceY += layout.verticalGroupSpacing;
+            }
+            
+            // Create export interfaces group
+            if (exportInterfaces.length > 0) {
+                exportInterfaces.forEach((iface, ifaceIndex) => {
+                    const interfaceNode = this.createInterfaceNode(
+                        nodeIdCounter++, 
+                        iface, 
+                        component.id, 
+                        currentX, 
+                        interfaceY,
+                        layout.interfaceWidth,
+                        layout.interfaceHeight
+                    );
+                    witElements.push(interfaceNode);
+
+                    // Create edge from package to interface
+                    const packageEdge: Edge = {
+                        id: `wit-contains-${edgeIdCounter++}`,
+                        type: 'wit-contains',
+                        element_type: 'wit-contains',
+                        sourceId: packageNode.id,
+                        targetId: interfaceNode.id,
+                        label: 'exports'
+                    };
+                    witElements.push(packageEdge);
+
+                    // Create function nodes with improved positioning
+                    const functionElements = this.createFunctionNodes(
+                        iface, 
+                        interfaceNode, 
+                        nodeIdCounter, 
+                        edgeIdCounter,
+                        currentX + layout.functionHorizontalOffset,
+                        interfaceY,
+                        layout.functionWidth,
+                        layout.functionHeight,
+                        layout.functionVerticalSpacing
+                    );
+                    
+                    nodeIdCounter += functionElements.nodes.length;
+                    edgeIdCounter += functionElements.edges.length;
+                    witElements.push(...functionElements.nodes, ...functionElements.edges);
+
+                    // Create type nodes if interface has types
+                    if (iface.types && iface.types.length > 0) {
+                        const typeElements = this.createTypeNodes(
+                            iface,
+                            interfaceNode,
+                            nodeIdCounter,
+                            edgeIdCounter,
+                            currentX + layout.functionHorizontalOffset + 200,
+                            interfaceY,
+                            layout.functionWidth,
+                            layout.functionHeight,
+                            layout.functionVerticalSpacing
+                        );
+                        
+                        nodeIdCounter += typeElements.nodes.length;
+                        edgeIdCounter += typeElements.edges.length;
+                        witElements.push(...typeElements.nodes, ...typeElements.edges);
+                    }
+                    
+                    interfaceY += layout.interfaceVerticalSpacing + (iface.functions?.length || 0) * layout.functionVerticalSpacing;
+                });
+            }
+            
+            // Update positioning for next component
+            currentX += layout.horizontalSpacing;
+            maxY = Math.max(maxY, interfaceY + layout.verticalGroupSpacing);
         });
 
-        
         return {
             success: true,
             transformedElements: witElements,
@@ -245,10 +364,155 @@ export class WasmViewTransformer implements ViewTransformer {
                     showPackages: true,
                     showInterfaces: true,
                     showFunctions: true,
-                    showTypes: true
+                    showTypes: true,
+                    groupByInterfaceType: true
                 }
             }
         };
+    }
+
+    /**
+     * Create an interface node with improved styling
+     */
+    private createInterfaceNode(
+        nodeId: number, 
+        iface: ComponentInterface, 
+        componentId: string, 
+        x: number, 
+        y: number,
+        width: number,
+        height: number
+    ): Node {
+        return {
+            id: `wit-interface-${nodeId}`,
+            type: 'wit-interface',
+            element_type: 'wit-interface',
+            label: iface.name,
+            bounds: {
+                x,
+                y,
+                width,
+                height
+            },
+            properties: {
+                componentId,
+                interfaceType: iface.type,
+                functionCount: iface.functions?.length || 0,
+                typeCount: iface.types?.length || 0,
+                functions: iface.functions || [],
+                types: iface.types || []
+            }
+        };
+    }
+
+    /**
+     * Create function nodes with improved layout
+     */
+    private createFunctionNodes(
+        iface: ComponentInterface, 
+        interfaceNode: Node, 
+        nodeIdCounter: number, 
+        edgeIdCounter: number,
+        baseX: number,
+        baseY: number,
+        width: number,
+        height: number,
+        verticalSpacing: number
+    ): { nodes: Node[], edges: Edge[] } {
+        const nodes: Node[] = [];
+        const edges: Edge[] = [];
+        
+        iface.functions?.forEach((func, funcIndex) => {
+            const functionY = baseY + (funcIndex * verticalSpacing);
+            
+            const functionNode: Node = {
+                id: `wit-function-${nodeIdCounter + funcIndex}`,
+                type: 'wit-function',
+                element_type: 'wit-function',
+                label: func.name,
+                bounds: {
+                    x: baseX,
+                    y: functionY,
+                    width,
+                    height
+                },
+                properties: {
+                    interfaceId: interfaceNode.id,
+                    parameters: func.parameters || [],
+                    returnType: func.returnType || 'void',
+                    parameterCount: func.parameters?.length || 0
+                }
+            };
+            nodes.push(functionNode);
+
+            // Create edge from interface to function
+            const functionEdge: Edge = {
+                id: `wit-contains-func-${edgeIdCounter + funcIndex}`,
+                type: 'wit-contains',
+                element_type: 'wit-contains',
+                sourceId: interfaceNode.id,
+                targetId: functionNode.id,
+                label: 'contains'
+            };
+            edges.push(functionEdge);
+        });
+        
+        return { nodes, edges };
+    }
+
+    /**
+     * Create type nodes for interface types
+     */
+    private createTypeNodes(
+        iface: ComponentInterface,
+        interfaceNode: Node,
+        nodeIdCounter: number,
+        edgeIdCounter: number,
+        baseX: number,
+        baseY: number,
+        width: number,
+        height: number,
+        verticalSpacing: number
+    ): { nodes: Node[], edges: Edge[] } {
+        const nodes: Node[] = [];
+        const edges: Edge[] = [];
+        
+        iface.types?.forEach((type, typeIndex) => {
+            const typeY = baseY + (typeIndex * verticalSpacing);
+            
+            const typeNode: Node = {
+                id: `wit-type-${nodeIdCounter + typeIndex}`,
+                type: 'wit-type',
+                element_type: 'wit-type',
+                label: type.name,
+                bounds: {
+                    x: baseX,
+                    y: typeY,
+                    width,
+                    height
+                },
+                properties: {
+                    interfaceId: interfaceNode.id,
+                    typeKind: type.kind,
+                    fields: type.fields || [],
+                    fieldCount: type.fields?.length || 0
+                }
+            };
+            nodes.push(typeNode);
+
+            // Create edge from interface to type
+            const typeEdge: Edge = {
+                id: `wit-contains-type-${edgeIdCounter + typeIndex}`,
+                type: 'wit-contains',
+                element_type: 'wit-contains',
+                sourceId: interfaceNode.id,
+                targetId: typeNode.id,
+                label: 'defines'
+            };
+            edges.push(typeEdge);
+        });
+        
+        return { nodes, edges };
     }
 
     /**
@@ -330,8 +594,8 @@ export class WasmViewTransformer implements ViewTransformer {
                         id: `dep-export-${edgeIdCounter++}`,
                         type: 'wit-export',
                         element_type: 'wit-export',
-                        source: exporterNode.id,
-                        target: interfaceNode.id,
+                        sourceId: exporterNode.id,
+                        targetId: interfaceNode.id,
                         label: 'exports'
                     };
                     dependencyElements.push(exportEdge);
@@ -362,8 +626,8 @@ export class WasmViewTransformer implements ViewTransformer {
                         id: `dep-import-${edgeIdCounter++}`,
                         type: 'wit-import',
                         element_type: 'wit-import',
-                        source: interfaceNode.id,
-                        target: importerNode.id,
+                        sourceId: interfaceNode.id,
+                        targetId: importerNode.id,
                         label: 'imported by'
                     };
                     dependencyElements.push(importEdge);
@@ -478,7 +742,7 @@ export class WasmViewTransformer implements ViewTransformer {
                 }));
             } else if (typeof interfaceData === 'number') {
                 // If interfaces is a count, create mock interfaces
-                const count = component.properties.interfaces;
+                const count = interfaceData;
                 for (let i = 0; i < count; i++) {
                     interfaces.push({
                         name: `interface-${i + 1}`,
