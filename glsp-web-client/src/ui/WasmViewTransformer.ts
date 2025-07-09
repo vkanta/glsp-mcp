@@ -131,8 +131,6 @@ export class WasmViewTransformer implements ViewTransformer {
         const wasmComponents = this.extractWasmComponents(elements);
         const witElements: ModelElement[] = [];
         
-        console.log('WasmViewTransformer: Transforming to interface view');
-        console.log('Found WASM components:', wasmComponents.length, wasmComponents);
 
         let nodeIdCounter = 1;
         let edgeIdCounter = 1;
@@ -142,7 +140,6 @@ export class WasmViewTransformer implements ViewTransformer {
             const baseX = 150 + (index * 300);
             const baseY = 150;
             
-            console.log(`Processing component ${component.name}:`, component.interfaces);
 
             // Create package node for each component
             const packageNode: Node = {
@@ -237,8 +234,6 @@ export class WasmViewTransformer implements ViewTransformer {
             });
         });
 
-        console.log(`WasmViewTransformer: Created ${witElements.length} WIT elements`);
-        console.log('WIT elements:', witElements);
         
         return {
             success: true,
@@ -403,7 +398,6 @@ export class WasmViewTransformer implements ViewTransformer {
             
             if (elementType === 'wasm-component') {
                 const node = element as Node;
-                console.log('Extracting component:', node.label, 'Properties:', node.properties);
                 const component: WasmComponentData = {
                     id: node.id,
                     name: node.label || `Component ${node.id}`,
@@ -427,8 +421,6 @@ export class WasmViewTransformer implements ViewTransformer {
     private extractComponentInterfaces(component: Node): ComponentInterface[] {
         const interfaces: ComponentInterface[] = [];
         
-        console.log('Extracting interfaces from component:', component.label);
-        console.log('Component properties:', JSON.stringify(component.properties, null, 2));
         
         // Check for various possible interface property names
         const interfaceData = component.properties?.interfaces || 
@@ -469,8 +461,20 @@ export class WasmViewTransformer implements ViewTransformer {
         // Try to extract interfaces from component properties
         if (interfaceData) {
             if (Array.isArray(interfaceData)) {
-                // If interfaces is already an array of interface objects
-                return interfaceData as ComponentInterface[];
+                // Map the actual interface structure to our expected format
+                return interfaceData.map((iface: any) => ({
+                    name: iface.name,
+                    type: iface.interface_type === 'export' ? 'export' : 'import',
+                    functions: iface.functions?.map((func: any) => ({
+                        name: func.name,
+                        parameters: func.params?.map((p: any) => ({
+                            name: p.name,
+                            type: p.param_type
+                        })) || [],
+                        returnType: func.returns?.[0]?.param_type || 'void'
+                    })) || [],
+                    types: iface.types || []
+                }));
             } else if (typeof interfaceData === 'number') {
                 // If interfaces is a count, create mock interfaces
                 const count = component.properties.interfaces;
