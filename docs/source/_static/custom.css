@@ -1,5 +1,25 @@
 /* Custom CSS for GLSP-Rust documentation */
 
+/* Furo theme fixes */
+.sidebar-drawer {
+    --sidebar-width: 15rem;
+}
+
+/* Fix for content width with right sidebar */
+.content {
+    max-width: calc(100vw - 30rem);
+}
+
+/* Fix table of contents in right sidebar */
+.toc-tree {
+    font-size: 0.9rem;
+}
+
+.toc-tree .current > a {
+    font-weight: 600;
+    color: var(--color-brand-primary);
+}
+
 /* Improve readability of code blocks */
 .highlight {
     background-color: #f8f9fa;
@@ -145,10 +165,12 @@ code {
     font-size: 0.875em;
 }
 
-/* PlantUML diagram styling */
+/* PlantUML diagram styling - Fix for Furo theme */
 .plantuml {
-    text-align: center;
-    margin: 1rem 0;
+    text-align: left;
+    margin: 1.5rem 0;
+    width: 100%;
+    clear: both;
 }
 
 .plantuml img {
@@ -157,6 +179,51 @@ code {
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: zoom-in;
+    transition: transform 0.2s ease;
+}
+
+.plantuml img:hover {
+    transform: scale(1.02);
+}
+
+/* Fix for large diagrams - make them scrollable */
+.plantuml {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+}
+
+/* Ensure diagrams don't interfere with right sidebar */
+@media (min-width: 82rem) {
+    .plantuml {
+        max-width: calc(100vw - 20rem);
+    }
+}
+
+/* Click to zoom functionality */
+.plantuml img.zoomed {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1.5);
+    z-index: 9999;
+    background: white;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    border: 2px solid #007bff;
+    cursor: zoom-out;
+    max-width: 90vw;
+    max-height: 90vh;
+}
+
+.plantuml img.zoomed ~ .zoom-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9998;
 }
 
 /* Responsive design improvements */

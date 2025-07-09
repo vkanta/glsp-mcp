@@ -62,6 +62,10 @@ html_theme = 'furo'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# Configure table of contents
+html_show_sourcelink = False
+html_show_sphinx = False
+
 # -- Options for sphinx_needs -----------------------------------------------
 
 # Define custom need types for GLSP-Rust components
@@ -292,13 +296,26 @@ html_theme_options = {
     'source_repository': 'https://github.com/glsp-rust/glsp-rust',
     'source_branch': 'main',
     'source_directory': 'docs/source/',
+    # Fix for table of contents issues
+    'light_css_variables': {
+        'color-sidebar-background': '#f8f9fa',
+        'color-sidebar-background-border': '#dee2e6',
+    },
+    'dark_css_variables': {
+        'color-sidebar-background': '#1a1a1a',
+        'color-sidebar-background-border': '#333',
+    },
 }
 
 # -- Additional configuration -----------------------------------------------
 
-# Add custom CSS
+# Add custom CSS and JS
 html_css_files = [
     'custom.css',
+]
+
+html_js_files = [
+    'diagram-zoom.js',
 ]
 
 # Configure code highlighting
