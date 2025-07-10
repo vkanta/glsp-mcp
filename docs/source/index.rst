@@ -155,11 +155,6 @@ Documentation Structure
    :maxdepth: 2
    :caption: Getting Started
 
-   getting_started/index
-   getting_started/installation
-   getting_started/quick_start
-   getting_started/basic_concepts
-
 .. toctree::
    :maxdepth: 2
    :caption: Requirements
@@ -192,52 +187,21 @@ Documentation Structure
    :maxdepth: 2
    :caption: API Reference
 
-   api/index
-   api/mcp_protocol
-   api/wasm_components
-   api/database
-   api/simulation
-   api/frontend
-
 .. toctree::
    :maxdepth: 2
    :caption: Developer Guide
-
-   developer/index
-   developer/contributing
-   developer/code_style
-   developer/testing
-   developer/debugging
-   developer/performance
 
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
 
-   user_guide/index
-   user_guide/creating_diagrams
-   user_guide/ai_interactions
-   user_guide/wasm_components
-   user_guide/advanced_features
-
 .. toctree::
    :maxdepth: 2
    :caption: Safety & Security
 
-   safety/index
-   safety/security_analysis
-   safety/wasm_sandboxing
-   safety/input_validation
-   safety/threat_modeling
-
 .. toctree::
    :maxdepth: 2
    :caption: Qualification
-
-   qualification/index
-   qualification/testing_strategy
-   qualification/performance_benchmarks
-   qualification/compliance
 
 Production Status
 -----------------
