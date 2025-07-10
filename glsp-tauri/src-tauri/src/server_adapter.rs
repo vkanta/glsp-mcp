@@ -1,9 +1,9 @@
 use glsp_mcp_server::{run_server, GlspConfig};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
-use std::net::TcpListener;
 
 // Global state to track the allocated server port
 static SERVER_PORT: std::sync::OnceLock<Arc<RwLock<u16>>> = std::sync::OnceLock::new();
@@ -15,7 +15,7 @@ fn find_available_port(preferred_port: u16, fallback_ports: &[u16]) -> Result<u1
         drop(listener);
         return Ok(preferred_port);
     }
-    
+
     // Try fallback ports
     for &port in fallback_ports {
         if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
@@ -23,7 +23,7 @@ fn find_available_port(preferred_port: u16, fallback_ports: &[u16]) -> Result<u1
             return Ok(port);
         }
     }
-    
+
     // If all specified ports fail, let the OS assign a random available port
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
@@ -39,11 +39,11 @@ fn get_server_port() -> u16 {
             return port;
         }
     }
-    
+
     // Try to find an available port
     let preferred_port = 3000;
     let fallback_ports = [3001, 3002, 3003, 8080, 8081, 8082, 9000, 9001];
-    
+
     match find_available_port(preferred_port, &fallback_ports) {
         Ok(port) => {
             info!("Found available port: {}", port);
@@ -69,17 +69,19 @@ pub async fn start_embedded_server() -> Result<(), Box<dyn std::error::Error + S
     std::env::set_var("PULSEENGINE_AUTH_DISABLED", "true");
     std::env::set_var("MCP_AUTH_STORAGE", "memory");
     std::env::set_var("MCP_DISABLE_AUTH", "true");
-    
+
     start_embedded_server_with_workspace(None).await
 }
 
 /// Start the embedded MCP server with a specific workspace directory
-pub async fn start_embedded_server_with_workspace(workspace_path: Option<String>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn start_embedded_server_with_workspace(
+    workspace_path: Option<String>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting embedded MCP server for Tauri application");
 
     // Allocate port dynamically
     let port = get_server_port();
-    
+
     // Store the allocated port for later use
     let port_lock = SERVER_PORT.get_or_init(|| Arc::new(RwLock::new(0)));
     *port_lock.write().await = port;
@@ -124,9 +126,14 @@ pub async fn start_embedded_server_with_workspace(workspace_path: Option<String>
     create_app_directories(&config).await?;
 
     info!("Starting MCP server on port {}", config.port);
-    run_server(config).await.map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { 
-        Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-    })
+    run_server(config)
+        .await
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                e.to_string(),
+            ))
+        })
 }
 
 /// Get application data directory path
@@ -138,36 +145,42 @@ fn get_app_dir(subdir: &str) -> String {
         })
         .join("wasm-component-designer")
         .join(subdir);
-    
+
     base.to_string_lossy().to_string()
 }
 
 /// Create necessary application directories
-async fn create_app_directories(config: &GlspConfig) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn create_app_directories(
+    config: &GlspConfig,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use std::fs;
-    
+
     // Create WASM components directory
     if let Err(e) = fs::create_dir_all(&config.wasm_path) {
-        warn!("Failed to create WASM directory {}: {}", config.wasm_path, e);
+        warn!(
+            "Failed to create WASM directory {}: {}",
+            config.wasm_path, e
+        );
     } else {
         info!("Created WASM components directory: {}", config.wasm_path);
     }
-    
+
     // Create diagrams directory
     if let Err(e) = fs::create_dir_all(&config.diagrams_path) {
-        warn!("Failed to create diagrams directory {}: {}", config.diagrams_path, e);
+        warn!(
+            "Failed to create diagrams directory {}: {}",
+            config.diagrams_path, e
+        );
     } else {
         info!("Created diagrams directory: {}", config.diagrams_path);
     }
-    
+
     Ok(())
 }
 
 /// Get the app data directory for external use
 pub fn get_app_data_directory() -> PathBuf {
     dirs::data_dir()
-        .unwrap_or_else(|| {
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-        })
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
         .join("wasm-component-designer")
 }

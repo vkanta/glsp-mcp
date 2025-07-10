@@ -2,8 +2,8 @@
 
 use clap::Parser;
 use glsp_mcp_server::{GlspBackend, GlspConfig};
-use pulseengine_mcp_server::{McpServer, ServerConfig};
 use pulseengine_mcp_auth::config::AuthConfig;
+use pulseengine_mcp_server::{McpServer, ServerConfig};
 use std::fs;
 use std::path::Path;
 use tracing::{info, warn};
@@ -62,7 +62,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     // Configure server with framework based on our config
     let mut server_config = ServerConfig::default();
-    
+
     // Use memory-only authentication (no persistent storage)
     server_config.auth_config = AuthConfig::memory();
 
@@ -81,7 +81,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             TransportConfig::streamable_http(config.port)
         }
     };
-    
+
     // Create and run server using framework
     let mut server = McpServer::new(backend, server_config).await?;
 

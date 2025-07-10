@@ -56,13 +56,16 @@ pub struct McpClient {
 impl McpClient {
     pub fn new(server_port: u16) -> Self {
         Self {
-            base_url: std::sync::Arc::new(std::sync::Mutex::new(format!("http://localhost:{}/messages", server_port))),
+            base_url: std::sync::Arc::new(std::sync::Mutex::new(format!(
+                "http://localhost:{}/messages",
+                server_port
+            ))),
             client: reqwest::Client::new(),
             next_id: std::sync::atomic::AtomicU64::new(1),
             session_id: std::sync::Mutex::new(None),
         }
     }
-    
+
     /// Update the server port if it changes
     pub fn update_port(&self, new_port: u16) {
         let mut url = self.base_url.lock().unwrap();
@@ -70,7 +73,8 @@ impl McpClient {
     }
 
     fn next_request_id(&self) -> u64 {
-        self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        self.next_id
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Initialize MCP session and get session ID
@@ -90,7 +94,8 @@ impl McpClient {
         };
 
         let base_url = self.base_url.lock().unwrap().clone();
-        let mut req_builder = self.client
+        let mut req_builder = self
+            .client
             .post(&base_url)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
@@ -111,7 +116,10 @@ impl McpClient {
             .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         if let Some(error) = mcp_response.error {
-            return Err(format!("MCP error: {} (code: {})", error.message, error.code));
+            return Err(format!(
+                "MCP error: {} (code: {})",
+                error.message, error.code
+            ));
         }
 
         // Extract session ID from response if available
@@ -127,7 +135,11 @@ impl McpClient {
     }
 
     /// Call an MCP tool on the server
-    pub async fn call_tool(&self, tool_name: &str, arguments: Option<Value>) -> Result<McpToolResult, String> {
+    pub async fn call_tool(
+        &self,
+        tool_name: &str,
+        arguments: Option<Value>,
+    ) -> Result<McpToolResult, String> {
         let request = McpRequest {
             jsonrpc: "2.0".to_string(),
             method: "tools/call".to_string(),
@@ -141,7 +153,8 @@ impl McpClient {
         debug!("Sending MCP request: {:?}", request);
 
         let base_url = self.base_url.lock().unwrap().clone();
-        let mut req_builder = self.client
+        let mut req_builder = self
+            .client
             .post(&base_url)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
@@ -171,33 +184,48 @@ impl McpClient {
         debug!("Received MCP response: {:?}", mcp_response);
 
         if let Some(error) = mcp_response.error {
-            return Err(format!("MCP error: {} (code: {})", error.message, error.code));
+            return Err(format!(
+                "MCP error: {} (code: {})",
+                error.message, error.code
+            ));
         }
 
         let result = mcp_response.result.ok_or("No result in response")?;
-        
-        serde_json::from_value(result)
-            .map_err(|e| format!("Failed to parse tool result: {}", e))
+
+        serde_json::from_value(result).map_err(|e| format!("Failed to parse tool result: {}", e))
     }
 
     /// Set workspace directory using MCP tool
-    pub async fn set_workspace_directory(&self, workspace_path: &str, create_if_missing: bool) -> Result<String, String> {
-        let result = self.call_tool("set_workspace_directory", Some(serde_json::json!({
-            "workspace_path": workspace_path,
-            "create_if_missing": create_if_missing
-        }))).await?;
+    pub async fn set_workspace_directory(
+        &self,
+        workspace_path: &str,
+        create_if_missing: bool,
+    ) -> Result<String, String> {
+        let result = self
+            .call_tool(
+                "set_workspace_directory",
+                Some(serde_json::json!({
+                    "workspace_path": workspace_path,
+                    "create_if_missing": create_if_missing
+                })),
+            )
+            .await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Unknown error", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let success_msg = result.content.get(0)
+        let success_msg = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .map_or("Workspace directory set successfully", |s| s);
-        
+
         Ok(success_msg.to_string())
     }
 
@@ -206,13 +234,17 @@ impl McpClient {
         let result = self.call_tool("get_workspace_info", None).await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Failed to get workspace info", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let workspace_text = result.content.get(0)
+        let workspace_text = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .ok_or("No workspace info in response")?;
 
@@ -222,41 +254,59 @@ impl McpClient {
 
     /// Set WASM components path using MCP tool
     pub async fn set_wasm_components_path(&self, wasm_path: &str) -> Result<String, String> {
-        let result = self.call_tool("set_wasm_components_path", Some(serde_json::json!({
-            "wasm_path": wasm_path
-        }))).await?;
+        let result = self
+            .call_tool(
+                "set_wasm_components_path",
+                Some(serde_json::json!({
+                    "wasm_path": wasm_path
+                })),
+            )
+            .await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Unknown error", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let success_msg = result.content.get(0)
+        let success_msg = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .map_or("WASM components path set successfully", |s| s);
-        
+
         Ok(success_msg.to_string())
     }
 
     /// Set diagrams path using MCP tool
     pub async fn set_diagrams_path(&self, diagrams_path: &str) -> Result<String, String> {
-        let result = self.call_tool("set_diagrams_path", Some(serde_json::json!({
-            "diagrams_path": diagrams_path
-        }))).await?;
+        let result = self
+            .call_tool(
+                "set_diagrams_path",
+                Some(serde_json::json!({
+                    "diagrams_path": diagrams_path
+                })),
+            )
+            .await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Unknown error", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let success_msg = result.content.get(0)
+        let success_msg = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .map_or("Diagrams path set successfully", |s| s);
-        
+
         Ok(success_msg.to_string())
     }
 
@@ -265,33 +315,46 @@ impl McpClient {
         let result = self.call_tool("rescan_workspace", None).await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Unknown error", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let success_msg = result.content.get(0)
+        let success_msg = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .map_or("Workspace rescanned successfully", |s| s);
-        
+
         Ok(success_msg.to_string())
     }
 
     /// Validate workspace structure using MCP tool
     pub async fn validate_workspace(&self, workspace_path: &str) -> Result<Value, String> {
-        let result = self.call_tool("validate_workspace", Some(serde_json::json!({
-            "workspace_path": workspace_path
-        }))).await?;
+        let result = self
+            .call_tool(
+                "validate_workspace",
+                Some(serde_json::json!({
+                    "workspace_path": workspace_path
+                })),
+            )
+            .await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Workspace validation failed", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let validation_text = result.content.get(0)
+        let validation_text = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .ok_or("No validation result in response")?;
 
@@ -301,21 +364,30 @@ impl McpClient {
 
     /// Create workspace structure using MCP tool
     pub async fn create_workspace_structure(&self, workspace_path: &str) -> Result<String, String> {
-        let result = self.call_tool("create_workspace_structure", Some(serde_json::json!({
-            "workspace_path": workspace_path
-        }))).await?;
+        let result = self
+            .call_tool(
+                "create_workspace_structure",
+                Some(serde_json::json!({
+                    "workspace_path": workspace_path
+                })),
+            )
+            .await?;
 
         if result.is_error.unwrap_or(false) {
-            let error_msg = result.content.get(0)
+            let error_msg = result
+                .content
+                .get(0)
                 .and_then(|c| c.text.as_ref())
                 .map_or("Unknown error", |s| s);
             return Err(error_msg.to_string());
         }
 
-        let success_msg = result.content.get(0)
+        let success_msg = result
+            .content
+            .get(0)
             .and_then(|c| c.text.as_ref())
             .map_or("Workspace structure created successfully", |s| s);
-        
+
         Ok(success_msg.to_string())
     }
 
@@ -323,13 +395,15 @@ impl McpClient {
     pub async fn health_check(&self) -> Result<bool, String> {
         let base_url = self.base_url.lock().unwrap().clone();
         // Extract port from base URL
-        let port = base_url.split(':').nth(2)
+        let port = base_url
+            .split(':')
+            .nth(2)
             .and_then(|s| s.split('/').next())
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(3000);
-        
+
         let health_url = format!("http://localhost:{}/health", port);
-        
+
         match self.client.get(&health_url).send().await {
             Ok(response) => Ok(response.status().is_success()),
             Err(_) => Ok(false),

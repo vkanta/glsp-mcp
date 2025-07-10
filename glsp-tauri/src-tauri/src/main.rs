@@ -1,13 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-mod server_adapter;
 mod mcp_client;
+mod server_adapter;
 
 use std::sync::Arc;
+use tauri::Manager;
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
-use tauri::Manager;
 
 /// Simplified AppState that only tracks essential application state
 #[derive(Debug)]
@@ -20,9 +20,10 @@ struct AppState {
 async fn main() {
     // Initialize logging
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            EnvFilter::new("glsp_desktop=info,glsp_mcp_server=info")
-        }))
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("glsp_desktop=info,glsp_mcp_server=info")),
+        )
         .init();
 
     // Start embedded MCP server in background thread
@@ -34,24 +35,24 @@ async fn main() {
 
     // Wait for server to allocate port and start
     tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
-    
+
     // Get the allocated server port
     let server_port = server_adapter::get_allocated_server_port().await;
     if server_port == 0 {
         eprintln!("Warning: Server port not allocated yet, using default 3000");
     }
     let port = if server_port > 0 { server_port } else { 3000 };
-    
+
     tracing::info!("Creating MCP client for port: {}", port);
 
     // Create MCP client and app state
     let mcp_client = Arc::new(mcp_client::McpClient::new(port));
-    
+
     // Initialize MCP client session
     if let Err(e) = mcp_client.initialize().await {
         eprintln!("Failed to initialize MCP client: {}", e);
     }
-    
+
     let app_state = AppState {
         mcp_client,
         current_workspace: Arc::new(Mutex::new(None)),
@@ -76,14 +77,14 @@ async fn main() {
         .setup(|app| {
             // Wait for MCP server to initialize
             std::thread::sleep(std::time::Duration::from_millis(500));
-            
+
             // Optional: Open developer tools in debug mode
             #[cfg(debug_assertions)]
             {
                 let window = app.get_window("main").unwrap();
                 window.open_devtools();
             }
-            
+
             Ok(())
         })
         .run(tauri::generate_context!())
