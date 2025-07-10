@@ -25,12 +25,29 @@ pub enum SecurityRiskLevel {
 /// Security issue types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SecurityIssueType {
-    UnsafeImport { import_name: String, reason: String },
-    SuspiciousExport { export_name: String, reason: String },
-    ExcessivePermissions { permission: String, reason: String },
-    UntrustedOrigin { source: String, reason: String },
-    MalformedComponent { issue: String },
-    ResourceLeak { resource_type: String, reason: String },
+    UnsafeImport {
+        import_name: String,
+        reason: String,
+    },
+    SuspiciousExport {
+        export_name: String,
+        reason: String,
+    },
+    ExcessivePermissions {
+        permission: String,
+        reason: String,
+    },
+    UntrustedOrigin {
+        source: String,
+        reason: String,
+    },
+    MalformedComponent {
+        issue: String,
+    },
+    ResourceLeak {
+        resource_type: String,
+        reason: String,
+    },
 }
 
 /// Security issue identified during scanning
@@ -79,7 +96,7 @@ impl Default for WasmSecurityScanner {
 impl WasmSecurityScanner {
     pub fn new() -> Self {
         let mut dangerous_imports = HashSet::new();
-        
+
         // Add known dangerous imports
         dangerous_imports.insert("wasi_snapshot_preview1::proc_exit".to_string());
         dangerous_imports.insert("wasi_snapshot_preview1::fd_write".to_string());
@@ -102,10 +119,7 @@ impl WasmSecurityScanner {
     }
 
     /// Perform comprehensive security analysis on a WASM component
-    pub async fn analyze_component<P: AsRef<Path>>(
-        &self,
-        path: P,
-    ) -> Result<SecurityAnalysis> {
+    pub async fn analyze_component<P: AsRef<Path>>(&self, path: P) -> Result<SecurityAnalysis> {
         let path = path.as_ref();
         let component_name = path
             .file_stem()
@@ -158,7 +172,8 @@ impl WasmSecurityScanner {
                     },
                     risk_level: SecurityRiskLevel::High,
                     description: format!("Component analysis failed: {}", e),
-                    recommendation: "Component may be malformed or corrupted. Verify integrity.".to_string(),
+                    recommendation: "Component may be malformed or corrupted. Verify integrity."
+                        .to_string(),
                     location: None,
                 });
             }
@@ -178,7 +193,7 @@ impl WasmSecurityScanner {
         analysis: &mut SecurityAnalysis,
     ) -> Result<()> {
         let parser = Parser::new(0);
-        
+
         for payload in parser.parse_all(wasm_bytes) {
             match payload? {
                 Payload::ImportSection(reader) => {
@@ -202,12 +217,16 @@ impl WasmSecurityScanner {
             analysis.issues.push(SecurityIssue {
                 issue_type: SecurityIssueType::ExcessivePermissions {
                     permission: "imports".to_string(),
-                    reason: format!("Component imports {} functions, exceeding threshold of {}", 
-                                  analysis.imports_analyzed, self.max_imports_threshold),
+                    reason: format!(
+                        "Component imports {} functions, exceeding threshold of {}",
+                        analysis.imports_analyzed, self.max_imports_threshold
+                    ),
                 },
                 risk_level: SecurityRiskLevel::Medium,
                 description: "Component imports an excessive number of functions".to_string(),
-                recommendation: "Review if all imports are necessary for the component's functionality".to_string(),
+                recommendation:
+                    "Review if all imports are necessary for the component's functionality"
+                        .to_string(),
                 location: Some("Import Section".to_string()),
             });
         }
@@ -226,7 +245,7 @@ impl WasmSecurityScanner {
             analysis.imports_analyzed += 1;
 
             let import_path = format!("{}::{}", import.module, import.name);
-            
+
             // Check against dangerous imports list
             if self.dangerous_imports.contains(&import_path) {
                 analysis.issues.push(SecurityIssue {
@@ -235,7 +254,10 @@ impl WasmSecurityScanner {
                         reason: "Import is known to be potentially dangerous".to_string(),
                     },
                     risk_level: SecurityRiskLevel::High,
-                    description: format!("Component imports potentially dangerous function: {}", import_path),
+                    description: format!(
+                        "Component imports potentially dangerous function: {}",
+                        import_path
+                    ),
                     recommendation: "Verify this import is necessary and used safely".to_string(),
                     location: Some(format!("Import: {}", import_path)),
                 });
@@ -247,15 +269,23 @@ impl WasmSecurityScanner {
             }
 
             // Check for suspicious patterns
-            if import.name.contains("exec") || import.name.contains("system") || import.name.contains("spawn") {
+            if import.name.contains("exec")
+                || import.name.contains("system")
+                || import.name.contains("spawn")
+            {
                 analysis.issues.push(SecurityIssue {
                     issue_type: SecurityIssueType::UnsafeImport {
                         import_name: import_path.clone(),
                         reason: "Import name suggests system execution capability".to_string(),
                     },
                     risk_level: SecurityRiskLevel::Critical,
-                    description: format!("Component imports function with execution capability: {}", import_path),
-                    recommendation: "Carefully review this import as it may allow arbitrary code execution".to_string(),
+                    description: format!(
+                        "Component imports function with execution capability: {}",
+                        import_path
+                    ),
+                    recommendation:
+                        "Carefully review this import as it may allow arbitrary code execution"
+                            .to_string(),
                     location: Some(format!("Import: {}", import_path)),
                 });
             }
@@ -282,7 +312,10 @@ impl WasmSecurityScanner {
                         reason: "Export uses internal naming convention".to_string(),
                     },
                     risk_level: SecurityRiskLevel::Low,
-                    description: format!("Component exports function with internal name: {}", export.name),
+                    description: format!(
+                        "Component exports function with internal name: {}",
+                        export.name
+                    ),
                     recommendation: "Verify this export is intentionally public".to_string(),
                     location: Some(format!("Export: {}", export.name)),
                 });
@@ -296,8 +329,11 @@ impl WasmSecurityScanner {
                         reason: "Component exports memory, allowing external access".to_string(),
                     },
                     risk_level: SecurityRiskLevel::Medium,
-                    description: "Component exports its memory, potentially exposing internal data".to_string(),
-                    recommendation: "Ensure memory export is necessary and doesn't leak sensitive data".to_string(),
+                    description: "Component exports its memory, potentially exposing internal data"
+                        .to_string(),
+                    recommendation:
+                        "Ensure memory export is necessary and doesn't leak sensitive data"
+                            .to_string(),
                     location: Some(format!("Memory Export: {}", export.name)),
                 });
             }
@@ -326,8 +362,10 @@ impl WasmSecurityScanner {
                                 reason: "Component not built with known safe toolchain".to_string(),
                             },
                             risk_level: SecurityRiskLevel::Medium,
-                            description: "Component built with unknown or untrusted toolchain".to_string(),
-                            recommendation: "Verify the toolchain used to build this component".to_string(),
+                            description: "Component built with unknown or untrusted toolchain"
+                                .to_string(),
+                            recommendation: "Verify the toolchain used to build this component"
+                                .to_string(),
                             location: Some("Producers Section".to_string()),
                         });
                     }
@@ -346,7 +384,10 @@ impl WasmSecurityScanner {
                             reason: "Large unknown custom section".to_string(),
                         },
                         risk_level: SecurityRiskLevel::Low,
-                        description: format!("Component contains large unknown custom section: {}", reader.name()),
+                        description: format!(
+                            "Component contains large unknown custom section: {}",
+                            reader.name()
+                        ),
                         recommendation: "Verify the purpose of this custom section".to_string(),
                         location: Some(format!("Custom Section: {}", reader.name())),
                     });
@@ -431,24 +472,50 @@ impl WasmSecurityScanner {
     pub fn generate_security_report(&self, analysis: &SecurityAnalysis) -> String {
         let mut report = String::new();
 
-        report.push_str(&format!("Security Analysis Report for: {}\n", analysis.component_name));
-        report.push_str(&format!("Scan Time: {}\n", analysis.scan_timestamp.format("%Y-%m-%d %H:%M:%S UTC")));
+        report.push_str(&format!(
+            "Security Analysis Report for: {}\n",
+            analysis.component_name
+        ));
+        report.push_str(&format!(
+            "Scan Time: {}\n",
+            analysis.scan_timestamp.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
         report.push_str(&format!("Overall Risk: {:?}\n", analysis.overall_risk));
         report.push_str(&format!("Scan Duration: {}ms\n", analysis.scan_duration_ms));
-        report.push_str(&format!("Component Valid: {}\n", analysis.is_component_valid));
-        
+        report.push_str(&format!(
+            "Component Valid: {}\n",
+            analysis.is_component_valid
+        ));
+
         if let Some(sig) = &analysis.trusted_signature {
             report.push_str(&format!("Trusted Signature: {}\n", sig));
         }
 
-        report.push_str(&format!("\nImports Analyzed: {}\n", analysis.imports_analyzed));
-        report.push_str(&format!("Exports Analyzed: {}\n", analysis.exports_analyzed));
-        report.push_str(&format!("Permissions Requested: {}\n", analysis.permissions_requested.len()));
+        report.push_str(&format!(
+            "\nImports Analyzed: {}\n",
+            analysis.imports_analyzed
+        ));
+        report.push_str(&format!(
+            "Exports Analyzed: {}\n",
+            analysis.exports_analyzed
+        ));
+        report.push_str(&format!(
+            "Permissions Requested: {}\n",
+            analysis.permissions_requested.len()
+        ));
 
         if !analysis.issues.is_empty() {
-            report.push_str(&format!("\nSecurity Issues Found ({}):\n", analysis.issues.len()));
+            report.push_str(&format!(
+                "\nSecurity Issues Found ({}):\n",
+                analysis.issues.len()
+            ));
             for (i, issue) in analysis.issues.iter().enumerate() {
-                report.push_str(&format!("  {}. [{:?}] {}\n", i + 1, issue.risk_level, issue.description));
+                report.push_str(&format!(
+                    "  {}. [{:?}] {}\n",
+                    i + 1,
+                    issue.risk_level,
+                    issue.description
+                ));
                 report.push_str(&format!("     Recommendation: {}\n", issue.recommendation));
                 if let Some(location) = &issue.location {
                     report.push_str(&format!("     Location: {}\n", location));
@@ -477,7 +544,7 @@ mod tests {
     #[tokio::test]
     async fn test_risk_calculation() {
         let scanner = WasmSecurityScanner::new();
-        
+
         // Test empty issues
         let risk = scanner.calculate_overall_risk(&[]);
         assert_eq!(risk, SecurityRiskLevel::Low);

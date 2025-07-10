@@ -1,9 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::num::NonZeroUsize;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// Graphics output types supported by the renderer
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,12 +47,34 @@ pub enum ImageFormat {
 #[serde(tag = "cmd")]
 pub enum CanvasCommand {
     BeginPath,
-    MoveTo { x: f32, y: f32 },
-    LineTo { x: f32, y: f32 },
-    Arc { x: f32, y: f32, radius: f32, start_angle: f32, end_angle: f32 },
-    Fill { color: String },
-    Stroke { color: String, width: f32 },
-    Text { x: f32, y: f32, text: String, font: String },
+    MoveTo {
+        x: f32,
+        y: f32,
+    },
+    LineTo {
+        x: f32,
+        y: f32,
+    },
+    Arc {
+        x: f32,
+        y: f32,
+        radius: f32,
+        start_angle: f32,
+        end_angle: f32,
+    },
+    Fill {
+        color: String,
+    },
+    Stroke {
+        color: String,
+        width: f32,
+    },
+    Text {
+        x: f32,
+        y: f32,
+        text: String,
+        font: String,
+    },
     Clear,
 }
 
@@ -101,7 +123,7 @@ impl WasmGraphicsRenderer {
         Self {
             config,
             render_cache: Arc::new(RwLock::new(lru::LruCache::new(
-                NonZeroUsize::new(100).unwrap()
+                NonZeroUsize::new(100).unwrap(),
             ))),
         }
     }
@@ -114,9 +136,13 @@ impl WasmGraphicsRenderer {
         input_data: &[u8],
     ) -> Result<GraphicsOutput> {
         // Check cache first
-        let cache_key = format!("{}-{}-{}", component_id, method, 
-            Self::hash_input(input_data));
-        
+        let cache_key = format!(
+            "{}-{}-{}",
+            component_id,
+            method,
+            Self::hash_input(input_data)
+        );
+
         {
             let cache = self.render_cache.read().await;
             if let Some(cached) = cache.peek(&cache_key) {
@@ -126,11 +152,9 @@ impl WasmGraphicsRenderer {
         }
 
         // Execute in sandboxed environment
-        let output = self.execute_sandboxed_render(
-            component_id,
-            method,
-            input_data
-        ).await?;
+        let output = self
+            .execute_sandboxed_render(component_id, method, input_data)
+            .await?;
 
         // Validate and sanitize output
         let sanitized = self.sanitize_output(output)?;
@@ -153,9 +177,9 @@ impl WasmGraphicsRenderer {
     ) -> Result<GraphicsOutput> {
         // WasmEngine integration not implemented yet
         // For now, return a placeholder
-        
+
         info!("Executing sandboxed render: {} -> {}", component_id, method);
-        
+
         // Placeholder implementation
         Ok(GraphicsOutput::Svg {
             width: 400,
@@ -175,7 +199,11 @@ impl WasmGraphicsRenderer {
     /// Sanitize graphics output to prevent XSS and other attacks
     fn sanitize_output(&self, output: GraphicsOutput) -> Result<GraphicsOutput> {
         match output {
-            GraphicsOutput::Svg { width, height, content } => {
+            GraphicsOutput::Svg {
+                width,
+                height,
+                content,
+            } => {
                 // Sanitize SVG content
                 let sanitized = self.sanitize_svg(&content)?;
                 Ok(GraphicsOutput::Svg {
@@ -184,22 +212,36 @@ impl WasmGraphicsRenderer {
                     content: sanitized,
                 })
             }
-            GraphicsOutput::Image { format, width, height, data } => {
+            GraphicsOutput::Image {
+                format,
+                width,
+                height,
+                data,
+            } => {
                 // Validate image dimensions
                 if width > self.config.max_width || height > self.config.max_height {
                     anyhow::bail!("Image dimensions exceed maximum allowed");
                 }
-                
+
                 // Validate format is allowed
                 if !self.config.allowed_formats.contains(&format) {
                     anyhow::bail!("Image format {:?} not allowed", format);
                 }
-                
+
                 // Image data integrity validation not implemented yet
-                
-                Ok(GraphicsOutput::Image { format, width, height, data })
+
+                Ok(GraphicsOutput::Image {
+                    format,
+                    width,
+                    height,
+                    data,
+                })
             }
-            GraphicsOutput::CanvasCommands { width, height, commands } => {
+            GraphicsOutput::CanvasCommands {
+                width,
+                height,
+                commands,
+            } => {
                 // Validate and sanitize canvas commands
                 let sanitized_commands = self.sanitize_canvas_commands(commands)?;
                 Ok(GraphicsOutput::CanvasCommands {
@@ -218,43 +260,46 @@ impl WasmGraphicsRenderer {
     fn sanitize_svg(&self, svg: &str) -> Result<String> {
         // Proper SVG sanitization not implemented yet
         // For now, basic validation
-        
+
         if svg.contains("<script") || svg.contains("javascript:") {
             anyhow::bail!("SVG contains potentially malicious content");
         }
-        
+
         // Remove event handlers
         let sanitized = svg
             .replace("onclick", "data-onclick")
             .replace("onload", "data-onload")
             .replace("onerror", "data-onerror");
-        
+
         Ok(sanitized)
     }
 
     /// Sanitize canvas commands
     fn sanitize_canvas_commands(&self, commands: Vec<CanvasCommand>) -> Result<Vec<CanvasCommand>> {
         // Validate commands don't contain malicious content
-        let sanitized: Result<Vec<_>> = commands.into_iter().map(|cmd| {
-            match cmd {
-                CanvasCommand::Text { x, y, text, font } => {
-                    // Sanitize text content
-                    if text.len() > 1000 {
-                        anyhow::bail!("Text content too long");
+        let sanitized: Result<Vec<_>> = commands
+            .into_iter()
+            .map(|cmd| {
+                match cmd {
+                    CanvasCommand::Text { x, y, text, font } => {
+                        // Sanitize text content
+                        if text.len() > 1000 {
+                            anyhow::bail!("Text content too long");
+                        }
+                        Ok(CanvasCommand::Text { x, y, text, font })
                     }
-                    Ok(CanvasCommand::Text { x, y, text, font })
+                    // Other commands are generally safe
+                    other => Ok(other),
                 }
-                // Other commands are generally safe
-                other => Ok(other),
-            }
-        }).collect();
-        
+            })
+            .collect();
+
         sanitized
     }
 
     /// Hash input data for caching
     fn hash_input(data: &[u8]) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(data);
         format!("{:x}", hasher.finalize())
@@ -268,10 +313,10 @@ impl WasmGraphicsRenderer {
     ) -> Result<impl futures::Stream<Item = Result<GraphicsOutput>>> {
         use futures::stream;
         use tokio::time::{interval, Duration};
-        
+
         let component_id = component_id.to_string();
         let renderer = self.clone();
-        
+
         Ok(stream::unfold(
             interval(Duration::from_millis(update_interval_ms)),
             move |mut interval| {
@@ -279,14 +324,17 @@ impl WasmGraphicsRenderer {
                 let renderer = renderer.clone();
                 async move {
                     interval.tick().await;
-                    
+
                     // Render next frame
-                    match renderer.render_component(&component_id, "next_frame", &[]).await {
+                    match renderer
+                        .render_component(&component_id, "next_frame", &[])
+                        .await
+                    {
                         Ok(output) => Some((Ok(output), interval)),
                         Err(e) => Some((Err(e), interval)),
                     }
                 }
-            }
+            },
         ))
     }
 }
@@ -307,12 +355,12 @@ mod tests {
     #[tokio::test]
     async fn test_svg_sanitization() {
         let renderer = WasmGraphicsRenderer::new(GraphicsConfig::default());
-        
+
         let malicious_svg = r#"<svg onclick="alert('xss')">
             <script>alert('xss')</script>
             <a href="javascript:alert('xss')">Click</a>
         </svg>"#;
-        
+
         let result = renderer.sanitize_svg(malicious_svg);
         assert!(result.is_err() || !result.unwrap().contains("script"));
     }
@@ -325,14 +373,14 @@ mod tests {
             ..Default::default()
         };
         let renderer = WasmGraphicsRenderer::new(config);
-        
+
         let oversized = GraphicsOutput::Image {
             format: ImageFormat::Png,
             width: 200,
             height: 200,
             data: vec![],
         };
-        
+
         let result = renderer.sanitize_output(oversized);
         assert!(result.is_err());
     }

@@ -58,9 +58,9 @@ pub use pulseengine_mcp_protocol::{
     ReadResourceRequestParam, Request, Resource, Response, ServerCapabilities, Tool,
 };
 
+use pulseengine_mcp_auth::config::AuthConfig;
 use pulseengine_mcp_server::{McpServer, ServerConfig};
 use pulseengine_mcp_transport::TransportConfig;
-use pulseengine_mcp_auth::config::AuthConfig;
 use tracing::info;
 
 /// Run the MCP server with the given configuration
@@ -72,8 +72,7 @@ pub async fn run_server(config: GlspConfig) -> Result<(), Box<dyn std::error::Er
     // Create server config with memory auth
     let mut server_config = ServerConfig::default();
     server_config.auth_config = AuthConfig::memory();
-    
-    
+
     // Set transport configuration
     server_config.transport_config = match config.transport.as_str() {
         "http" => TransportConfig::http(config.port),
@@ -88,7 +87,7 @@ pub async fn run_server(config: GlspConfig) -> Result<(), Box<dyn std::error::Er
             TransportConfig::streamable_http(config.port)
         }
     };
-    
+
     // Create and run server using framework
     let mut server = McpServer::new(backend, server_config).await?;
 

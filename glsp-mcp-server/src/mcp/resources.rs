@@ -1,9 +1,9 @@
+use crate::database::dataset::DatasetManager;
+use crate::database::traits::{MetadataStore, SensorDataRepository, TimeSeriesStore};
 use crate::mcp::protocol::{Resource, ResourceContent};
 use crate::mcp::tools::DiagramTools;
 use crate::model::{ElementType, Position};
-use crate::database::traits::{SensorDataRepository, MetadataStore, TimeSeriesStore};
-use crate::database::dataset::DatasetManager;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 pub struct DiagramResources;
@@ -214,7 +214,10 @@ impl DiagramResources {
             resources.push(Resource {
                 uri: format!("selection://current/{}", diagram.id),
                 name: format!("Selection: {}", diagram.diagram_type),
-                description: Some(format!("Current selection in {} diagram", diagram.diagram_type)),
+                description: Some(format!(
+                    "Current selection in {} diagram",
+                    diagram.diagram_type
+                )),
                 mime_type: Some("application/json".to_string()),
             });
         }
@@ -316,23 +319,28 @@ impl DiagramResources {
             }),
             _ => {
                 if uri.starts_with("diagram://model/") {
-                    let diagram_id = uri.strip_prefix("diagram://model/")
+                    let diagram_id = uri
+                        .strip_prefix("diagram://model/")
                         .ok_or_else(|| anyhow!("Invalid diagram model URI: {}", uri))?;
                     self.get_diagram_model(diagram_id, tools)
                 } else if uri.starts_with("diagram://elements/") {
-                    let diagram_id = uri.strip_prefix("diagram://elements/")
+                    let diagram_id = uri
+                        .strip_prefix("diagram://elements/")
                         .ok_or_else(|| anyhow!("Invalid diagram elements URI: {}", uri))?;
                     self.get_diagram_elements(diagram_id, tools)
                 } else if uri.starts_with("diagram://metadata/") {
-                    let diagram_id = uri.strip_prefix("diagram://metadata/")
+                    let diagram_id = uri
+                        .strip_prefix("diagram://metadata/")
                         .ok_or_else(|| anyhow!("Invalid diagram metadata URI: {}", uri))?;
                     self.get_diagram_metadata(diagram_id, tools)
                 } else if uri.starts_with("diagram://validation/") {
-                    let diagram_id = uri.strip_prefix("diagram://validation/")
+                    let diagram_id = uri
+                        .strip_prefix("diagram://validation/")
                         .ok_or_else(|| anyhow!("Invalid diagram validation URI: {}", uri))?;
                     self.get_validation_results(diagram_id, tools)
                 } else if uri.starts_with("wasm://component/") {
-                    let path = uri.strip_prefix("wasm://component/")
+                    let path = uri
+                        .strip_prefix("wasm://component/")
                         .ok_or_else(|| anyhow!("Invalid WASM component URI: {}", uri))?;
                     if let Some((component_name, suffix)) = path.split_once('/') {
                         match suffix {
@@ -345,43 +353,52 @@ impl DiagramResources {
                         self.get_wasm_component_details(path, tools)
                     }
                 } else if uri.starts_with("selection://current/") {
-                    let diagram_id = uri.strip_prefix("selection://current/")
+                    let diagram_id = uri
+                        .strip_prefix("selection://current/")
                         .ok_or_else(|| anyhow!("Invalid selection URI: {}", uri))?;
                     self.get_current_selection(diagram_id, tools)
                 } else if uri.starts_with("selection://element-at/") {
                     // Parse URI like: selection://element-at/{diagramId}?x={x}&y={y}
-                    let path = uri.strip_prefix("selection://element-at/")
+                    let path = uri
+                        .strip_prefix("selection://element-at/")
                         .ok_or_else(|| anyhow!("Invalid element-at URI: {}", uri))?;
                     self.get_element_at_position_from_uri(path, tools)
                 } else if uri.starts_with("sensor://metadata/") {
-                    let sensor_id = uri.strip_prefix("sensor://metadata/")
+                    let sensor_id = uri
+                        .strip_prefix("sensor://metadata/")
                         .ok_or_else(|| anyhow!("Invalid sensor metadata URI: {}", uri))?;
                     self.get_sensor_metadata(sensor_id, tools).await
                 } else if uri.starts_with("sensor://statistics/") {
-                    let sensor_id = uri.strip_prefix("sensor://statistics/")
+                    let sensor_id = uri
+                        .strip_prefix("sensor://statistics/")
                         .ok_or_else(|| anyhow!("Invalid sensor statistics URI: {}", uri))?;
                     self.get_sensor_statistics(sensor_id, tools).await
                 } else if uri.starts_with("sensor://time-range/") {
-                    let sensor_id = uri.strip_prefix("sensor://time-range/")
+                    let sensor_id = uri
+                        .strip_prefix("sensor://time-range/")
                         .ok_or_else(|| anyhow!("Invalid sensor time-range URI: {}", uri))?;
                     self.get_sensor_time_range(sensor_id, tools).await
                 } else if uri.starts_with("sensor://data?") {
                     // Parse query parameters from URI
                     self.query_sensor_data_from_uri(uri, tools).await
                 } else if uri.starts_with("sensor://gaps/") {
-                    let sensor_id = uri.strip_prefix("sensor://gaps/")
+                    let sensor_id = uri
+                        .strip_prefix("sensor://gaps/")
                         .ok_or_else(|| anyhow!("Invalid sensor gaps URI: {}", uri))?;
                     self.detect_sensor_gaps(sensor_id, tools).await
                 } else if uri.starts_with("sensor://visualization/") {
-                    let path = uri.strip_prefix("sensor://visualization/")
+                    let path = uri
+                        .strip_prefix("sensor://visualization/")
                         .ok_or_else(|| anyhow!("Invalid sensor visualization URI: {}", uri))?;
                     self.visualize_sensor_data_from_uri(path, tools).await
                 } else if uri.starts_with("dataset://info/") {
-                    let dataset_id = uri.strip_prefix("dataset://info/")
+                    let dataset_id = uri
+                        .strip_prefix("dataset://info/")
                         .ok_or_else(|| anyhow!("Invalid dataset info URI: {}", uri))?;
                     self.get_dataset_info(dataset_id, tools).await
                 } else if uri.starts_with("wasm://executions/") {
-                    let path = uri.strip_prefix("wasm://executions/")
+                    let path = uri
+                        .strip_prefix("wasm://executions/")
                         .ok_or_else(|| anyhow!("Invalid executions URI: {}", uri))?;
                     if let Some((execution_id, suffix)) = path.split_once('/') {
                         match suffix {
@@ -1103,7 +1120,11 @@ impl DiagramResources {
         .to_string()
     }
 
-    fn get_current_selection(&self, diagram_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    fn get_current_selection(
+        &self,
+        diagram_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         let diagram = tools
             .get_diagram(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found: {}", diagram_id))?;
@@ -1146,7 +1167,11 @@ impl DiagramResources {
         })
     }
 
-    fn get_element_at_position_from_uri(&self, path: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    fn get_element_at_position_from_uri(
+        &self,
+        path: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         // Parse path like: {diagramId}?x={x}&y={y}
         let (diagram_id, query) = if let Some(pos) = path.find('?') {
             (&path[..pos], &path[pos + 1..])
@@ -1195,7 +1220,7 @@ impl DiagramResources {
             // Get the database backend
             let db = manager.backend();
             let sensors = db.list_sensors().await?;
-            
+
             Ok(json!({
                 "sensors": sensors,
                 "total": sensors.len()
@@ -1211,12 +1236,16 @@ impl DiagramResources {
         }
     }
 
-    async fn get_sensor_metadata(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn get_sensor_metadata(
+        &self,
+        sensor_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let db = manager.backend();
             let metadata = db.get_sensor_metadata(sensor_id).await?;
-            
+
             Ok(ResourceContent {
                 uri: format!("sensor://metadata/{sensor_id}"),
                 mime_type: Some("application/json".to_string()),
@@ -1228,12 +1257,16 @@ impl DiagramResources {
         }
     }
 
-    async fn get_sensor_statistics(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn get_sensor_statistics(
+        &self,
+        sensor_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let db = manager.backend();
             let stats = db.get_sensor_statistics(sensor_id).await?;
-            
+
             Ok(ResourceContent {
                 uri: format!("sensor://statistics/{sensor_id}"),
                 mime_type: Some("application/json".to_string()),
@@ -1245,12 +1278,16 @@ impl DiagramResources {
         }
     }
 
-    async fn get_sensor_time_range(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn get_sensor_time_range(
+        &self,
+        sensor_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let db = manager.backend();
             let time_range = db.get_time_range(sensor_id).await?;
-            
+
             Ok(ResourceContent {
                 uri: format!("sensor://time-range/{sensor_id}"),
                 mime_type: Some("application/json".to_string()),
@@ -1268,14 +1305,19 @@ impl DiagramResources {
         }
     }
 
-    async fn query_sensor_data_from_uri(&self, uri: &str, _tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn query_sensor_data_from_uri(
+        &self,
+        uri: &str,
+        _tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         // Parse query parameters from URI
-        let _query_str = uri.strip_prefix("sensor://data?")
+        let _query_str = uri
+            .strip_prefix("sensor://data?")
             .ok_or_else(|| anyhow!("Invalid sensor data URI"))?;
-        
+
         // TODO: Implement query parameter parsing and sensor data query
         // This would parse parameters like sensorIds, startTime, endTime
-        
+
         Ok(ResourceContent {
             uri: uri.to_string(),
             mime_type: Some("application/json".to_string()),
@@ -1290,7 +1332,11 @@ impl DiagramResources {
         })
     }
 
-    async fn detect_sensor_gaps(&self, sensor_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn detect_sensor_gaps(
+        &self,
+        sensor_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let db = manager.backend();
@@ -1298,8 +1344,15 @@ impl DiagramResources {
             let time_range = db.get_time_range(sensor_id).await?;
             if let Some(range) = time_range {
                 // Detect gaps with 60 second threshold (60 * 1_000_000 microseconds)
-                let gaps = db.detect_gaps(sensor_id, range.start_time_us, range.end_time_us, 60_000_000).await?;
-                
+                let gaps = db
+                    .detect_gaps(
+                        sensor_id,
+                        range.start_time_us,
+                        range.end_time_us,
+                        60_000_000,
+                    )
+                    .await?;
+
                 Ok(ResourceContent {
                     uri: format!("sensor://gaps/{sensor_id}"),
                     mime_type: Some("application/json".to_string()),
@@ -1334,7 +1387,11 @@ impl DiagramResources {
         }
     }
 
-    async fn visualize_sensor_data_from_uri(&self, path: &str, _tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn visualize_sensor_data_from_uri(
+        &self,
+        path: &str,
+        _tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         // Parse path like: {sensorId}?type={visualizationType}
         let (sensor_id, _query) = if let Some(pos) = path.find('?') {
             (&path[..pos], &path[pos + 1..])
@@ -1343,7 +1400,7 @@ impl DiagramResources {
         };
 
         // TODO: Implement visualization generation based on type parameter
-        
+
         Ok(ResourceContent {
             uri: format!("sensor://visualization/{path}"),
             mime_type: Some("application/json".to_string()),
@@ -1363,7 +1420,7 @@ impl DiagramResources {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let datasets = manager.list_datasets().await?;
-            
+
             Ok(json!({
                 "datasets": datasets,
                 "total": datasets.len()
@@ -1379,11 +1436,15 @@ impl DiagramResources {
         }
     }
 
-    async fn get_dataset_info(&self, dataset_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
+    async fn get_dataset_info(
+        &self,
+        dataset_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
         if let Some(dataset_manager) = &tools.dataset_manager {
             let manager = dataset_manager.lock().await;
             let dataset = manager.get_dataset(dataset_id).await?;
-            
+
             Ok(ResourceContent {
                 uri: format!("dataset://info/{dataset_id}"),
                 mime_type: Some("application/json".to_string()),
@@ -1398,7 +1459,7 @@ impl DiagramResources {
     // WASM execution resource methods
     fn get_executions_list(&self, tools: &DiagramTools) -> String {
         let executions = tools.list_wasm_executions_for_resource();
-        
+
         json!({
             "executions": executions,
             "total": executions.len()
@@ -1406,10 +1467,15 @@ impl DiagramResources {
         .to_string()
     }
 
-    fn get_execution_progress(&self, execution_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
-        let progress = tools.get_execution_progress_for_resource(execution_id)
+    fn get_execution_progress(
+        &self,
+        execution_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
+        let progress = tools
+            .get_execution_progress_for_resource(execution_id)
             .ok_or_else(|| anyhow!("Execution not found: {}", execution_id))?;
-        
+
         Ok(ResourceContent {
             uri: format!("wasm://executions/{execution_id}/progress"),
             mime_type: Some("application/json".to_string()),
@@ -1418,10 +1484,15 @@ impl DiagramResources {
         })
     }
 
-    fn get_execution_result(&self, execution_id: &str, tools: &DiagramTools) -> Result<ResourceContent> {
-        let result = tools.get_execution_result_for_resource(execution_id)
+    fn get_execution_result(
+        &self,
+        execution_id: &str,
+        tools: &DiagramTools,
+    ) -> Result<ResourceContent> {
+        let result = tools
+            .get_execution_result_for_resource(execution_id)
             .ok_or_else(|| anyhow!("Execution result not found: {}", execution_id))?;
-        
+
         Ok(ResourceContent {
             uri: format!("wasm://executions/{execution_id}/result"),
             mime_type: Some("application/json".to_string()),
@@ -1432,7 +1503,7 @@ impl DiagramResources {
 
     fn get_uploaded_components_list(&self, tools: &DiagramTools) -> String {
         let uploaded = tools.list_uploaded_components_for_resource();
-        
+
         json!({
             "components": uploaded,
             "total": uploaded.len()

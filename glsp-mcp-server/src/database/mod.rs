@@ -4,11 +4,11 @@
 //! and other time-series data through a unified SDK interface.
 
 pub mod config;
-pub mod traits;
-pub mod models;
-pub mod factory;
-pub mod error;
 pub mod dataset;
+pub mod error;
+pub mod factory;
+pub mod models;
+pub mod traits;
 
 #[cfg(test)]
 pub mod tests;
@@ -28,11 +28,11 @@ pub mod redis;
 
 // Re-exports for convenience
 pub use config::DatabaseConfig;
+pub use dataset::*;
 pub use error::{DatabaseError, DatabaseResult};
 pub use factory::DatabaseFactory;
 pub use models::*;
 pub use traits::*;
-pub use dataset::*;
 
 /// Version of the database schema/API
 pub const DATABASE_API_VERSION: &str = "1.0.0";

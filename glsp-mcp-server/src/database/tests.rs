@@ -6,11 +6,11 @@ mod tests {
     use crate::database::*;
     use chrono::Utc;
     use std::collections::HashMap;
-    
+
     /// Create test sensor readings for testing
     fn create_test_readings() -> Vec<SensorReading> {
         let base_time = Utc::now().timestamp() * 1_000_000; // microseconds
-        
+
         vec![
             SensorReading::new(
                 "camera_front".to_string(),
@@ -71,7 +71,7 @@ mod tests {
             ),
         ]
     }
-    
+
     /// Create test dataset
     fn create_test_dataset() -> SensorDataset {
         let readings = create_test_readings();
@@ -81,7 +81,7 @@ mod tests {
             reading_count: readings.len() as u64,
             data_size_bytes: readings.iter().map(|r| r.payload.len() as u64).sum(),
         };
-        
+
         let sensors = vec![
             SensorInfo {
                 sensor_id: "camera_front".to_string(),
@@ -130,7 +130,7 @@ mod tests {
                 is_selected: false,
             },
         ];
-        
+
         SensorDataset {
             dataset_id: "test_scenario_1".to_string(),
             name: "Test Scenario 1".to_string(),
@@ -150,13 +150,13 @@ mod tests {
             is_active: false,
         }
     }
-    
+
     #[tokio::test]
     async fn test_dataset_creation_and_retrieval() -> DatabaseResult<()> {
         // Create mock backend
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let mut dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Add some test data first so datasets can be created
         let readings = create_test_readings();
         let batch = SensorBatch {
@@ -166,28 +166,28 @@ mod tests {
             source: "test".to_string(),
         };
         dataset_manager.import_data("default", &batch).await?;
-        
+
         // Create test dataset
         let dataset = create_test_dataset();
         dataset_manager.create_dataset(&dataset).await?;
-        
+
         // List datasets (should now have the default one with data)
         let datasets = dataset_manager.list_datasets().await?;
         assert!(!datasets.is_empty(), "Should have at least one dataset");
-        
+
         // Try to get specific dataset
         let retrieved = dataset_manager.get_dataset("default").await?;
         assert!(retrieved.is_some(), "Should find default dataset");
-        
+
         Ok(())
     }
-    
+
     #[tokio::test]
     async fn test_sensor_selection() -> DatabaseResult<()> {
         // Create mock backend with test data
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let mut dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Add test data
         let readings = create_test_readings();
         let batch = SensorBatch {
@@ -196,60 +196,71 @@ mod tests {
             created_at: Utc::now(),
             source: "test".to_string(),
         };
-        
+
         dataset_manager.import_data("default", &batch).await?;
-        
+
         // Set active dataset
         dataset_manager.set_active_dataset("default").await?;
-        
+
         // Select specific sensors
         let selected_sensors = vec!["camera_front".to_string(), "radar_front".to_string()];
-        dataset_manager.select_sensors("default", &selected_sensors).await?;
-        
+        dataset_manager
+            .select_sensors("default", &selected_sensors)
+            .await?;
+
         // Get selection
         let selection = dataset_manager.get_selection("default").await?;
         assert_eq!(selection.selected_sensors.len(), 2);
-        assert!(selection.selected_sensors.contains(&"camera_front".to_string()));
-        assert!(selection.selected_sensors.contains(&"radar_front".to_string()));
-        
+        assert!(selection
+            .selected_sensors
+            .contains(&"camera_front".to_string()));
+        assert!(selection
+            .selected_sensors
+            .contains(&"radar_front".to_string()));
+
         Ok(())
     }
-    
+
     #[tokio::test]
     async fn test_sensor_selection_validation() -> DatabaseResult<()> {
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Test validation with non-existent dataset
         let invalid_selection = SensorSelection {
             dataset_id: "non_existent".to_string(),
             selected_sensors: vec!["sensor1".to_string()],
             ..Default::default()
         };
-        
-        let validation = dataset_manager.validate_selection(&invalid_selection).await?;
-        assert!(!validation.is_valid, "Should be invalid for non-existent dataset");
+
+        let validation = dataset_manager
+            .validate_selection(&invalid_selection)
+            .await?;
+        assert!(
+            !validation.is_valid,
+            "Should be invalid for non-existent dataset"
+        );
         assert!(!validation.errors.is_empty(), "Should have errors");
-        
+
         // Test validation with valid selection
         let valid_selection = SensorSelection {
             dataset_id: "default".to_string(),
             selected_sensors: vec![], // Empty but valid
             ..Default::default()
         };
-        
+
         let _validation = dataset_manager.validate_selection(&valid_selection).await?;
         // Note: This might be valid or invalid depending on whether sensors exist
         // The test verifies the validation logic runs without errors
-        
+
         Ok(())
     }
-    
+
     #[tokio::test]
     async fn test_data_querying_with_selection() -> DatabaseResult<()> {
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let mut dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Add test data
         let readings = create_test_readings();
         let batch = SensorBatch {
@@ -258,28 +269,32 @@ mod tests {
             created_at: Utc::now(),
             source: "test".to_string(),
         };
-        
+
         dataset_manager.import_data("default", &batch).await?;
-        
+
         // Select specific sensors
-        dataset_manager.select_sensors("default", &vec!["camera_front".to_string()]).await?;
-        
+        dataset_manager
+            .select_sensors("default", &vec!["camera_front".to_string()])
+            .await?;
+
         // Query data
         let query = SensorQuery::time_range(
             readings[0].timestamp_us - 1000,
             readings[0].timestamp_us + 1000,
         );
-        
-        let results = dataset_manager.query_selected_data("default", &query).await?;
-        
+
+        let results = dataset_manager
+            .query_selected_data("default", &query)
+            .await?;
+
         // Should only return camera data due to selection
         for reading in results {
             assert_eq!(reading.sensor_id, "camera_front");
         }
-        
+
         Ok(())
     }
-    
+
     #[tokio::test]
     async fn test_interpolation_settings() {
         let settings = InterpolationSettings::default();
@@ -287,12 +302,12 @@ mod tests {
         assert_eq!(settings.max_gap_us, 1_000_000); // 1 second
         assert!(matches!(settings.method, InterpolationMethod::Linear));
     }
-    
+
     #[tokio::test]
     async fn test_sensor_selection_updates() -> DatabaseResult<()> {
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let mut dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Create initial selection
         let mut selection = SensorSelection {
             dataset_id: "test".to_string(),
@@ -301,29 +316,29 @@ mod tests {
             min_quality: Some(0.8),
             ..Default::default()
         };
-        
+
         dataset_manager.update_selection(&selection).await?;
-        
+
         // Modify selection
         selection.playback_speed = 2.0;
         selection.selected_sensors.push("sensor2".to_string());
-        
+
         dataset_manager.update_selection(&selection).await?;
-        
+
         // Retrieve and verify
         let retrieved = dataset_manager.get_selection("test").await?;
         assert_eq!(retrieved.playback_speed, 2.0);
         assert_eq!(retrieved.selected_sensors.len(), 2);
         assert_eq!(retrieved.min_quality, Some(0.8));
-        
+
         Ok(())
     }
-    
+
     #[tokio::test]
     async fn test_validation_warnings_and_recommendations() -> DatabaseResult<()> {
         let mock_backend = factory::MockDatabaseBackend::new(DatabaseConfig::mock()).await?;
         let mut dataset_manager = DatabaseDatasetManager::new(mock_backend);
-        
+
         // Add test data so dataset exists
         let readings = create_test_readings();
         let batch = SensorBatch {
@@ -333,21 +348,26 @@ mod tests {
             source: "test".to_string(),
         };
         dataset_manager.import_data("default", &batch).await?;
-        
+
         // Test high playback speed warning
         let high_speed_selection = SensorSelection {
             dataset_id: "default".to_string(),
             selected_sensors: vec!["camera_front".to_string()], // Use an actual sensor from test data
-            playback_speed: 15.0, // Very high speed
+            playback_speed: 15.0,                               // Very high speed
             ..Default::default()
         };
-        
-        let validation = dataset_manager.validate_selection(&high_speed_selection).await?;
-        assert!(validation.warnings.iter().any(|w| w.contains("High playback speed")));
-        
+
+        let validation = dataset_manager
+            .validate_selection(&high_speed_selection)
+            .await?;
+        assert!(validation
+            .warnings
+            .iter()
+            .any(|w| w.contains("High playback speed")));
+
         Ok(())
     }
-    
+
     #[test]
     fn test_sensor_data_types() {
         // Test camera sensor type
@@ -357,12 +377,12 @@ mod tests {
             format: ImageFormat::RGB24,
             fps: Some(30.0),
         };
-        
+
         // Serialize and deserialize
         let json = serde_json::to_string(&camera).unwrap();
         let deserialized: SensorDataType = serde_json::from_str(&json).unwrap();
         assert_eq!(camera, deserialized);
-        
+
         // Test radar sensor type
         let radar = SensorDataType::Radar {
             point_count: 100,
@@ -373,38 +393,41 @@ mod tests {
                 elevation_resolution_deg: Some(2.0),
             },
         };
-        
+
         let json = serde_json::to_string(&radar).unwrap();
         let deserialized: SensorDataType = serde_json::from_str(&json).unwrap();
         assert_eq!(radar, deserialized);
     }
-    
+
     #[test]
     fn test_time_range_calculations() {
         let readings = create_test_readings();
-        
+
         let min_time = readings.iter().map(|r| r.timestamp_us).min().unwrap();
         let max_time = readings.iter().map(|r| r.timestamp_us).max().unwrap();
-        
-        assert!(max_time > min_time, "Max time should be greater than min time");
-        
+
+        assert!(
+            max_time > min_time,
+            "Max time should be greater than min time"
+        );
+
         // Test reading time range check
         let _middle_time = (min_time + max_time) / 2;
         let test_reading = &readings[0];
-        
+
         assert!(test_reading.is_in_range(min_time - 1000, max_time + 1000));
         assert!(!test_reading.is_in_range(max_time + 1000, max_time + 2000));
     }
-    
+
     #[test]
     fn test_vec3_operations() {
         let vec = Vec3::new(3.0, 4.0, 0.0);
         assert_eq!(vec.magnitude(), 5.0);
-        
+
         let zero_vec = Vec3::new(0.0, 0.0, 0.0);
         assert_eq!(zero_vec.magnitude(), 0.0);
     }
-    
+
     #[test]
     fn test_quaternion_operations() {
         let identity = Quaternion::identity();
@@ -412,11 +435,11 @@ mod tests {
         assert_eq!(identity.x, 0.0);
         assert_eq!(identity.y, 0.0);
         assert_eq!(identity.z, 0.0);
-        
+
         let custom = Quaternion::new(0.5, 0.5, 0.5, 0.5);
         assert_eq!(custom.w, 0.5);
     }
-    
+
     #[tokio::test]
     async fn test_dataset_source_types() {
         let sources = vec![
@@ -426,7 +449,7 @@ mod tests {
             DatasetSourceType::Live,
             DatasetSourceType::Custom("custom_type".to_string()),
         ];
-        
+
         for source in sources {
             let json = serde_json::to_string(&source).unwrap();
             let _deserialized: DatasetSourceType = serde_json::from_str(&json).unwrap();

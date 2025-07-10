@@ -3,10 +3,10 @@
 //! Provides Redis-based storage for caching and session management.
 
 use crate::database::{
-    traits::{DatabaseBackend, SessionManager},
-    error::{DatabaseError, DatabaseResult},
     config::DatabaseConfig,
+    error::{DatabaseError, DatabaseResult},
     models::*,
+    traits::{DatabaseBackend, SessionManager},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ impl RedisBackend {
     /// Create a new Redis backend instance
     pub fn new(config: &DatabaseConfig) -> DatabaseResult<Self> {
         let url = format!("redis://{}:{}", config.host, config.port);
-        
+
         Ok(Self {
             url,
             client: None,
@@ -35,25 +35,28 @@ impl RedisBackend {
 
     /// Get Redis connection
     async fn get_connection(&self) -> DatabaseResult<redis::Connection> {
-        let client = self.client.as_ref()
-            .ok_or(DatabaseError::ConnectionError("Redis client not initialized".to_string()))?;
-        
-        client.get_connection()
-            .map_err(|e| DatabaseError::ConnectionError(format!("Failed to get Redis connection: {}", e)))
+        let client = self.client.as_ref().ok_or(DatabaseError::ConnectionError(
+            "Redis client not initialized".to_string(),
+        ))?;
+
+        client.get_connection().map_err(|e| {
+            DatabaseError::ConnectionError(format!("Failed to get Redis connection: {}", e))
+        })
     }
 }
 
 #[async_trait]
 impl DatabaseBackend for RedisBackend {
     async fn initialize(&mut self) -> DatabaseResult<()> {
-        let client = redis::Client::open(self.url.as_str())
-            .map_err(|e| DatabaseError::ConnectionError(format!("Failed to create Redis client: {}", e)))?;
-        
+        let client = redis::Client::open(self.url.as_str()).map_err(|e| {
+            DatabaseError::ConnectionError(format!("Failed to create Redis client: {}", e))
+        })?;
+
         self.client = Some(client);
-        
+
         // Test connection
         let _conn = self.get_connection().await?;
-        
+
         Ok(())
     }
 
@@ -77,30 +80,46 @@ impl DatabaseBackend for RedisBackend {
 
     async fn write_sensor_data(&mut self, _data: &SensorData) -> DatabaseResult<()> {
         // Redis is primarily used for caching, not sensor data storage
-        Err(DatabaseError::UnsupportedOperation("Redis backend does not support sensor data storage".to_string()))
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data storage".to_string(),
+        ))
     }
 
     async fn read_sensor_data(&self, _query: &SensorQuery) -> DatabaseResult<Vec<SensorData>> {
         // Redis is primarily used for caching, not sensor data queries
-        Err(DatabaseError::UnsupportedOperation("Redis backend does not support sensor data queries".to_string()))
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data queries".to_string(),
+        ))
     }
 
     async fn write_simulation_state(&mut self, _state: &SimulationState) -> DatabaseResult<()> {
         // Redis can store simulation state as JSON
-        Err(DatabaseError::UnsupportedOperation("Simulation state storage not yet implemented for Redis".to_string()))
+        Err(DatabaseError::UnsupportedOperation(
+            "Simulation state storage not yet implemented for Redis".to_string(),
+        ))
     }
 
-    async fn read_simulation_state(&self, _simulation_id: &str) -> DatabaseResult<Option<SimulationState>> {
+    async fn read_simulation_state(
+        &self,
+        _simulation_id: &str,
+    ) -> DatabaseResult<Option<SimulationState>> {
         // Redis can retrieve simulation state
-        Err(DatabaseError::UnsupportedOperation("Simulation state retrieval not yet implemented for Redis".to_string()))
+        Err(DatabaseError::UnsupportedOperation(
+            "Simulation state retrieval not yet implemented for Redis".to_string(),
+        ))
     }
 }
 
 #[async_trait]
 impl SessionManager for RedisBackend {
-    async fn create_session(&mut self, session_id: &str, user_id: &str, ttl: Duration) -> DatabaseResult<()> {
+    async fn create_session(
+        &mut self,
+        session_id: &str,
+        user_id: &str,
+        ttl: Duration,
+    ) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
-        
+
         let session_key = format!("session:{}", session_id);
         let session_data = serde_json::json!({
             "user_id": user_id,
@@ -108,25 +127,33 @@ impl SessionManager for RedisBackend {
                 .unwrap_or(Duration::from_secs(0)).as_secs(),
             "ttl": ttl.as_secs()
         });
-        
+
         use redis::Commands;
-        conn.set_ex(&session_key, session_data.to_string(), ttl.as_secs() as usize)
-            .map_err(|e| DatabaseError::WriteError(format!("Failed to create session: {}", e)))?;
-        
+        conn.set_ex(
+            &session_key,
+            session_data.to_string(),
+            ttl.as_secs() as usize,
+        )
+        .map_err(|e| DatabaseError::WriteError(format!("Failed to create session: {}", e)))?;
+
         Ok(())
     }
 
-    async fn get_session(&self, session_id: &str) -> DatabaseResult<Option<HashMap<String, String>>> {
+    async fn get_session(
+        &self,
+        session_id: &str,
+    ) -> DatabaseResult<Option<HashMap<String, String>>> {
         let mut conn = self.get_connection().await?;
-        
+
         let session_key = format!("session:{}", session_id);
-        
+
         use redis::Commands;
         match conn.get::<String, String>(&session_key) {
             Ok(data) => {
-                let session_data: serde_json::Value = serde_json::from_str(&data)
-                    .map_err(|e| DatabaseError::ReadError(format!("Failed to parse session data: {}", e)))?;
-                
+                let session_data: serde_json::Value = serde_json::from_str(&data).map_err(|e| {
+                    DatabaseError::ReadError(format!("Failed to parse session data: {}", e))
+                })?;
+
                 let mut result = HashMap::new();
                 if let Some(user_id) = session_data.get("user_id").and_then(|v| v.as_str()) {
                     result.insert("user_id".to_string(), user_id.to_string());
@@ -134,35 +161,41 @@ impl SessionManager for RedisBackend {
                 if let Some(created_at) = session_data.get("created_at").and_then(|v| v.as_u64()) {
                     result.insert("created_at".to_string(), created_at.to_string());
                 }
-                
+
                 Ok(Some(result))
             }
-            Err(redis::RedisError { kind: redis::ErrorKind::ResponseError, .. }) => Ok(None),
-            Err(e) => Err(DatabaseError::ReadError(format!("Failed to get session: {}", e))),
+            Err(redis::RedisError {
+                kind: redis::ErrorKind::ResponseError,
+                ..
+            }) => Ok(None),
+            Err(e) => Err(DatabaseError::ReadError(format!(
+                "Failed to get session: {}",
+                e
+            ))),
         }
     }
 
     async fn delete_session(&mut self, session_id: &str) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
-        
+
         let session_key = format!("session:{}", session_id);
-        
+
         use redis::Commands;
         conn.del(&session_key)
             .map_err(|e| DatabaseError::WriteError(format!("Failed to delete session: {}", e)))?;
-        
+
         Ok(())
     }
 
     async fn extend_session(&mut self, session_id: &str, ttl: Duration) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
-        
+
         let session_key = format!("session:{}", session_id);
-        
+
         use redis::Commands;
         conn.expire(&session_key, ttl.as_secs() as usize)
             .map_err(|e| DatabaseError::WriteError(format!("Failed to extend session: {}", e)))?;
-        
+
         Ok(())
     }
 }
@@ -203,7 +236,7 @@ mod tests {
         };
 
         let mut backend = RedisBackend::new(&config).expect("Failed to create Redis backend");
-        
+
         // This will fail if Redis is not running, but that's expected in CI
         let _ = backend.initialize().await;
     }

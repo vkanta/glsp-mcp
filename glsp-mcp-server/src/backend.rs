@@ -2,10 +2,15 @@
 //!
 //! This is a simplified version to get the basic structure working first.
 
-use crate::database::{DatabaseConfig, config::DatabaseBackend, factory::DatabaseManager, BoxedDatasetManager};
+use crate::database::{
+    config::DatabaseBackend, factory::DatabaseManager, BoxedDatasetManager, DatabaseConfig,
+};
 use crate::model::{DiagramModel, Edge, ElementType, Node, Position};
 use crate::persistence::PersistenceManager;
-use crate::wasm::{FileSystemWatcher, WasmFileWatcher, WasmExecutionEngine, WasmPipelineEngine, WasmSimulationEngine};
+use crate::wasm::{
+    FileSystemWatcher, WasmExecutionEngine, WasmFileWatcher, WasmPipelineEngine,
+    WasmSimulationEngine,
+};
 use clap::Parser;
 use pulseengine_mcp_cli_derive::McpConfig;
 use pulseengine_mcp_protocol::*;
@@ -107,7 +112,12 @@ impl GlspConfig {
             "redis" => DatabaseBackend::Redis,
             "sqlite" => DatabaseBackend::SQLite,
             "mock" => DatabaseBackend::Mock,
-            _ => return Err(format!("Unknown database backend: {}", self.database_backend)),
+            _ => {
+                return Err(format!(
+                    "Unknown database backend: {}",
+                    self.database_backend
+                ))
+            }
         };
 
         let mut config = DatabaseConfig::default();
@@ -181,7 +191,7 @@ impl From<GlspError> for Error {
 
 /// GLSP Backend implementation - The core server backend for AI-native diagram modeling
 ///
-/// This backend provides a complete implementation of the Model Context Protocol (MCP) 
+/// This backend provides a complete implementation of the Model Context Protocol (MCP)
 /// for AI agents to interact with graphical diagrams and WASM components. It manages
 /// diagram persistence, WASM component execution, and real-time collaboration.
 ///
@@ -272,34 +282,48 @@ impl GlspBackend {
         };
 
         // Initialize WASM execution engines if database is available
-        let (execution_engine, pipeline_engine, simulation_engine) = if let Some(ref _db_manager) = database_manager {
+        let (execution_engine, pipeline_engine, simulation_engine) = if let Some(ref _db_manager) =
+            database_manager
+        {
             // Create dataset manager using database backend
             match config.to_database_config() {
                 Ok(db_config) => {
                     match crate::database::DatabaseFactory::create(db_config).await {
                         Ok(backend) => {
-                            let dataset_manager = crate::database::BoxedDatasetManager::new(backend);
-                            let dataset_manager_arc = std::sync::Arc::new(tokio::sync::Mutex::new(dataset_manager));
-                            
+                            let dataset_manager =
+                                crate::database::BoxedDatasetManager::new(backend);
+                            let dataset_manager_arc =
+                                std::sync::Arc::new(tokio::sync::Mutex::new(dataset_manager));
+
                             // Create execution engine with sensor support
-                            match WasmExecutionEngine::with_dataset_manager(10, dataset_manager_arc.clone()) {
+                            match WasmExecutionEngine::with_dataset_manager(
+                                10,
+                                dataset_manager_arc.clone(),
+                            ) {
                                 Ok(exec_engine) => {
                                     let exec_engine_arc = std::sync::Arc::new(exec_engine);
-                                    
+
                                     // Create pipeline engine
-                                    let pipeline_engine = WasmPipelineEngine::new(exec_engine_arc.clone(), 5);
+                                    let pipeline_engine =
+                                        WasmPipelineEngine::new(exec_engine_arc.clone(), 5);
                                     let pipeline_engine_arc = std::sync::Arc::new(pipeline_engine);
-                                    
+
                                     // Create simulation engine with sensor support
                                     match WasmSimulationEngine::with_sensor_support(
                                         pipeline_engine_arc.clone(),
                                         dataset_manager_arc.clone(),
-                                        3
-                                    ).await {
+                                        3,
+                                    )
+                                    .await
+                                    {
                                         Ok(sim_engine) => {
                                             let sim_engine_arc = std::sync::Arc::new(sim_engine);
                                             info!("WASM execution engines initialized with sensor support");
-                                            (Some(exec_engine_arc), Some(pipeline_engine_arc), Some(sim_engine_arc))
+                                            (
+                                                Some(exec_engine_arc),
+                                                Some(pipeline_engine_arc),
+                                                Some(sim_engine_arc),
+                                            )
                                         }
                                         Err(e) => {
                                             error!("Failed to create simulation engine: {}", e);
@@ -331,13 +355,18 @@ impl GlspBackend {
                     let exec_engine_arc = std::sync::Arc::new(exec_engine);
                     let pipeline_engine = WasmPipelineEngine::new(exec_engine_arc.clone(), 5);
                     let pipeline_engine_arc = std::sync::Arc::new(pipeline_engine);
-                    
+
                     // Create simulation engine without sensor support
-                    let simulation_engine = WasmSimulationEngine::new(pipeline_engine_arc.clone(), 3);
+                    let simulation_engine =
+                        WasmSimulationEngine::new(pipeline_engine_arc.clone(), 3);
                     let simulation_engine_arc = std::sync::Arc::new(simulation_engine);
-                    
+
                     info!("WASM execution engines initialized without sensor support");
-                    (Some(exec_engine_arc), Some(pipeline_engine_arc), Some(simulation_engine_arc))
+                    (
+                        Some(exec_engine_arc),
+                        Some(pipeline_engine_arc),
+                        Some(simulation_engine_arc),
+                    )
                 }
                 Err(e) => {
                     error!("Failed to create basic execution engine: {}", e);
@@ -366,17 +395,17 @@ impl GlspBackend {
         info!("Performing initial WASM component scan...");
         {
             let mut wasm_watcher = backend.wasm_watcher.lock().await;
-            
+
             // Initialize with execution engine
-            *wasm_watcher = wasm_watcher.clone()
-                .with_execution_engine(3)
-                .map_err(|e| GlspError::NotImplemented(format!("Failed to init execution engine: {e}")))?;
-            
+            *wasm_watcher = wasm_watcher.clone().with_execution_engine(3).map_err(|e| {
+                GlspError::NotImplemented(format!("Failed to init execution engine: {e}"))
+            })?;
+
             // Start file watching for real-time updates
             if let Err(e) = wasm_watcher.start_file_watching().await {
                 error!("Failed to start file watching: {}", e);
             }
-            
+
             // Perform initial scan
             if let Err(e) = wasm_watcher.scan_components().await {
                 error!("Failed to perform initial WASM component scan: {}", e);
@@ -415,7 +444,7 @@ impl GlspBackend {
         if let Some(db_manager) = &self.database_manager {
             if !db_manager.is_healthy().await {
                 return Err(GlspError::ToolExecution(
-                    "Database connection is unhealthy".to_string()
+                    "Database connection is unhealthy".to_string(),
                 ));
             }
         }
@@ -478,83 +507,119 @@ impl GlspBackend {
 
     /// Check if full simulation capabilities are available
     pub fn is_simulation_enabled(&self) -> bool {
-        self.execution_engine.is_some() && self.pipeline_engine.is_some() && self.simulation_engine.is_some()
+        self.execution_engine.is_some()
+            && self.pipeline_engine.is_some()
+            && self.simulation_engine.is_some()
     }
 
     /// Set a new workspace directory (sets both wasm and diagrams subdirectories)
-    pub async fn set_workspace_directory(&self, workspace_path: String) -> std::result::Result<(), GlspError> {
+    pub async fn set_workspace_directory(
+        &self,
+        workspace_path: String,
+    ) -> std::result::Result<(), GlspError> {
         use std::path::Path;
-        
+
         let workspace = Path::new(&workspace_path);
         if !workspace.exists() {
-            return Err(GlspError::ToolExecution(format!("Workspace directory does not exist: {}", workspace_path)));
+            return Err(GlspError::ToolExecution(format!(
+                "Workspace directory does not exist: {}",
+                workspace_path
+            )));
         }
-        
+
         if !workspace.is_dir() {
-            return Err(GlspError::ToolExecution(format!("Path is not a directory: {}", workspace_path)));
+            return Err(GlspError::ToolExecution(format!(
+                "Path is not a directory: {}",
+                workspace_path
+            )));
         }
-        
+
         // Set standard workspace structure
-        let wasm_path = workspace.join("wasm-components").to_string_lossy().to_string();
+        let wasm_path = workspace
+            .join("wasm-components")
+            .to_string_lossy()
+            .to_string();
         let diagrams_path = workspace.join("diagrams").to_string_lossy().to_string();
-        
+
         // Create directories if they don't exist
-        std::fs::create_dir_all(&wasm_path).map_err(|e| 
-            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e)))?;
-        std::fs::create_dir_all(&diagrams_path).map_err(|e| 
-            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
-        
+        std::fs::create_dir_all(&wasm_path).map_err(|e| {
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e))
+        })?;
+        std::fs::create_dir_all(&diagrams_path).map_err(|e| {
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+        })?;
+
         // Update paths
         self.set_wasm_components_path(wasm_path).await?;
         self.set_diagrams_path(diagrams_path).await?;
-        
+
         info!("Workspace directory set to: {}", workspace_path);
         Ok(())
     }
 
     /// Set a new WASM components path and update the file watcher
-    pub async fn set_wasm_components_path(&self, wasm_path: String) -> std::result::Result<(), GlspError> {
+    pub async fn set_wasm_components_path(
+        &self,
+        wasm_path: String,
+    ) -> std::result::Result<(), GlspError> {
         use std::path::Path;
-        
+
         let path = Path::new(&wasm_path);
         if !path.exists() {
-            std::fs::create_dir_all(path).map_err(|e| 
-                GlspError::ToolExecution(format!("Failed to create WASM directory: {}", e)))?;
+            std::fs::create_dir_all(path).map_err(|e| {
+                GlspError::ToolExecution(format!("Failed to create WASM directory: {}", e))
+            })?;
         }
-        
+
         // Update filesystem watcher
         {
             let mut filesystem_watcher = self.filesystem_watcher.write().await;
-            filesystem_watcher.change_watch_path(path.to_path_buf()).await.map_err(|e|
-                GlspError::ToolExecution(format!("Failed to update filesystem watcher: {}", e)))?;
+            filesystem_watcher
+                .change_watch_path(path.to_path_buf())
+                .await
+                .map_err(|e| {
+                    GlspError::ToolExecution(format!("Failed to update filesystem watcher: {}", e))
+                })?;
         }
-        
+
         // Update WASM file watcher
         {
             let mut wasm_watcher = self.wasm_watcher.lock().await;
-            wasm_watcher.change_watch_path(path.to_path_buf()).await.map_err(|e|
-                GlspError::ToolExecution(format!("Failed to update WASM watcher: {}", e)))?;
+            wasm_watcher
+                .change_watch_path(path.to_path_buf())
+                .await
+                .map_err(|e| {
+                    GlspError::ToolExecution(format!("Failed to update WASM watcher: {}", e))
+                })?;
         }
-        
+
         info!("WASM components path set to: {}", wasm_path);
         Ok(())
     }
 
     /// Set a new diagrams path and update the persistence manager
-    pub async fn set_diagrams_path(&self, diagrams_path: String) -> std::result::Result<(), GlspError> {
+    pub async fn set_diagrams_path(
+        &self,
+        diagrams_path: String,
+    ) -> std::result::Result<(), GlspError> {
         use std::path::Path;
-        
+
         let path = Path::new(&diagrams_path);
         if !path.exists() {
-            std::fs::create_dir_all(path).map_err(|e| 
-                GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
+            std::fs::create_dir_all(path).map_err(|e| {
+                GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+            })?;
         }
-        
+
         // Update persistence manager - since it's in an Arc, we need to replace it
         // For now, just validate the path change
-        self.persistence.change_storage_path(path.to_path_buf()).await.map_err(|e|
-            GlspError::ToolExecution(format!("Failed to update persistence manager: {}", e)))?;
-        
+        self.persistence
+            .change_storage_path(path.to_path_buf())
+            .await
+            .map_err(|e| {
+                GlspError::ToolExecution(format!("Failed to update persistence manager: {}", e))
+            })?;
+
         info!("Diagrams path set to: {}", diagrams_path);
         Ok(())
     }
@@ -563,11 +628,15 @@ impl GlspBackend {
     pub async fn get_current_workspace(&self) -> std::result::Result<serde_json::Value, GlspError> {
         let wasm_path = &self.config.wasm_path;
         let diagrams_path = &self.config.diagrams_path;
-        
+
         // Try to determine workspace root by checking if both paths are subdirectories of a common parent
         let workspace_root = if let (Some(wasm_parent), Some(diagrams_parent)) = (
-            std::path::Path::new(wasm_path).parent().map(|p| p.to_string_lossy().to_string()),
-            std::path::Path::new(diagrams_path).parent().map(|p| p.to_string_lossy().to_string())
+            std::path::Path::new(wasm_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string()),
+            std::path::Path::new(diagrams_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string()),
         ) {
             if wasm_parent == diagrams_parent {
                 Some(wasm_parent)
@@ -577,7 +646,7 @@ impl GlspBackend {
         } else {
             None
         };
-        
+
         Ok(json!({
             "workspace_root": workspace_root,
             "wasm_components_path": wasm_path,
@@ -592,33 +661,40 @@ impl GlspBackend {
         // Trigger WASM component rescan
         {
             let mut wasm_watcher = self.wasm_watcher.lock().await;
-            wasm_watcher.scan_components().await.map_err(|e|
-                GlspError::ToolExecution(format!("Failed to rescan WASM components: {}", e)))?;
+            wasm_watcher.scan_components().await.map_err(|e| {
+                GlspError::ToolExecution(format!("Failed to rescan WASM components: {}", e))
+            })?;
         }
-        
+
         // Reload diagrams from disk
         self.load_all_diagrams().await?;
-        
+
         info!("Workspace rescan completed");
         Ok(())
     }
 
     /// Validate workspace paths and structure
-    pub async fn validate_workspace_paths(&self, workspace_path: &str) -> std::result::Result<serde_json::Value, GlspError> {
+    pub async fn validate_workspace_paths(
+        &self,
+        workspace_path: &str,
+    ) -> std::result::Result<serde_json::Value, GlspError> {
         use std::path::Path;
-        
+
         let workspace = Path::new(workspace_path);
         let wasm_dir = workspace.join("wasm-components");
         let diagrams_dir = workspace.join("diagrams");
-        
+
         let mut errors = Vec::new();
-        
+
         // Check workspace root
         let workspace_exists = workspace.exists();
         let workspace_is_dir = workspace.is_dir();
-        let workspace_writable = workspace_exists && workspace.metadata()
-            .map(|m| !m.permissions().readonly()).unwrap_or(false);
-        
+        let workspace_writable = workspace_exists
+            && workspace
+                .metadata()
+                .map(|m| !m.permissions().readonly())
+                .unwrap_or(false);
+
         if !workspace_exists {
             errors.push("Workspace directory does not exist".to_string());
         } else if !workspace_is_dir {
@@ -626,11 +702,11 @@ impl GlspBackend {
         } else if !workspace_writable {
             errors.push("Workspace directory is not writable".to_string());
         }
-        
+
         // Check subdirectories
         let wasm_exists = wasm_dir.exists();
         let diagrams_exists = diagrams_dir.exists();
-        
+
         // Count existing files
         let wasm_count = if wasm_exists {
             std::fs::read_dir(&wasm_dir)
@@ -639,7 +715,7 @@ impl GlspBackend {
         } else {
             0
         };
-        
+
         let diagrams_count = if diagrams_exists {
             std::fs::read_dir(&diagrams_dir)
                 .map(|entries| entries.filter_map(|e| e.ok()).count())
@@ -647,7 +723,7 @@ impl GlspBackend {
         } else {
             0
         };
-        
+
         Ok(json!({
             "valid": errors.is_empty(),
             "workspace_exists": workspace_exists,
@@ -1111,16 +1187,21 @@ impl GlspBackend {
             "get_component_path" => self.get_component_path(request.arguments).await,
             "get_component_wit_info" => self.get_component_wit_info(request.arguments).await,
             "debug_wit_analysis" => self.debug_wit_analysis(request.arguments).await,
-            
+
             // Workspace management tools
             "set_workspace_directory" => self.set_workspace_directory_tool(request.arguments).await,
             "get_workspace_info" => self.get_current_workspace_tool().await,
-            "set_wasm_components_path" => self.set_wasm_components_path_tool(request.arguments).await,
+            "set_wasm_components_path" => {
+                self.set_wasm_components_path_tool(request.arguments).await
+            }
             "set_diagrams_path" => self.set_diagrams_path_tool(request.arguments).await,
             "rescan_workspace" => self.rescan_workspace_tool().await,
             "validate_workspace" => self.validate_workspace_tool(request.arguments).await,
-            "create_workspace_structure" => self.create_workspace_structure_tool(request.arguments).await,
-            
+            "create_workspace_structure" => {
+                self.create_workspace_structure_tool(request.arguments)
+                    .await
+            }
+
             _ => Err(GlspError::NotImplemented(format!(
                 "Tool not implemented: {}",
                 request.name
@@ -1773,14 +1854,19 @@ impl GlspBackend {
         let missing = components.len() - available;
 
         // Convert components to JSON format expected by the client
-        let components_json: Vec<_> = components.iter().map(|c| json!({
-            "name": c.name,
-            "path": c.path,
-            "fileExists": c.file_exists,
-            "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
-            "metadata": c.metadata,
-            "interfaces": c.interfaces
-        })).collect();
+        let components_json: Vec<_> = components
+            .iter()
+            .map(|c| {
+                json!({
+                    "name": c.name,
+                    "path": c.path,
+                    "fileExists": c.file_exists,
+                    "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
+                    "metadata": c.metadata,
+                    "interfaces": c.interfaces
+                })
+            })
+            .collect();
 
         let result = json!({
             "components": components_json,
@@ -2501,118 +2587,174 @@ impl GlspBackend {
     }
 
     // Workspace management tool wrapper methods
-    
-    async fn set_workspace_directory_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+
+    async fn set_workspace_directory_tool(
+        &self,
+        arguments: Option<serde_json::Value>,
+    ) -> std::result::Result<CallToolResult, GlspError> {
         let args = arguments.unwrap_or_default();
-        let workspace_path = args.get("workspace_path")
+        let workspace_path = args
+            .get("workspace_path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
-        
-        let create_if_missing = args.get("create_if_missing")
+            .ok_or_else(|| {
+                GlspError::ToolExecution("workspace_path parameter is required".to_string())
+            })?;
+
+        let create_if_missing = args
+            .get("create_if_missing")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
-        
+
         // Create workspace directory if requested and it doesn't exist
         if create_if_missing && !std::path::Path::new(workspace_path).exists() {
-            std::fs::create_dir_all(workspace_path).map_err(|e| 
-                GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e)))?;
+            std::fs::create_dir_all(workspace_path).map_err(|e| {
+                GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e))
+            })?;
         }
-        
-        self.set_workspace_directory(workspace_path.to_string()).await?;
-        
+
+        self.set_workspace_directory(workspace_path.to_string())
+            .await?;
+
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Successfully set workspace directory to: {}", workspace_path))],
+            content: vec![Content::text(format!(
+                "Successfully set workspace directory to: {}",
+                workspace_path
+            ))],
             is_error: Some(false),
         })
     }
-    
+
     async fn get_current_workspace_tool(&self) -> std::result::Result<CallToolResult, GlspError> {
         let workspace_info = self.get_current_workspace().await?;
-        
+
         Ok(CallToolResult {
-            content: vec![Content::text(serde_json::to_string_pretty(&workspace_info)
-                .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize workspace info: {}", e)))?)],
+            content: vec![Content::text(
+                serde_json::to_string_pretty(&workspace_info).map_err(|e| {
+                    GlspError::ToolExecution(format!("Failed to serialize workspace info: {}", e))
+                })?,
+            )],
             is_error: Some(false),
         })
     }
-    
-    async fn set_wasm_components_path_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+
+    async fn set_wasm_components_path_tool(
+        &self,
+        arguments: Option<serde_json::Value>,
+    ) -> std::result::Result<CallToolResult, GlspError> {
         let args = arguments.unwrap_or_default();
-        let wasm_path = args.get("wasm_path")
+        let wasm_path = args
+            .get("wasm_path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| GlspError::ToolExecution("wasm_path parameter is required".to_string()))?;
-        
+            .ok_or_else(|| {
+                GlspError::ToolExecution("wasm_path parameter is required".to_string())
+            })?;
+
         self.set_wasm_components_path(wasm_path.to_string()).await?;
-        
+
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Successfully set WASM components path to: {}", wasm_path))],
+            content: vec![Content::text(format!(
+                "Successfully set WASM components path to: {}",
+                wasm_path
+            ))],
             is_error: Some(false),
         })
     }
-    
-    async fn set_diagrams_path_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+
+    async fn set_diagrams_path_tool(
+        &self,
+        arguments: Option<serde_json::Value>,
+    ) -> std::result::Result<CallToolResult, GlspError> {
         let args = arguments.unwrap_or_default();
-        let diagrams_path = args.get("diagrams_path")
+        let diagrams_path = args
+            .get("diagrams_path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| GlspError::ToolExecution("diagrams_path parameter is required".to_string()))?;
-        
+            .ok_or_else(|| {
+                GlspError::ToolExecution("diagrams_path parameter is required".to_string())
+            })?;
+
         self.set_diagrams_path(diagrams_path.to_string()).await?;
-        
+
         Ok(CallToolResult {
-            content: vec![Content::text(format!("Successfully set diagrams path to: {}", diagrams_path))],
+            content: vec![Content::text(format!(
+                "Successfully set diagrams path to: {}",
+                diagrams_path
+            ))],
             is_error: Some(false),
         })
     }
-    
+
     async fn rescan_workspace_tool(&self) -> std::result::Result<CallToolResult, GlspError> {
         self.rescan_workspace().await?;
-        
+
         Ok(CallToolResult {
-            content: vec![Content::text("Successfully rescanned workspace for WASM components and diagrams".to_string())],
+            content: vec![Content::text(
+                "Successfully rescanned workspace for WASM components and diagrams".to_string(),
+            )],
             is_error: Some(false),
         })
     }
-    
-    async fn validate_workspace_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+
+    async fn validate_workspace_tool(
+        &self,
+        arguments: Option<serde_json::Value>,
+    ) -> std::result::Result<CallToolResult, GlspError> {
         let args = arguments.unwrap_or_default();
-        let workspace_path = args.get("workspace_path")
+        let workspace_path = args
+            .get("workspace_path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
-        
+            .ok_or_else(|| {
+                GlspError::ToolExecution("workspace_path parameter is required".to_string())
+            })?;
+
         let validation_result = self.validate_workspace_paths(workspace_path).await?;
-        
+
         Ok(CallToolResult {
-            content: vec![Content::text(serde_json::to_string_pretty(&validation_result)
-                .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize validation result: {}", e)))?)],
+            content: vec![Content::text(
+                serde_json::to_string_pretty(&validation_result).map_err(|e| {
+                    GlspError::ToolExecution(format!(
+                        "Failed to serialize validation result: {}",
+                        e
+                    ))
+                })?,
+            )],
             is_error: Some(false),
         })
     }
-    
-    async fn create_workspace_structure_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+
+    async fn create_workspace_structure_tool(
+        &self,
+        arguments: Option<serde_json::Value>,
+    ) -> std::result::Result<CallToolResult, GlspError> {
         let args = arguments.unwrap_or_default();
-        let workspace_path = args.get("workspace_path")
+        let workspace_path = args
+            .get("workspace_path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
-        
+            .ok_or_else(|| {
+                GlspError::ToolExecution("workspace_path parameter is required".to_string())
+            })?;
+
         use std::path::Path;
         let workspace = Path::new(workspace_path);
-        
+
         // Create workspace root
-        std::fs::create_dir_all(workspace).map_err(|e| 
-            GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e)))?;
-        
+        std::fs::create_dir_all(workspace).map_err(|e| {
+            GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e))
+        })?;
+
         // Create subdirectories
         let wasm_dir = workspace.join("wasm-components");
         let diagrams_dir = workspace.join("diagrams");
-        
-        std::fs::create_dir_all(&wasm_dir).map_err(|e| 
-            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e)))?;
-        std::fs::create_dir_all(&diagrams_dir).map_err(|e| 
-            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
-        
+
+        std::fs::create_dir_all(&wasm_dir).map_err(|e| {
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e))
+        })?;
+        std::fs::create_dir_all(&diagrams_dir).map_err(|e| {
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+        })?;
+
         Ok(CallToolResult {
             content: vec![Content::text(format!(
-                "Successfully created workspace structure:\n- {}\n- {}\n- {}", 
+                "Successfully created workspace structure:\n- {}\n- {}\n- {}",
                 workspace_path,
                 wasm_dir.display(),
                 diagrams_dir.display()

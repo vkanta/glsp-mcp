@@ -1,44 +1,43 @@
 mod execution_engine;
 mod filesystem_watcher;
-mod security_scanner;
-mod wit_analyzer;
 mod graphics_renderer;
-mod sensor_bridge;
 mod pipeline;
+mod security_scanner;
+mod sensor_bridge;
 mod simulation;
+mod wit_analyzer;
 
 pub use execution_engine::{
     ExecutionContext, ExecutionProgress, ExecutionResult, ExecutionStage, GraphicsFormat,
     GraphicsOutput, VideoFormat, WasmExecutionEngine,
 };
 pub use filesystem_watcher::{FileSystemWatcher, WasmChangeType, WasmComponentChange};
+pub use graphics_renderer::{CanvasCommand, GraphicsConfig, ImageFormat, WasmGraphicsRenderer};
+pub use pipeline::{
+    BackoffStrategy, ConnectionType, DataConnection, DataMapping, DataTransform, ExecutionMode,
+    ExecutionStats, PersistenceSettings, PipelineConfig, PipelineExecution, PipelineSettings,
+    PipelineStage, PipelineState, RetryConfig, StageExecutionSettings, StageResult, StageStats,
+    WasmPipelineEngine,
+};
 pub use security_scanner::{
     SecurityAnalysis, SecurityIssue, SecurityIssueType, SecurityRiskLevel, WasmSecurityScanner,
 };
-pub use wit_analyzer::{
-    ComponentWitAnalysis, WitAnalyzer, WitCompatibilityReport, WitDependency, WitFunction, 
-    WitInterface, WitInterfaceType, WitParam, WitType, WitTypeDefinition, WitValidationIssue,
-    WitValidationIssueType, WitValidationSeverity,
-};
-pub use graphics_renderer::{
-    WasmGraphicsRenderer, GraphicsConfig, CanvasCommand, ImageFormat,
-};
 pub use sensor_bridge::{
-    SensorDataBridge, SensorBridgeConfig, SensorFrame, BridgeStatus, WasmSensorInterface,
-    TimingConfig, BufferSettings, SyncMode as SensorSyncMode, SimulationTimeInfo, BufferStats,
-};
-pub use pipeline::{
-    WasmPipelineEngine, PipelineConfig, PipelineStage, PipelineExecution, PipelineState,
-    DataConnection, DataMapping, DataTransform, ConnectionType, StageExecutionSettings,
-    RetryConfig, BackoffStrategy, PipelineSettings, PersistenceSettings, ExecutionMode,
-    StageResult, ExecutionStats, StageStats,
+    BridgeStatus, BufferSettings, BufferStats, SensorBridgeConfig, SensorDataBridge, SensorFrame,
+    SimulationTimeInfo, SyncMode as SensorSyncMode, TimingConfig, WasmSensorInterface,
 };
 pub use simulation::{
-    WasmSimulationEngine, SimulationConfig, SimulationScenario, SimulationExecution, SimulationState,
-    PipelineDependency, DependencyType, DataSharingConfig, ScenarioSettings, ResourceLimits,
-    ScenarioExecutionMode, SimulationSettings, SimulationExecutionMode, RealTimeSyncSettings,
-    SyncMode, OutputConfig, OutputFormat, OutputDestination, SimulationStats, ScenarioStats,
-    ResourceUsage, ScenarioTrigger, TriggerType, TriggerCondition, ScenarioCondition,
+    DataSharingConfig, DependencyType, OutputConfig, OutputDestination, OutputFormat,
+    PipelineDependency, RealTimeSyncSettings, ResourceLimits, ResourceUsage, ScenarioCondition,
+    ScenarioExecutionMode, ScenarioSettings, ScenarioStats, ScenarioTrigger, SimulationConfig,
+    SimulationExecution, SimulationExecutionMode, SimulationScenario, SimulationSettings,
+    SimulationState, SimulationStats, SyncMode, TriggerCondition, TriggerType,
+    WasmSimulationEngine,
+};
+pub use wit_analyzer::{
+    ComponentWitAnalysis, WitAnalyzer, WitCompatibilityReport, WitDependency, WitFunction,
+    WitInterface, WitInterfaceType, WitParam, WitType, WitTypeDefinition, WitValidationIssue,
+    WitValidationIssueType, WitValidationSeverity,
 };
 
 use chrono::{DateTime, Utc};
@@ -46,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// WASM interface definition representing import or export interfaces
 ///
@@ -123,7 +122,7 @@ impl WasmFileWatcher {
             filesystem_watcher: None,
         }
     }
-    
+
     /// List all executions (active and recent)
     pub fn list_executions(&self) -> Vec<ExecutionResult> {
         if let Some(engine) = &self.execution_engine {
@@ -132,37 +131,41 @@ impl WasmFileWatcher {
             vec![]
         }
     }
-    
+
     /// Get execution progress by ID
     pub fn get_execution_progress(&self, execution_id: &str) -> Option<ExecutionProgress> {
-        self.execution_engine.as_ref()?.get_execution_progress(execution_id)
+        self.execution_engine
+            .as_ref()?
+            .get_execution_progress(execution_id)
     }
-    
+
     /// Get execution result by ID
     pub fn get_execution_result(&self, execution_id: &str) -> Option<ExecutionResult> {
-        self.execution_engine.as_ref()?.get_execution_result(execution_id)
+        self.execution_engine
+            .as_ref()?
+            .get_execution_result(execution_id)
     }
-    
+
     /// Start filesystem watcher for real-time component monitoring
     pub async fn start_file_watching(&mut self) -> Result<(), anyhow::Error> {
         // Create and start the filesystem watcher
         let mut fs_watcher = FileSystemWatcher::new(self.watch_path.clone());
         fs_watcher.start_watching().await?;
-        
+
         // Get the changes receiver before storing watcher
         let changes_rx = fs_watcher.get_changes_receiver();
         let recent_changes = self.recent_changes.clone();
-        
+
         // Spawn a task to collect changes
         tokio::spawn(async move {
             let mut rx = changes_rx.write().await;
             while let Some(change) = rx.recv().await {
                 info!("Component change detected: {:?}", change);
-                
+
                 // Add to recent changes
                 let mut changes = recent_changes.lock().await;
                 changes.push(change);
-                
+
                 // Keep only last 100 changes
                 if changes.len() > 100 {
                     let drain_count = changes.len() - 100;
@@ -170,14 +173,14 @@ impl WasmFileWatcher {
                 }
             }
         });
-        
+
         // Store the watcher
         self.filesystem_watcher = Some(Arc::new(tokio::sync::RwLock::new(fs_watcher)));
-        
+
         info!("Filesystem watcher started for path: {:?}", self.watch_path);
         Ok(())
     }
-    
+
     /// Get recent component changes
     pub async fn get_recent_changes(&self) -> Vec<WasmComponentChange> {
         self.recent_changes.lock().await.clone()
@@ -334,17 +337,20 @@ impl WasmFileWatcher {
                     .to_string();
 
                 // Perform security analysis
-                let security_analysis = match self.security_scanner.analyze_component(wasm_path).await {
-                    Ok(analysis) => {
-                        info!("Security analysis completed for {}: {:?} risk", 
-                                component_name, analysis.overall_risk);
-                        Some(analysis)
-                    }
-                    Err(e) => {
-                        warn!("Security analysis failed for {}: {}", component_name, e);
-                        None
-                    }
-                };
+                let security_analysis =
+                    match self.security_scanner.analyze_component(wasm_path).await {
+                        Ok(analysis) => {
+                            info!(
+                                "Security analysis completed for {}: {:?} risk",
+                                component_name, analysis.overall_risk
+                            );
+                            Some(analysis)
+                        }
+                        Err(e) => {
+                            warn!("Security analysis failed for {}: {}", component_name, e);
+                            None
+                        }
+                    };
 
                 Ok(WasmComponent {
                     name: component_name,
@@ -362,9 +368,7 @@ impl WasmFileWatcher {
                 })
             }
             Err(e) => {
-                warn!(
-                    "Failed to extract WASM metadata for {component_name}: {e}. Using fallback."
-                );
+                warn!("Failed to extract WASM metadata for {component_name}: {e}. Using fallback.");
 
                 // Fallback to basic component info if extraction fails
                 Ok(WasmComponent {
@@ -733,7 +737,8 @@ impl WasmFileWatcher {
 
     /// Get security analysis for a specific component
     pub fn get_security_analysis(&self, component_name: &str) -> Option<&SecurityAnalysis> {
-        self.components.get(component_name)
+        self.components
+            .get(component_name)
             .and_then(|comp| comp.security_analysis.as_ref())
     }
 
@@ -763,18 +768,25 @@ impl WasmFileWatcher {
         timeout_ms: u64,
         max_memory_mb: u32,
     ) -> Result<String, anyhow::Error> {
-        let execution_engine = self.execution_engine.as_ref()
+        let execution_engine = self
+            .execution_engine
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Execution engine not initialized"))?;
 
-        let component = self.components.get(component_name)
+        let component = self
+            .components
+            .get(component_name)
             .ok_or_else(|| anyhow::anyhow!("Component '{}' not found", component_name))?;
 
         if !component.file_exists {
-            return Err(anyhow::anyhow!("Component '{}' file does not exist", component_name));
+            return Err(anyhow::anyhow!(
+                "Component '{}' file does not exist",
+                component_name
+            ));
         }
 
         let execution_id = uuid::Uuid::new_v4().to_string();
-        
+
         let context = ExecutionContext {
             execution_id: execution_id.clone(),
             component_name: component_name.to_string(),
@@ -787,13 +799,16 @@ impl WasmFileWatcher {
         };
 
         let component_path = std::path::Path::new(&component.path);
-        
-        execution_engine.execute_component(context, component_path).await
+
+        execution_engine
+            .execute_component(context, component_path)
+            .await
     }
 
     /// Cancel an execution
     pub fn cancel_execution(&self, execution_id: &str) -> bool {
-        self.execution_engine.as_ref()
+        self.execution_engine
+            .as_ref()
             .map(|engine| engine.cancel_execution(execution_id))
             .unwrap_or(false)
     }
@@ -1000,23 +1015,25 @@ impl WasmFileWatcher {
             };
             info!("   Security Coverage: {components_with_security_analysis}/{available_components} ({security_coverage:.1}%)");
             info!("   Total Security Issues: {total_security_issues}");
-            
+
             for (risk_level, count) in &security_summary {
                 if *count > 0 {
                     let icon = match risk_level {
                         SecurityRiskLevel::Critical => "🔴",
-                        SecurityRiskLevel::High => "🟠", 
+                        SecurityRiskLevel::High => "🟠",
                         SecurityRiskLevel::Medium => "🟡",
                         SecurityRiskLevel::Low => "🟢",
                     };
                     info!("   {icon} {:?}: {count} components", risk_level);
                 }
             }
-            
+
             // Security recommendations
-            let critical_count = security_summary.get(&SecurityRiskLevel::Critical).unwrap_or(&0);
+            let critical_count = security_summary
+                .get(&SecurityRiskLevel::Critical)
+                .unwrap_or(&0);
             let high_count = security_summary.get(&SecurityRiskLevel::High).unwrap_or(&0);
-            
+
             if *critical_count > 0 {
                 warn!("   URGENT: {critical_count} components have critical security issues!");
             }
@@ -1052,27 +1069,32 @@ impl WasmFileWatcher {
 
     /// Change the watched path and restart filesystem monitoring
     pub async fn change_watch_path(&mut self, new_path: PathBuf) -> anyhow::Result<()> {
-        info!("Changing WASM file watcher path from {:?} to {:?}", self.watch_path, new_path);
-        
+        info!(
+            "Changing WASM file watcher path from {:?} to {:?}",
+            self.watch_path, new_path
+        );
+
         // Update the path
         self.watch_path = new_path;
-        
+
         // Clear existing components since they're from the old path
         self.components.clear();
-        
+
         // Clear recent changes
         self.recent_changes.lock().await.clear();
-        
+
         // If we have a filesystem watcher, update its path
         if let Some(fs_watcher_arc) = &self.filesystem_watcher {
             let mut fs_watcher = fs_watcher_arc.write().await;
-            fs_watcher.change_watch_path(self.watch_path.clone()).await
+            fs_watcher
+                .change_watch_path(self.watch_path.clone())
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to change filesystem watcher path: {}", e))?;
         }
-        
+
         // Perform initial scan of the new path
         self.scan_components().await?;
-        
+
         info!("WASM file watcher successfully changed to new path");
         Ok(())
     }

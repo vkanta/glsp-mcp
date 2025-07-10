@@ -1,9 +1,9 @@
+use crate::database::dataset::{DatasetManager, SensorSelector};
+use crate::database::{BoxedDatasetManager, SensorQuery};
 use crate::mcp::protocol::{CallToolParams, CallToolResult, TextContent, Tool};
 use crate::model::{DiagramModel, Edge, ElementType, ModelElement, Node, Position};
 use crate::selection::SelectionMode;
-use crate::wasm::{WasmComponent, WasmFileWatcher, WasmComponentChange};
-use crate::database::{BoxedDatasetManager, SensorQuery};
-use crate::database::dataset::{DatasetManager, SensorSelector};
+use crate::wasm::{WasmComponent, WasmComponentChange, WasmFileWatcher};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
@@ -72,8 +72,11 @@ impl DiagramTools {
             dataset_manager: None,
         }
     }
-    
-    pub fn with_dataset_manager(mut self, dataset_manager: Arc<Mutex<BoxedDatasetManager>>) -> Self {
+
+    pub fn with_dataset_manager(
+        mut self,
+        dataset_manager: Arc<Mutex<BoxedDatasetManager>>,
+    ) -> Self {
         self.dataset_manager = Some(dataset_manager);
         self
     }
@@ -463,7 +466,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "execute_wasm_component".to_string(),
-                description: Some("Execute a method on a WASM component with sandboxing".to_string()),
+                description: Some(
+                    "Execute a method on a WASM component with sandboxing".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -525,7 +530,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "list_wasm_executions".to_string(),
-                description: Some("List all active and recent WASM component executions".to_string()),
+                description: Some(
+                    "List all active and recent WASM component executions".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {},
@@ -620,7 +627,10 @@ impl DiagramTools {
             },
             Tool {
                 name: "get_sensor_statistics".to_string(),
-                description: Some("Get statistics for a sensor including time range and quality metrics".to_string()),
+                description: Some(
+                    "Get statistics for a sensor including time range and quality metrics"
+                        .to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -832,11 +842,11 @@ impl DiagramTools {
                 }),
             },
         ];
-        
+
         // Filter out tools that have been converted to resources
         let converted_to_resources = [
             "get_selection",
-            "get_element_at_position", 
+            "get_element_at_position",
             "check_wasm_component_status",
             "get_execution_progress",
             "get_execution_result",
@@ -850,9 +860,9 @@ impl DiagramTools {
             "list_sensor_datasets",
             "get_dataset_info",
             "visualize_sensor_data",
-            "detect_sensor_gaps"
+            "detect_sensor_gaps",
         ];
-        
+
         tools.retain(|tool| !converted_to_resources.contains(&tool.name.as_str()));
         tools
     }
@@ -1549,7 +1559,7 @@ impl DiagramTools {
     pub fn get_wasm_components(&self) -> Vec<&WasmComponent> {
         self.wasm_watcher.get_components()
     }
-    
+
     pub async fn get_recent_wasm_changes(&self) -> Vec<WasmComponentChange> {
         self.wasm_watcher.get_recent_changes().await
     }
@@ -1595,45 +1605,50 @@ impl DiagramTools {
 
     pub fn find_element_at_position(&self, diagram_id: &str, position: Position) -> Option<String> {
         let diagram = self.models.get(diagram_id)?;
-        
+
         // Search elements in reverse z-order (highest z-index first)
-        let mut elements_with_z: Vec<(&String, &ModelElement, i32)> = diagram.elements
+        let mut elements_with_z: Vec<(&String, &ModelElement, i32)> = diagram
+            .elements
             .iter()
             .filter(|(_, element)| element.visible)
             .map(|(id, element)| (id, element, element.z_index.unwrap_or(0)))
             .collect();
-        
+
         elements_with_z.sort_by(|a, b| b.2.cmp(&a.2));
-        
+
         for (id, element, _) in elements_with_z {
             if let Some(bounds) = &element.bounds {
-                if position.x >= bounds.x 
+                if position.x >= bounds.x
                     && position.x <= bounds.x + bounds.width
-                    && position.y >= bounds.y 
-                    && position.y <= bounds.y + bounds.height {
+                    && position.y >= bounds.y
+                    && position.y <= bounds.y + bounds.height
+                {
                     return Some(id.clone());
                 }
             }
         }
-        
+
         None
     }
 
     // WASM execution helper methods for resources
     pub fn list_wasm_executions_for_resource(&self) -> Vec<serde_json::Value> {
-        self.wasm_watcher.list_executions()
+        self.wasm_watcher
+            .list_executions()
             .into_iter()
-            .map(|exec| json!({
-                "executionId": exec.execution_id,
-                "success": exec.success,
-                "result": exec.result,
-                "error": exec.error,
-                "executionTimeMs": exec.execution_time_ms,
-                "memoryUsageMb": exec.memory_usage_mb,
-                "completedAt": exec.completed_at,
-                "graphicsOutput": exec.graphics_output,
-                "outputData": exec.output_data.map(|d| base64::encode(&d))
-            }))
+            .map(|exec| {
+                json!({
+                    "executionId": exec.execution_id,
+                    "success": exec.success,
+                    "result": exec.result,
+                    "error": exec.error,
+                    "executionTimeMs": exec.execution_time_ms,
+                    "memoryUsageMb": exec.memory_usage_mb,
+                    "completedAt": exec.completed_at,
+                    "graphicsOutput": exec.graphics_output,
+                    "outputData": exec.output_data.map(|d| base64::encode(&d))
+                })
+            })
             .collect()
     }
 
@@ -1643,32 +1658,43 @@ impl DiagramTools {
         vec![]
     }
 
-    pub fn get_execution_progress_for_resource(&self, execution_id: &str) -> Option<serde_json::Value> {
-        self.wasm_watcher.get_execution_progress(execution_id)
-            .map(|progress| json!({
-                "executionId": execution_id,
-                "progress": progress.progress,
-                "message": progress.message,
-                "stage": progress.stage,
-                "timestamp": progress.timestamp
-            }))
+    pub fn get_execution_progress_for_resource(
+        &self,
+        execution_id: &str,
+    ) -> Option<serde_json::Value> {
+        self.wasm_watcher
+            .get_execution_progress(execution_id)
+            .map(|progress| {
+                json!({
+                    "executionId": execution_id,
+                    "progress": progress.progress,
+                    "message": progress.message,
+                    "stage": progress.stage,
+                    "timestamp": progress.timestamp
+                })
+            })
     }
 
-    pub fn get_execution_result_for_resource(&self, execution_id: &str) -> Option<serde_json::Value> {
-        self.wasm_watcher.get_execution_result(execution_id)
-            .map(|result| json!({
-                "executionId": result.execution_id,
-                "success": result.success,
-                "result": result.result,
-                "error": result.error,
-                "executionTimeMs": result.execution_time_ms,
-                "memoryUsageMb": result.memory_usage_mb,
-                "completedAt": result.completed_at,
-                "graphicsOutput": result.graphics_output,
-                "outputData": result.output_data.map(|d| base64::encode(&d))
-            }))
+    pub fn get_execution_result_for_resource(
+        &self,
+        execution_id: &str,
+    ) -> Option<serde_json::Value> {
+        self.wasm_watcher
+            .get_execution_result(execution_id)
+            .map(|result| {
+                json!({
+                    "executionId": result.execution_id,
+                    "success": result.success,
+                    "result": result.result,
+                    "error": result.error,
+                    "executionTimeMs": result.execution_time_ms,
+                    "memoryUsageMb": result.memory_usage_mb,
+                    "completedAt": result.completed_at,
+                    "graphicsOutput": result.graphics_output,
+                    "outputData": result.output_data.map(|d| base64::encode(&d))
+                })
+            })
     }
-
 
     // WASM tool handlers
     async fn scan_wasm_components(&mut self) -> Result<CallToolResult> {
@@ -1679,14 +1705,19 @@ impl DiagramTools {
                 let missing = components.len() - available;
 
                 // Convert components to JSON format expected by the client
-                let components_json: Vec<_> = components.iter().map(|c| json!({
-                    "name": c.name,
-                    "path": c.path,
-                    "fileExists": c.file_exists,
-                    "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
-                    "metadata": c.metadata,
-                    "interfaces": c.interfaces
-                })).collect();
+                let components_json: Vec<_> = components
+                    .iter()
+                    .map(|c| {
+                        json!({
+                            "name": c.name,
+                            "path": c.path,
+                            "fileExists": c.file_exists,
+                            "lastSeen": c.last_seen.map(|dt| dt.to_rfc3339()),
+                            "metadata": c.metadata,
+                            "interfaces": c.interfaces
+                        })
+                    })
+                    .collect();
 
                 let result = json!({
                     "components": components_json,
@@ -1879,13 +1910,17 @@ impl DiagramTools {
         let max_memory_mb = args["max_memory_mb"].as_u64().unwrap_or(64) as u32;
         let method_args = args.get("args").cloned().unwrap_or(json!({}));
 
-        match self.wasm_watcher.execute_component(
-            component_name,
-            method,
-            method_args,
-            timeout_ms,
-            max_memory_mb,
-        ).await {
+        match self
+            .wasm_watcher
+            .execute_component(
+                component_name,
+                method,
+                method_args,
+                timeout_ms,
+                max_memory_mb,
+            )
+            .await
+        {
             Ok(execution_id) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -1960,7 +1995,7 @@ impl DiagramTools {
 
     async fn list_wasm_executions(&self) -> Result<CallToolResult> {
         let executions = self.wasm_watcher.list_executions();
-        
+
         if executions.is_empty() {
             Ok(CallToolResult {
                 content: vec![TextContent {
@@ -1988,7 +2023,7 @@ impl DiagramTools {
             .ok_or_else(|| anyhow::anyhow!("Missing executionId"))?;
 
         let cancelled = self.wasm_watcher.cancel_execution(execution_id);
-        
+
         if cancelled {
             Ok(CallToolResult {
                 content: vec![TextContent {
@@ -2001,7 +2036,10 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Execution {} not found or could not be cancelled", execution_id),
+                    text: format!(
+                        "Execution {} not found or could not be cancelled",
+                        execution_id
+                    ),
                 }],
                 is_error: Some(true),
             })
@@ -2011,35 +2049,35 @@ impl DiagramTools {
     // Sensor data tool implementations
     async fn query_sensor_data(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-        
+
         let sensor_ids: Vec<String> = args["sensorIds"]
             .as_array()
             .unwrap_or(&vec![])
             .iter()
             .filter_map(|v| v.as_str().map(String::from))
             .collect();
-            
+
         let start_time = args["startTime"]
             .as_str()
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
             .ok_or_else(|| anyhow::anyhow!("Invalid or missing startTime"))?;
-            
+
         let end_time = args["endTime"]
             .as_str()
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
             .ok_or_else(|| anyhow::anyhow!("Invalid or missing endTime"))?;
-            
+
         let limit = args["limit"].as_u64().map(|v| v as usize);
         let min_quality = args["minQuality"].as_f64().map(|v| v as f32);
-        let downsample_interval_ms = args["downsampleIntervalMs"]
-            .as_u64()
-            .map(|ms| ms * 1000); // Convert to microseconds
-            
+        let downsample_interval_ms = args["downsampleIntervalMs"].as_u64().map(|ms| ms * 1000); // Convert to microseconds
+
         let query = SensorQuery {
             sensor_ids,
             start_time_us: start_time,
@@ -2049,19 +2087,24 @@ impl DiagramTools {
             downsample_interval_us: downsample_interval_ms.map(|v| v as i64),
             data_types: None, // Could be extended to filter by data types
         };
-        
+
         let manager = dataset_manager.lock().await;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
-        
-        match manager.query_selected_data(&active_dataset.dataset_id, &query).await {
+
+        match manager
+            .query_selected_data(&active_dataset.dataset_id, &query)
+            .await
+        {
             Ok(readings) => {
                 let result = json!({
                     "readingCount": readings.len(),
                     "readings": readings.iter().take(100).collect::<Vec<_>>(), // Limit response size
                     "truncated": readings.len() > 100
                 });
-                
+
                 Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
@@ -2079,22 +2122,26 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn list_sensors(&self) -> Result<CallToolResult> {
-        let dataset_manager = self.dataset_manager.as_ref()
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
-        
+
         match manager.list_sensors(&active_dataset.dataset_id).await {
             Ok(sensor_infos) => {
                 let result = json!({
                     "sensorCount": sensor_infos.len(),
                     "sensors": sensor_infos.iter().map(|si| &si.sensor_id).collect::<Vec<_>>()
                 });
-                
+
                 Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
@@ -2112,21 +2159,28 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn get_sensor_metadata(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let sensor_id = args["sensorId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
-            
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
-        
-        match manager.get_sensor_info(&active_dataset.dataset_id, sensor_id).await {
+
+        match manager
+            .get_sensor_info(&active_dataset.dataset_id, sensor_id)
+            .await
+        {
             Ok(Some(sensor_info)) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -2150,21 +2204,28 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn get_sensor_statistics(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let sensor_id = args["sensorId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
-            
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
-        
-        match manager.get_sensor_info(&active_dataset.dataset_id, sensor_id).await {
+
+        match manager
+            .get_sensor_info(&active_dataset.dataset_id, sensor_id)
+            .await
+        {
             Ok(Some(sensor_info)) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -2188,28 +2249,35 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn get_sensor_time_range(&self, args: Option<Value>) -> Result<CallToolResult> {
-        let dataset_manager = self.dataset_manager.as_ref()
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let sensor_id = args.as_ref().and_then(|a| a["sensorId"].as_str());
-        
+
         let manager = dataset_manager.lock().await;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No active dataset"))?;
-        
+
         let result: Result<Option<crate::database::TimeRange>> = if let Some(id) = sensor_id {
             // Get sensor-specific time range from sensor info
-            match manager.get_sensor_info(&active_dataset.dataset_id, id).await? {
+            match manager
+                .get_sensor_info(&active_dataset.dataset_id, id)
+                .await?
+            {
                 Some(sensor_info) => Ok(Some(sensor_info.statistics.time_range)),
-                None => Ok(None)
+                None => Ok(None),
             }
         } else {
             // Get dataset's global time range
             Ok(Some(active_dataset.time_range))
         };
-        
+
         match result {
             Ok(Some(range)) => Ok(CallToolResult {
                 content: vec![TextContent {
@@ -2234,20 +2302,24 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn list_sensor_datasets(&self, args: Option<Value>) -> Result<CallToolResult> {
         let include_metadata = args
             .and_then(|a| a["includeMetadata"].as_bool())
             .unwrap_or(true);
-            
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
         let datasets = manager.list_datasets().await?;
-        let active_dataset = manager.get_active_dataset().await?
+        let active_dataset = manager
+            .get_active_dataset()
+            .await?
             .map(|d| d.dataset_id.clone());
-        
+
         let result = if include_metadata {
             json!({
                 "datasetCount": datasets.len(),
@@ -2262,7 +2334,7 @@ impl DiagramTools {
                 "datasetIds": ids
             })
         };
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -2271,16 +2343,18 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn get_dataset_info(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let dataset_id = args["datasetId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing datasetId"))?;
-            
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
         if let Some(dataset) = manager.get_dataset(dataset_id).await? {
             Ok(CallToolResult {
@@ -2300,16 +2374,18 @@ impl DiagramTools {
             })
         }
     }
-    
+
     async fn set_active_dataset(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let dataset_id = args["datasetId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing datasetId"))?;
-            
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let mut manager = dataset_manager.lock().await;
         match manager.set_active_dataset(dataset_id).await {
             Ok(()) => Ok(CallToolResult {
@@ -2328,19 +2404,17 @@ impl DiagramTools {
             }),
         }
     }
-    
+
     async fn visualize_sensor_data(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
+
         let sensor_id = args["sensorId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
-        let visualization_type = args["visualizationType"]
-            .as_str()
-            .unwrap_or("timeline");
+        let visualization_type = args["visualizationType"].as_str().unwrap_or("timeline");
         let width = args["width"].as_u64().unwrap_or(800) as u32;
         let height = args["height"].as_u64().unwrap_or(400) as u32;
-        
+
         // For now, return a placeholder response
         // In a full implementation, this would generate actual visualizations
         let result = json!({
@@ -2349,10 +2423,10 @@ impl DiagramTools {
             "width": width,
             "height": height,
             "status": "Visualization generation not yet implemented",
-            "placeholder": format!("Would generate {} visualization for sensor {} at {}x{}", 
+            "placeholder": format!("Would generate {} visualization for sensor {} at {}x{}",
                 visualization_type, sensor_id, width, height)
         });
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -2361,35 +2435,40 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn detect_sensor_gaps(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
+
         let sensor_id = args["sensorId"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing sensorId"))?;
-            
+
         let start_time = args["startTime"]
             .as_str()
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
             .ok_or_else(|| anyhow::anyhow!("Invalid or missing startTime"))?;
-            
+
         let end_time = args["endTime"]
             .as_str()
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
             .ok_or_else(|| anyhow::anyhow!("Invalid or missing endTime"))?;
-            
+
         let max_gap_ms = args["maxGapMs"].as_u64().unwrap_or(1000);
         let max_gap_us = max_gap_ms * 1000; // Convert to microseconds
-        
-        let dataset_manager = self.dataset_manager.as_ref()
+
+        let dataset_manager = self
+            .dataset_manager
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No dataset manager configured"))?;
-            
+
         let manager = dataset_manager.lock().await;
         let backend = manager.backend();
-        match backend.detect_gaps(sensor_id, start_time, end_time, max_gap_us as i64).await {
+        match backend
+            .detect_gaps(sensor_id, start_time, end_time, max_gap_us as i64)
+            .await
+        {
             Ok(gaps) => {
                 let result = json!({
                     "sensorId": sensor_id,
@@ -2397,7 +2476,7 @@ impl DiagramTools {
                     "maxGapMs": max_gap_ms,
                     "gaps": gaps
                 });
-                
+
                 Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
@@ -2419,7 +2498,7 @@ impl DiagramTools {
     // Component upload tool implementations
     async fn upload_wasm_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
+
         let component_name = args["componentName"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
@@ -2428,12 +2507,13 @@ impl DiagramTools {
             .ok_or_else(|| anyhow::anyhow!("Missing wasmBase64"))?;
         let description = args["description"].as_str();
         let version = args["version"].as_str().unwrap_or("1.0.0");
-        
+
         // Decode base64 WASM content
         use base64::Engine as _;
-        let wasm_bytes = base64::engine::general_purpose::STANDARD.decode(wasm_base64)
+        let wasm_bytes = base64::engine::general_purpose::STANDARD
+            .decode(wasm_base64)
             .map_err(|e| anyhow::anyhow!("Failed to decode base64: {}", e))?;
-        
+
         // Validate size
         if wasm_bytes.len() > 50 * 1024 * 1024 {
             return Ok(CallToolResult {
@@ -2444,28 +2524,31 @@ impl DiagramTools {
                 is_error: Some(true),
             });
         }
-        
+
         // Save component to file system
         let wasm_path = self.wasm_watcher.get_watch_path();
         let component_filename = format!("{}.wasm", component_name);
         let component_path = wasm_path.join(&component_filename);
-        
+
         // Check if component already exists
         if component_path.exists() {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Component '{}' already exists. Delete it first to re-upload.", component_name),
+                    text: format!(
+                        "Component '{}' already exists. Delete it first to re-upload.",
+                        component_name
+                    ),
                 }],
                 is_error: Some(true),
             });
         }
-        
+
         // Write WASM file
         use std::fs;
         fs::write(&component_path, &wasm_bytes)
             .map_err(|e| anyhow::anyhow!("Failed to write WASM file: {}", e))?;
-        
+
         // Create metadata file
         let metadata = json!({
             "name": component_name,
@@ -2475,37 +2558,40 @@ impl DiagramTools {
             "size": wasm_bytes.len(),
             "checksum": format!("{:x}", sha2::Sha256::digest(&wasm_bytes)),
         });
-        
+
         let metadata_path = wasm_path.join(format!("{}.json", component_name));
         fs::write(&metadata_path, serde_json::to_string_pretty(&metadata)?)
             .map_err(|e| anyhow::anyhow!("Failed to write metadata: {}", e))?;
-        
+
         // Trigger component scan to pick up the new component
         self.wasm_watcher.scan_components().await?;
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
                 text: format!(
                     "Successfully uploaded WASM component '{}' (version: {}, size: {} bytes)",
-                    component_name, version, wasm_bytes.len()
+                    component_name,
+                    version,
+                    wasm_bytes.len()
                 ),
             }],
             is_error: None,
         })
     }
-    
+
     async fn validate_wasm_component(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let wasm_base64 = args["wasmBase64"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing wasmBase64"))?;
-        
+
         // Decode base64
         use base64::Engine as _;
-        let wasm_bytes = base64::engine::general_purpose::STANDARD.decode(wasm_base64)
+        let wasm_bytes = base64::engine::general_purpose::STANDARD
+            .decode(wasm_base64)
             .map_err(|e| anyhow::anyhow!("Failed to decode base64: {}", e))?;
-        
+
         // Basic validation
         let mut validation_result = json!({
             "isValid": true,
@@ -2516,70 +2602,86 @@ impl DiagramTools {
                 "checksum": format!("{:x}", sha2::Sha256::digest(&wasm_bytes)),
             }
         });
-        
+
         // Check size
         if wasm_bytes.len() > 50 * 1024 * 1024 {
             validation_result["isValid"] = json!(false);
-            validation_result["errors"].as_array_mut().unwrap()
+            validation_result["errors"]
+                .as_array_mut()
+                .unwrap()
                 .push(json!("File size exceeds 50MB limit"));
         }
-        
+
         // Validate WASM format using wasmparser
         use wasmparser::Validator;
         let mut validator = Validator::new();
         match validator.validate_all(&wasm_bytes) {
             Ok(_) => {
                 validation_result["metadata"]["format"] = json!("Valid WebAssembly module");
-                
+
                 // Try to parse as component
                 use wit_component::decode;
                 match decode(&wasm_bytes) {
                     Ok(decoded) => {
                         validation_result["metadata"]["type"] = json!("WebAssembly Component");
-                        
+
                         match decoded {
                             wit_component::DecodedWasm::WitPackage(resolve, pkg) => {
-                                validation_result["metadata"]["packageId"] = json!(format!("{:?}", pkg));
-                                
+                                validation_result["metadata"]["packageId"] =
+                                    json!(format!("{:?}", pkg));
+
                                 // Extract interface information
-                                let interfaces: Vec<String> = resolve.interfaces.iter()
+                                let interfaces: Vec<String> = resolve
+                                    .interfaces
+                                    .iter()
                                     .filter_map(|(_, iface)| iface.name.clone())
                                     .collect();
-                                
+
                                 validation_result["metadata"]["interfaces"] = json!(interfaces);
                             }
                             wit_component::DecodedWasm::Component(resolve, world) => {
-                                validation_result["metadata"]["worldId"] = json!(format!("{:?}", world));
-                                
+                                validation_result["metadata"]["worldId"] =
+                                    json!(format!("{:?}", world));
+
                                 // Extract interface information
-                                let interfaces: Vec<String> = resolve.interfaces.iter()
+                                let interfaces: Vec<String> = resolve
+                                    .interfaces
+                                    .iter()
                                     .filter_map(|(_, iface)| iface.name.clone())
                                     .collect();
-                                
+
                                 validation_result["metadata"]["interfaces"] = json!(interfaces);
                             }
                         }
                     }
                     Err(_) => {
                         validation_result["metadata"]["type"] = json!("WebAssembly Module");
-                        validation_result["warnings"].as_array_mut().unwrap()
-                            .push(json!("Not a WebAssembly component (missing component metadata)"));
+                        validation_result["warnings"]
+                            .as_array_mut()
+                            .unwrap()
+                            .push(json!(
+                                "Not a WebAssembly component (missing component metadata)"
+                            ));
                     }
                 }
             }
             Err(e) => {
                 validation_result["isValid"] = json!(false);
-                validation_result["errors"].as_array_mut().unwrap()
+                validation_result["errors"]
+                    .as_array_mut()
+                    .unwrap()
                     .push(json!(format!("Invalid WebAssembly format: {}", e)));
             }
         }
-        
+
         // Security checks
         if wasm_bytes.len() < 8 {
-            validation_result["warnings"].as_array_mut().unwrap()
+            validation_result["warnings"]
+                .as_array_mut()
+                .unwrap()
                 .push(json!("Suspiciously small file size"));
         }
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -2588,15 +2690,15 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn list_uploaded_components(&self, args: Option<Value>) -> Result<CallToolResult> {
         let include_metadata = args
             .and_then(|a| a["includeMetadata"].as_bool())
             .unwrap_or(true);
-        
+
         let wasm_path = self.wasm_watcher.get_watch_path();
         let mut components = Vec::new();
-        
+
         // Read all .json metadata files
         use std::fs;
         if let Ok(entries) = fs::read_dir(&wasm_path) {
@@ -2621,12 +2723,12 @@ impl DiagramTools {
                 }
             }
         }
-        
+
         let result = json!({
             "componentCount": components.len(),
             "components": components
         });
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -2635,17 +2737,17 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn delete_uploaded_component(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
         let component_name = args["componentName"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
-        
+
         let wasm_path = self.wasm_watcher.get_watch_path();
         let component_path = wasm_path.join(format!("{}.wasm", component_name));
         let metadata_path = wasm_path.join(format!("{}.json", component_name));
-        
+
         // Check if component exists
         if !component_path.exists() && !metadata_path.exists() {
             return Ok(CallToolResult {
@@ -2656,26 +2758,26 @@ impl DiagramTools {
                 is_error: Some(true),
             });
         }
-        
+
         // Delete files
         use std::fs;
         let mut deleted = Vec::new();
-        
+
         if component_path.exists() {
             fs::remove_file(&component_path)
                 .map_err(|e| anyhow::anyhow!("Failed to delete WASM file: {}", e))?;
             deleted.push("WASM file");
         }
-        
+
         if metadata_path.exists() {
             fs::remove_file(&metadata_path)
                 .map_err(|e| anyhow::anyhow!("Failed to delete metadata file: {}", e))?;
             deleted.push("metadata file");
         }
-        
+
         // Remove from watcher if present
         self.wasm_watcher.remove_missing_component(component_name);
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),

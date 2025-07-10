@@ -110,13 +110,33 @@ pub enum WitValidationSeverity {
 /// WIT validation issue types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WitValidationIssueType {
-    MissingInterface { expected: String },
-    IncompatibleType { interface: String, expected: String, found: String },
-    CircularDependency { cycle: Vec<String> },
-    UndefinedType { type_name: String, location: String },
-    InterfaceContract { interface: String, issue: String },
-    InvalidSignature { function: String, issue: String },
-    ResourceConstraint { resource: String, constraint: String },
+    MissingInterface {
+        expected: String,
+    },
+    IncompatibleType {
+        interface: String,
+        expected: String,
+        found: String,
+    },
+    CircularDependency {
+        cycle: Vec<String>,
+    },
+    UndefinedType {
+        type_name: String,
+        location: String,
+    },
+    InterfaceContract {
+        interface: String,
+        issue: String,
+    },
+    InvalidSignature {
+        function: String,
+        issue: String,
+    },
+    ResourceConstraint {
+        resource: String,
+        constraint: String,
+    },
 }
 
 /// Individual WIT validation issue
@@ -757,7 +777,7 @@ impl WitAnalyzer {
     ) {
         // Check for interface naming conflicts
         let mut interface_names = std::collections::HashSet::new();
-        
+
         for interface in imports.iter().chain(exports.iter()) {
             if !interface_names.insert(&interface.name) {
                 validation_results.push(WitValidationIssue {
@@ -784,9 +804,18 @@ impl WitAnalyzer {
                             issue: "Getter function has no return value".to_string(),
                         },
                         severity: WitValidationSeverity::Warning,
-                        message: format!("Function '{}' appears to be a getter but has no return value", function.name),
-                        suggestion: Some("Consider adding a return type if this function should return data".to_string()),
-                        location: Some(format!("Interface: {}, Function: {}", interface.name, function.name)),
+                        message: format!(
+                            "Function '{}' appears to be a getter but has no return value",
+                            function.name
+                        ),
+                        suggestion: Some(
+                            "Consider adding a return type if this function should return data"
+                                .to_string(),
+                        ),
+                        location: Some(format!(
+                            "Interface: {}, Function: {}",
+                            interface.name, function.name
+                        )),
                     });
                 }
             }
@@ -800,7 +829,8 @@ impl WitAnalyzer {
                     issue: "No imports defined".to_string(),
                 },
                 severity: WitValidationSeverity::Warning,
-                message: "Component has exports but no imports, which may indicate isolation".to_string(),
+                message: "Component has exports but no imports, which may indicate isolation"
+                    .to_string(),
                 suggestion: Some("Consider if this component needs input interfaces".to_string()),
                 location: Some("Component structure".to_string()),
             });
@@ -813,7 +843,7 @@ impl WitAnalyzer {
         validation_results: &mut Vec<WitValidationIssue>,
     ) {
         let mut type_names = std::collections::HashSet::new();
-        
+
         for wit_type in types {
             // Check for duplicate type names
             if !type_names.insert(&wit_type.name) {
@@ -840,7 +870,9 @@ impl WitAnalyzer {
                             },
                             severity: WitValidationSeverity::Warning,
                             message: format!("Record type '{}' has no fields", wit_type.name),
-                            suggestion: Some("Consider if this empty record is intentional".to_string()),
+                            suggestion: Some(
+                                "Consider if this empty record is intentional".to_string(),
+                            ),
                             location: Some(format!("Type: {}", wit_type.name)),
                         });
                     }
@@ -885,7 +917,7 @@ impl WitAnalyzer {
     ) {
         // Check for circular dependencies (simplified check)
         let mut dependency_graph = std::collections::HashMap::new();
-        
+
         for dep in dependencies {
             dependency_graph.insert(&dep.package, &dep.interfaces);
         }
@@ -898,7 +930,10 @@ impl WitAnalyzer {
                     constraint: format!("Too many dependencies: {}", dependencies.len()),
                 },
                 severity: WitValidationSeverity::Warning,
-                message: format!("Component has {} dependencies, which may impact performance", dependencies.len()),
+                message: format!(
+                    "Component has {} dependencies, which may impact performance",
+                    dependencies.len()
+                ),
                 suggestion: Some("Consider consolidating or reducing dependencies".to_string()),
                 location: Some("Dependency list".to_string()),
             });
@@ -907,17 +942,26 @@ impl WitAnalyzer {
         // Check for missing standard ADAS dependencies for automotive components
         let adas_standard_deps = ["wasi:io", "wasi:filesystem", "adas:sensors"];
         let has_adas_marker = dependencies.iter().any(|dep| dep.package.contains("adas"));
-        
+
         if has_adas_marker {
             for expected_dep in &adas_standard_deps {
-                if !dependencies.iter().any(|dep| dep.package.contains(expected_dep)) {
+                if !dependencies
+                    .iter()
+                    .any(|dep| dep.package.contains(expected_dep))
+                {
                     validation_results.push(WitValidationIssue {
                         issue_type: WitValidationIssueType::MissingInterface {
                             expected: expected_dep.to_string(),
                         },
                         severity: WitValidationSeverity::Info,
-                        message: format!("ADAS component might benefit from '{}' interface", expected_dep),
-                        suggestion: Some(format!("Consider adding {} dependency if needed", expected_dep)),
+                        message: format!(
+                            "ADAS component might benefit from '{}' interface",
+                            expected_dep
+                        ),
+                        suggestion: Some(format!(
+                            "Consider adding {} dependency if needed",
+                            expected_dep
+                        )),
                         location: Some("Dependency analysis".to_string()),
                     });
                 }
@@ -938,30 +982,34 @@ impl WitAnalyzer {
         // Check if component A's exports satisfy component B's imports
         for import in &component_b.imports {
             let mut found_compatible = false;
-            
+
             for export in &component_a.exports {
                 if import.name == export.name {
                     found_compatible = true;
-                    
+
                     // Check function compatibility
                     for import_func in &import.functions {
-                        if let Some(export_func) = export.functions.iter().find(|f| f.name == import_func.name) {
+                        if let Some(export_func) =
+                            export.functions.iter().find(|f| f.name == import_func.name)
+                        {
                             // Simple signature check
-                            if import_func.params.len() != export_func.params.len() ||
-                               import_func.results.len() != export_func.results.len() {
+                            if import_func.params.len() != export_func.params.len()
+                                || import_func.results.len() != export_func.results.len()
+                            {
                                 type_mismatches.push((
                                     format!("{}::{}", import.name, import_func.name),
                                     "Parameter or return type count mismatch".to_string(),
                                 ));
                             }
                         } else {
-                            incompatible_exports.push(format!("{}::{}", import.name, import_func.name));
+                            incompatible_exports
+                                .push(format!("{}::{}", import.name, import_func.name));
                         }
                     }
                     break;
                 }
             }
-            
+
             if !found_compatible {
                 missing_imports.push(import.name.clone());
             }
@@ -969,9 +1017,10 @@ impl WitAnalyzer {
 
         // Generate suggestions
         if !missing_imports.is_empty() {
-            suggestions.push("Some required imports are not satisfied by the other component".to_string());
+            suggestions
+                .push("Some required imports are not satisfied by the other component".to_string());
         }
-        
+
         if !type_mismatches.is_empty() {
             suggestions.push("Type signatures need to be aligned between components".to_string());
         }

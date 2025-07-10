@@ -16,19 +16,20 @@ impl DatabaseFactory {
     /// Create a database backend from configuration
     pub async fn create(config: DatabaseConfig) -> DatabaseResult<Box<dyn DatabaseInterface>> {
         config.validate()?;
-        
+
         info!(
             "Creating {} database backend: {}:{}",
             config.backend.as_str(),
             config.connection.host,
             config.connection.port
         );
-        
+
         match config.backend {
             DatabaseBackend::PostgreSQL => {
                 #[cfg(feature = "postgresql")]
                 {
-                    let backend = crate::database::postgresql::PostgreSQLBackend::new(config).await?;
+                    let backend =
+                        crate::database::postgresql::PostgreSQLBackend::new(config).await?;
                     Ok(Box::new(backend))
                 }
                 #[cfg(not(feature = "postgresql"))]
@@ -38,7 +39,7 @@ impl DatabaseFactory {
                     })
                 }
             }
-            
+
             DatabaseBackend::InfluxDB => {
                 #[cfg(feature = "influxdb")]
                 {
@@ -52,7 +53,7 @@ impl DatabaseFactory {
                     })
                 }
             }
-            
+
             DatabaseBackend::Redis => {
                 #[cfg(feature = "redis")]
                 {
@@ -66,14 +67,14 @@ impl DatabaseFactory {
                     })
                 }
             }
-            
+
             DatabaseBackend::SQLite => {
                 let mut backend = MockDatabaseBackend::new(config).await?;
                 backend.connect().await?;
                 warn!("SQLite backend not yet implemented, using mock backend");
                 Ok(Box::new(backend))
             }
-            
+
             DatabaseBackend::Mock => {
                 let mut backend = MockDatabaseBackend::new(config).await?;
                 backend.connect().await?;
@@ -81,13 +82,13 @@ impl DatabaseFactory {
             }
         }
     }
-    
+
     /// Create backend from environment variables
     pub async fn from_env() -> DatabaseResult<Box<dyn DatabaseInterface>> {
         let config = DatabaseConfig::from_env()?;
         Self::create(config).await
     }
-    
+
     /// Create backend with default configuration for testing
     pub async fn mock() -> DatabaseResult<Box<dyn DatabaseInterface>> {
         let config = DatabaseConfig::mock();
@@ -106,46 +107,45 @@ impl DatabaseManager {
     /// Create a new database manager
     pub async fn new(config: DatabaseConfig) -> DatabaseResult<Self> {
         let backend = DatabaseFactory::create(config.clone()).await?;
-        
+
         // Perform initial health check
         let is_healthy = backend.health_check().await.is_ok() && backend.is_connected();
-        
+
         Ok(Self {
             backend: Arc::new(RwLock::new(backend)),
             config,
             is_healthy: Arc::new(RwLock::new(is_healthy)),
         })
     }
-    
+
     /// Get a reference to the database backend
     pub async fn backend(&self) -> Arc<RwLock<Box<dyn DatabaseInterface>>> {
         Arc::clone(&self.backend)
     }
-    
+
     /// Check if database is healthy
     pub async fn is_healthy(&self) -> bool {
         *self.is_healthy.read().await
     }
-    
+
     /// Start health monitoring (runs in background)
     pub async fn start_health_monitoring(&self) {
         let backend = Arc::clone(&self.backend);
         let is_healthy = Arc::clone(&self.is_healthy);
         let check_interval = self.config.timeouts.health_check_secs;
-        
+
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                std::time::Duration::from_secs(check_interval)
-            );
-            
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(check_interval));
+
             loop {
                 interval.tick().await;
-                
+
                 let health_status = {
                     let backend_guard = backend.read().await;
                     backend_guard.health_check().await
                 };
-                
+
                 let healthy = match health_status {
                     Ok(health) => {
                         if health.is_connected {
@@ -160,7 +160,7 @@ impl DatabaseManager {
                         false
                     }
                 };
-                
+
                 {
                     let mut is_healthy_guard = is_healthy.write().await;
                     *is_healthy_guard = healthy;
@@ -168,51 +168,48 @@ impl DatabaseManager {
             }
         });
     }
-    
+
     /// Reconnect to database if connection is lost
     pub async fn reconnect(&self) -> DatabaseResult<()> {
         info!("Reconnecting to database...");
-        
+
         let new_backend = DatabaseFactory::create(self.config.clone()).await?;
-        
+
         {
             let mut backend_guard = self.backend.write().await;
             *backend_guard = new_backend;
         }
-        
+
         {
             let mut is_healthy_guard = self.is_healthy.write().await;
             *is_healthy_guard = true;
         }
-        
+
         info!("Database reconnection successful");
         Ok(())
     }
-    
+
     /// Shutdown database connections gracefully
     pub async fn shutdown(&self) -> DatabaseResult<()> {
         info!("Shutting down database connections...");
-        
+
         {
             let mut backend_guard = self.backend.write().await;
             backend_guard.disconnect().await?;
         }
-        
+
         {
             let mut is_healthy_guard = self.is_healthy.write().await;
             *is_healthy_guard = false;
         }
-        
+
         info!("Database shutdown complete");
         Ok(())
     }
 }
 
 // Mock backend implementation for testing and fallback
-use crate::database::{
-    models::*,
-    traits::*,
-};
+use crate::database::{models::*, traits::*};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -240,16 +237,16 @@ impl DatabaseProvider for MockDatabaseBackend {
         self.connected = true;
         Ok(())
     }
-    
+
     async fn disconnect(&mut self) -> DatabaseResult<()> {
         self.connected = false;
         Ok(())
     }
-    
+
     fn is_connected(&self) -> bool {
         self.connected
     }
-    
+
     async fn health_check(&self) -> DatabaseResult<DatabaseHealth> {
         Ok(DatabaseHealth {
             is_connected: self.connected,
@@ -261,11 +258,11 @@ impl DatabaseProvider for MockDatabaseBackend {
             error: None,
         })
     }
-    
+
     fn database_type(&self) -> &'static str {
         "mock"
     }
-    
+
     fn connection_info(&self) -> String {
         "mock://localhost/test".to_string()
     }
@@ -278,13 +275,13 @@ impl SensorDataRepository for MockDatabaseBackend {
         readings.push(reading.clone());
         Ok(())
     }
-    
+
     async fn store_batch(&mut self, batch: &SensorBatch) -> DatabaseResult<()> {
         let mut readings = self.readings.lock().await;
         readings.extend(batch.readings.iter().cloned());
         Ok(())
     }
-    
+
     async fn query_readings(&self, query: &SensorQuery) -> DatabaseResult<Vec<SensorReading>> {
         let readings = self.readings.lock().await;
         let filtered: Vec<SensorReading> = readings
@@ -294,24 +291,24 @@ impl SensorDataRepository for MockDatabaseBackend {
                 if r.timestamp_us < query.start_time_us || r.timestamp_us > query.end_time_us {
                     return false;
                 }
-                
+
                 // Sensor ID filter
                 if !query.sensor_ids.is_empty() && !query.sensor_ids.contains(&r.sensor_id) {
                     return false;
                 }
-                
+
                 // Quality filter
                 if let Some(min_quality) = query.min_quality {
                     if r.quality < min_quality {
                         return false;
                     }
                 }
-                
+
                 true
             })
             .cloned()
             .collect();
-        
+
         // Apply limit
         if let Some(limit) = query.limit {
             Ok(filtered.into_iter().take(limit).collect())
@@ -319,7 +316,7 @@ impl SensorDataRepository for MockDatabaseBackend {
             Ok(filtered)
         }
     }
-    
+
     async fn get_reading_at_time(
         &self,
         sensor_id: &str,
@@ -332,22 +329,30 @@ impl SensorDataRepository for MockDatabaseBackend {
             .min_by_key(|r| (r.timestamp_us - timestamp_us).abs())
             .cloned())
     }
-    
+
     async fn get_time_range(&self, sensor_id: &str) -> DatabaseResult<Option<TimeRange>> {
         let readings = self.readings.lock().await;
         let sensor_readings: Vec<&SensorReading> = readings
             .iter()
             .filter(|r| r.sensor_id == sensor_id)
             .collect();
-        
+
         if sensor_readings.is_empty() {
             return Ok(None);
         }
-        
-        let min_time = sensor_readings.iter().map(|r| r.timestamp_us).min().unwrap();
-        let max_time = sensor_readings.iter().map(|r| r.timestamp_us).max().unwrap();
+
+        let min_time = sensor_readings
+            .iter()
+            .map(|r| r.timestamp_us)
+            .min()
+            .unwrap();
+        let max_time = sensor_readings
+            .iter()
+            .map(|r| r.timestamp_us)
+            .max()
+            .unwrap();
         let total_bytes: u64 = sensor_readings.iter().map(|r| r.payload.len() as u64).sum();
-        
+
         Ok(Some(TimeRange {
             start_time_us: min_time,
             end_time_us: max_time,
@@ -355,17 +360,17 @@ impl SensorDataRepository for MockDatabaseBackend {
             data_size_bytes: total_bytes,
         }))
     }
-    
+
     async fn get_global_time_range(&self) -> DatabaseResult<Option<TimeRange>> {
         let readings = self.readings.lock().await;
         if readings.is_empty() {
             return Ok(None);
         }
-        
+
         let min_time = readings.iter().map(|r| r.timestamp_us).min().unwrap();
         let max_time = readings.iter().map(|r| r.timestamp_us).max().unwrap();
         let total_bytes: u64 = readings.iter().map(|r| r.payload.len() as u64).sum();
-        
+
         Ok(Some(TimeRange {
             start_time_us: min_time,
             end_time_us: max_time,
@@ -373,7 +378,7 @@ impl SensorDataRepository for MockDatabaseBackend {
             data_size_bytes: total_bytes,
         }))
     }
-    
+
     async fn list_sensors(&self) -> DatabaseResult<Vec<String>> {
         let readings = self.readings.lock().await;
         let mut sensors: Vec<String> = readings
@@ -385,23 +390,26 @@ impl SensorDataRepository for MockDatabaseBackend {
         sensors.sort();
         Ok(sensors)
     }
-    
+
     async fn get_sensor_statistics(&self, sensor_id: &str) -> DatabaseResult<SensorStatistics> {
-        let time_range = self.get_time_range(sensor_id).await?
+        let time_range = self
+            .get_time_range(sensor_id)
+            .await?
             .ok_or_else(|| DatabaseError::SensorNotFound(sensor_id.to_string()))?;
-        
+
         let readings = self.readings.lock().await;
         let sensor_readings: Vec<&SensorReading> = readings
             .iter()
             .filter(|r| r.sensor_id == sensor_id)
             .collect();
-        
-        let avg_quality = sensor_readings.iter().map(|r| r.quality).sum::<f32>() 
-            / sensor_readings.len() as f32;
-        
-        let duration_secs = (time_range.end_time_us - time_range.start_time_us) as f32 / 1_000_000.0;
+
+        let avg_quality =
+            sensor_readings.iter().map(|r| r.quality).sum::<f32>() / sensor_readings.len() as f32;
+
+        let duration_secs =
+            (time_range.end_time_us - time_range.start_time_us) as f32 / 1_000_000.0;
         let avg_sampling_rate = sensor_readings.len() as f32 / duration_secs;
-        
+
         Ok(SensorStatistics {
             sensor_id: sensor_id.to_string(),
             time_range,
@@ -411,7 +419,7 @@ impl SensorDataRepository for MockDatabaseBackend {
             total_size_bytes: sensor_readings.iter().map(|r| r.payload.len() as u64).sum(),
         })
     }
-    
+
     async fn delete_readings(
         &mut self,
         sensor_id: &str,
@@ -420,13 +428,13 @@ impl SensorDataRepository for MockDatabaseBackend {
     ) -> DatabaseResult<u64> {
         let mut readings = self.readings.lock().await;
         let initial_len = readings.len();
-        
+
         readings.retain(|r| {
-            !(r.sensor_id == sensor_id 
-              && r.timestamp_us >= start_time_us 
-              && r.timestamp_us <= end_time_us)
+            !(r.sensor_id == sensor_id
+                && r.timestamp_us >= start_time_us
+                && r.timestamp_us <= end_time_us)
         });
-        
+
         Ok((initial_len - readings.len()) as u64)
     }
 }
@@ -450,10 +458,10 @@ impl TimeSeriesStore for MockDatabaseBackend {
             downsample_interval_us: Some(interval_us),
             data_types: None,
         };
-        
+
         self.query_readings(&query).await
     }
-    
+
     async fn interpolate(
         &self,
         sensor_id: &str,
@@ -468,7 +476,7 @@ impl TimeSeriesStore for MockDatabaseBackend {
         }
         Ok(results)
     }
-    
+
     async fn aggregate(
         &self,
         _sensor_id: &str,
@@ -479,7 +487,7 @@ impl TimeSeriesStore for MockDatabaseBackend {
         // Mock implementation
         Ok(vec![])
     }
-    
+
     async fn detect_gaps(
         &self,
         _sensor_id: &str,
@@ -499,35 +507,35 @@ impl MetadataStore for MockDatabaseBackend {
         meta_store.insert(metadata.sensor_id.clone(), metadata.clone());
         Ok(())
     }
-    
+
     async fn get_sensor_metadata(&self, sensor_id: &str) -> DatabaseResult<Option<SensorMetadata>> {
         let meta_store = self.metadata.lock().await;
         Ok(meta_store.get(sensor_id).cloned())
     }
-    
+
     async fn list_sensor_metadata(&self) -> DatabaseResult<Vec<SensorMetadata>> {
         let meta_store = self.metadata.lock().await;
         Ok(meta_store.values().cloned().collect())
     }
-    
+
     async fn update_sensor_metadata(&mut self, metadata: &SensorMetadata) -> DatabaseResult<()> {
         self.store_sensor_metadata(metadata).await
     }
-    
+
     async fn delete_sensor_metadata(&mut self, sensor_id: &str) -> DatabaseResult<()> {
         let mut meta_store = self.metadata.lock().await;
         meta_store.remove(sensor_id);
         Ok(())
     }
-    
+
     async fn store_config(&mut self, _key: &str, _value: &serde_json::Value) -> DatabaseResult<()> {
         Ok(())
     }
-    
+
     async fn get_config(&self, _key: &str) -> DatabaseResult<Option<serde_json::Value>> {
         Ok(None)
     }
-    
+
     async fn list_config_keys(&self) -> DatabaseResult<Vec<String>> {
         Ok(vec![])
     }
@@ -538,15 +546,15 @@ impl DatabaseInterface for MockDatabaseBackend {
     fn supported_features(&self) -> DatabaseFeatures {
         DatabaseFeatures::basic()
     }
-    
+
     async fn optimize(&mut self) -> DatabaseResult<()> {
         Ok(())
     }
-    
+
     async fn backup(&self, _destination: &str) -> DatabaseResult<()> {
         Ok(())
     }
-    
+
     async fn restore(&mut self, _source: &str) -> DatabaseResult<()> {
         Ok(())
     }

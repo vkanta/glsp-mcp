@@ -10,19 +10,19 @@ use std::time::Duration;
 pub struct DatabaseConfig {
     /// Database backend type
     pub backend: DatabaseBackend,
-    
+
     /// Connection configuration
     pub connection: ConnectionConfig,
-    
+
     /// Pool configuration
     pub pool: PoolConfig,
-    
+
     /// Timeout configuration
     pub timeouts: TimeoutConfig,
-    
+
     /// Feature configuration
     pub features: FeatureConfig,
-    
+
     /// Backend-specific settings
     pub backend_specific: HashMap<String, serde_json::Value>,
 }
@@ -33,16 +33,16 @@ pub struct DatabaseConfig {
 pub enum DatabaseBackend {
     /// PostgreSQL with TimescaleDB extension
     PostgreSQL,
-    
+
     /// InfluxDB time-series database
     InfluxDB,
-    
+
     /// Redis in-memory database
     Redis,
-    
+
     /// SQLite file-based database
     SQLite,
-    
+
     /// Mock database for testing
     Mock,
 }
@@ -52,23 +52,23 @@ pub enum DatabaseBackend {
 pub struct ConnectionConfig {
     /// Hostname or IP address
     pub host: String,
-    
+
     /// Port number
     pub port: u16,
-    
+
     /// Database name
     pub database: String,
-    
+
     /// Username
     pub username: Option<String>,
-    
+
     /// Password (will be loaded from environment or keyring in practice)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
-    
+
     /// SSL/TLS configuration
     pub ssl: SslConfig,
-    
+
     /// Additional connection parameters
     pub params: HashMap<String, String>,
 }
@@ -78,19 +78,19 @@ pub struct ConnectionConfig {
 pub struct SslConfig {
     /// Enable SSL/TLS
     pub enabled: bool,
-    
+
     /// Require SSL/TLS
     pub required: bool,
-    
+
     /// Certificate file path
     pub cert_file: Option<String>,
-    
+
     /// Private key file path
     pub key_file: Option<String>,
-    
+
     /// CA certificate file path
     pub ca_file: Option<String>,
-    
+
     /// Verify certificate
     pub verify_cert: bool,
 }
@@ -100,16 +100,16 @@ pub struct SslConfig {
 pub struct PoolConfig {
     /// Minimum number of connections in pool
     pub min_connections: u32,
-    
+
     /// Maximum number of connections in pool
     pub max_connections: u32,
-    
+
     /// Maximum lifetime of a connection
     pub max_lifetime_secs: u64,
-    
+
     /// Maximum idle time for a connection
     pub max_idle_secs: u64,
-    
+
     /// Connection acquisition timeout
     pub acquire_timeout_secs: u64,
 }
@@ -119,13 +119,13 @@ pub struct PoolConfig {
 pub struct TimeoutConfig {
     /// Connection timeout
     pub connection_secs: u64,
-    
+
     /// Query timeout
     pub query_secs: u64,
-    
+
     /// Transaction timeout
     pub transaction_secs: u64,
-    
+
     /// Health check timeout
     pub health_check_secs: u64,
 }
@@ -135,25 +135,25 @@ pub struct TimeoutConfig {
 pub struct FeatureConfig {
     /// Enable time-series optimizations
     pub enable_time_series: bool,
-    
+
     /// Enable streaming/pub-sub
     pub enable_streaming: bool,
-    
+
     /// Enable transactions
     pub enable_transactions: bool,
-    
+
     /// Enable automatic data compression
     pub enable_compression: bool,
-    
+
     /// Enable data retention policies
     pub enable_retention: bool,
-    
+
     /// Default retention period in days
     pub default_retention_days: Option<u32>,
-    
+
     /// Enable automatic indexing
     pub enable_auto_indexing: bool,
-    
+
     /// Maximum batch size for bulk operations
     pub max_batch_size: usize,
 }
@@ -246,7 +246,7 @@ impl DatabaseConfig {
         config.connection.database = database.to_string();
         config
     }
-    
+
     /// Create an InfluxDB configuration
     pub fn influxdb(host: &str, port: u16, database: &str) -> Self {
         let mut config = Self::default();
@@ -258,7 +258,7 @@ impl DatabaseConfig {
         config.features.enable_streaming = true;
         config
     }
-    
+
     /// Create a Redis configuration
     pub fn redis(host: &str, port: u16) -> Self {
         let mut config = Self::default();
@@ -270,7 +270,7 @@ impl DatabaseConfig {
         config.features.enable_transactions = false;
         config
     }
-    
+
     /// Create a SQLite configuration
     pub fn sqlite(path: &str) -> Self {
         let mut config = Self::default();
@@ -281,7 +281,7 @@ impl DatabaseConfig {
         config.pool.max_connections = 1; // SQLite is single-threaded
         config
     }
-    
+
     /// Create a mock configuration for testing
     pub fn mock() -> Self {
         let mut config = Self::default();
@@ -291,7 +291,7 @@ impl DatabaseConfig {
         config.connection.database = "mock".to_string();
         config
     }
-    
+
     /// Build connection string for the configured backend
     pub fn connection_string(&self) -> Result<String, DatabaseError> {
         match self.backend {
@@ -301,71 +301,75 @@ impl DatabaseConfig {
                     format!("port={}", self.connection.port),
                     format!("dbname={}", self.connection.database),
                 ];
-                
+
                 if let Some(username) = &self.connection.username {
                     parts.push(format!("user={}", username));
                 }
-                
+
                 if let Some(password) = &self.connection.password {
                     parts.push(format!("password={}", password));
                 }
-                
+
                 if self.connection.ssl.enabled {
                     parts.push("sslmode=require".to_string());
                 } else {
                     parts.push("sslmode=disable".to_string());
                 }
-                
+
                 Ok(parts.join(" "))
             }
-            
+
             DatabaseBackend::InfluxDB => {
-                let protocol = if self.connection.ssl.enabled { "https" } else { "http" };
+                let protocol = if self.connection.ssl.enabled {
+                    "https"
+                } else {
+                    "http"
+                };
                 Ok(format!(
                     "{}://{}:{}",
                     protocol, self.connection.host, self.connection.port
                 ))
             }
-            
+
             DatabaseBackend::Redis => {
-                let protocol = if self.connection.ssl.enabled { "rediss" } else { "redis" };
+                let protocol = if self.connection.ssl.enabled {
+                    "rediss"
+                } else {
+                    "redis"
+                };
                 let mut url = format!(
                     "{}://{}:{}",
                     protocol, self.connection.host, self.connection.port
                 );
-                
+
                 if !self.connection.database.is_empty() && self.connection.database != "0" {
                     url.push_str(&format!("/{}", self.connection.database));
                 }
-                
+
                 Ok(url)
             }
-            
-            DatabaseBackend::SQLite => {
-                Ok(format!("sqlite:{}", self.connection.database))
-            }
-            
-            DatabaseBackend::Mock => {
-                Ok("mock://localhost/test".to_string())
-            }
+
+            DatabaseBackend::SQLite => Ok(format!("sqlite:{}", self.connection.database)),
+
+            DatabaseBackend::Mock => Ok("mock://localhost/test".to_string()),
         }
     }
-    
+
     /// Get connection timeout as Duration
     pub fn connection_timeout(&self) -> Duration {
         Duration::from_secs(self.timeouts.connection_secs)
     }
-    
+
     /// Get query timeout as Duration
     pub fn query_timeout(&self) -> Duration {
         Duration::from_secs(self.timeouts.query_secs)
     }
-    
+
     /// Get transaction timeout as Duration
     pub fn transaction_timeout(&self) -> Duration {
         Duration::from_secs(self.timeouts.transaction_secs)
     }
-    
+
     /// Validate configuration
     pub fn validate(&self) -> Result<(), DatabaseError> {
         if self.connection.host.is_empty() {
@@ -373,32 +377,32 @@ impl DatabaseConfig {
                 "Host cannot be empty".to_string(),
             ));
         }
-        
+
         if self.connection.database.is_empty() && self.backend != DatabaseBackend::Redis {
             return Err(DatabaseError::ConfigurationError(
                 "Database name cannot be empty".to_string(),
             ));
         }
-        
+
         if self.pool.min_connections > self.pool.max_connections {
             return Err(DatabaseError::ConfigurationError(
                 "Minimum connections cannot exceed maximum connections".to_string(),
             ));
         }
-        
+
         if self.features.max_batch_size == 0 {
             return Err(DatabaseError::ConfigurationError(
                 "Batch size must be greater than 0".to_string(),
             ));
         }
-        
+
         Ok(())
     }
-    
+
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, DatabaseError> {
         let mut config = Self::default();
-        
+
         // Database backend
         if let Ok(backend) = std::env::var("GLSP_DB_BACKEND") {
             config.backend = match backend.to_lowercase().as_str() {
@@ -407,40 +411,43 @@ impl DatabaseConfig {
                 "redis" => DatabaseBackend::Redis,
                 "sqlite" => DatabaseBackend::SQLite,
                 "mock" => DatabaseBackend::Mock,
-                _ => return Err(DatabaseError::ConfigurationError(
-                    format!("Unknown database backend: {}", backend),
-                )),
+                _ => {
+                    return Err(DatabaseError::ConfigurationError(format!(
+                        "Unknown database backend: {}",
+                        backend
+                    )))
+                }
             };
         }
-        
+
         // Connection settings
         if let Ok(host) = std::env::var("GLSP_DB_HOST") {
             config.connection.host = host;
         }
-        
+
         if let Ok(port) = std::env::var("GLSP_DB_PORT") {
             config.connection.port = port.parse().map_err(|_| {
                 DatabaseError::ConfigurationError("Invalid port number".to_string())
             })?;
         }
-        
+
         if let Ok(database) = std::env::var("GLSP_DB_NAME") {
             config.connection.database = database;
         }
-        
+
         if let Ok(username) = std::env::var("GLSP_DB_USER") {
             config.connection.username = Some(username);
         }
-        
+
         if let Ok(password) = std::env::var("GLSP_DB_PASSWORD") {
             config.connection.password = Some(password);
         }
-        
+
         // SSL settings
         if let Ok(ssl) = std::env::var("GLSP_DB_SSL") {
             config.connection.ssl.enabled = ssl.to_lowercase() == "true";
         }
-        
+
         config.validate()?;
         Ok(config)
     }

@@ -239,26 +239,32 @@ impl FileSystemWatcher {
     }
 
     /// Change the watched path and restart the watcher
-    pub async fn change_watch_path(&mut self, new_path: PathBuf) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        info!("Changing filesystem watcher path from {:?} to {:?}", self.watch_path, new_path);
-        
+    pub async fn change_watch_path(
+        &mut self,
+        new_path: PathBuf,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        info!(
+            "Changing filesystem watcher path from {:?} to {:?}",
+            self.watch_path, new_path
+        );
+
         // Stop existing watcher if it exists
         if let Some(_watcher) = self.watcher.take() {
             info!("Stopping existing filesystem watcher");
             // Watcher will be dropped and stop watching
         }
-        
+
         // Clear known files
         self.known_files.write().await.clear();
-        
+
         // Update path
         self.watch_path = new_path;
-        
+
         // Restart watching with new path
-        self.start_watching().await.map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
-            Box::new(e)
-        })?;
-        
+        self.start_watching()
+            .await
+            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+
         info!("Filesystem watcher successfully changed to new path");
         Ok(())
     }
