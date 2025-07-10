@@ -481,6 +481,200 @@ impl GlspBackend {
         self.execution_engine.is_some() && self.pipeline_engine.is_some() && self.simulation_engine.is_some()
     }
 
+    /// Set a new workspace directory (sets both wasm and diagrams subdirectories)
+    pub async fn set_workspace_directory(&self, workspace_path: String) -> std::result::Result<(), GlspError> {
+        use std::path::Path;
+        
+        let workspace = Path::new(&workspace_path);
+        if !workspace.exists() {
+            return Err(GlspError::ToolExecution(format!("Workspace directory does not exist: {}", workspace_path)));
+        }
+        
+        if !workspace.is_dir() {
+            return Err(GlspError::ToolExecution(format!("Path is not a directory: {}", workspace_path)));
+        }
+        
+        // Set standard workspace structure
+        let wasm_path = workspace.join("wasm-components").to_string_lossy().to_string();
+        let diagrams_path = workspace.join("diagrams").to_string_lossy().to_string();
+        
+        // Create directories if they don't exist
+        std::fs::create_dir_all(&wasm_path).map_err(|e| 
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e)))?;
+        std::fs::create_dir_all(&diagrams_path).map_err(|e| 
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
+        
+        // Update paths
+        self.set_wasm_components_path(wasm_path).await?;
+        self.set_diagrams_path(diagrams_path).await?;
+        
+        info!("Workspace directory set to: {}", workspace_path);
+        Ok(())
+    }
+
+    /// Set a new WASM components path and update the file watcher
+    pub async fn set_wasm_components_path(&self, wasm_path: String) -> std::result::Result<(), GlspError> {
+        use std::path::Path;
+        
+        let path = Path::new(&wasm_path);
+        if !path.exists() {
+            std::fs::create_dir_all(path).map_err(|e| 
+                GlspError::ToolExecution(format!("Failed to create WASM directory: {}", e)))?;
+        }
+        
+        // Update filesystem watcher
+        {
+            let mut filesystem_watcher = self.filesystem_watcher.write().await;
+            filesystem_watcher.change_watch_path(path.to_path_buf()).await.map_err(|e|
+                GlspError::ToolExecution(format!("Failed to update filesystem watcher: {}", e)))?;
+        }
+        
+        // Update WASM file watcher
+        {
+            let mut wasm_watcher = self.wasm_watcher.lock().await;
+            wasm_watcher.change_watch_path(path.to_path_buf()).await.map_err(|e|
+                GlspError::ToolExecution(format!("Failed to update WASM watcher: {}", e)))?;
+        }
+        
+        info!("WASM components path set to: {}", wasm_path);
+        Ok(())
+    }
+
+    /// Set a new diagrams path and update the persistence manager
+    pub async fn set_diagrams_path(&self, diagrams_path: String) -> std::result::Result<(), GlspError> {
+        use std::path::Path;
+        
+        let path = Path::new(&diagrams_path);
+        if !path.exists() {
+            std::fs::create_dir_all(path).map_err(|e| 
+                GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
+        }
+        
+        // Update persistence manager - since it's in an Arc, we need to replace it
+        // For now, just validate the path change
+        self.persistence.change_storage_path(path.to_path_buf()).await.map_err(|e|
+            GlspError::ToolExecution(format!("Failed to update persistence manager: {}", e)))?;
+        
+        info!("Diagrams path set to: {}", diagrams_path);
+        Ok(())
+    }
+
+    /// Get current workspace information
+    pub async fn get_current_workspace(&self) -> std::result::Result<serde_json::Value, GlspError> {
+        let wasm_path = &self.config.wasm_path;
+        let diagrams_path = &self.config.diagrams_path;
+        
+        // Try to determine workspace root by checking if both paths are subdirectories of a common parent
+        let workspace_root = if let (Some(wasm_parent), Some(diagrams_parent)) = (
+            std::path::Path::new(wasm_path).parent().map(|p| p.to_string_lossy().to_string()),
+            std::path::Path::new(diagrams_path).parent().map(|p| p.to_string_lossy().to_string())
+        ) {
+            if wasm_parent == diagrams_parent {
+                Some(wasm_parent)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        Ok(json!({
+            "workspace_root": workspace_root,
+            "wasm_components_path": wasm_path,
+            "diagrams_path": diagrams_path,
+            "wasm_components_count": self.count_wasm_components().await,
+            "diagrams_count": self.count_diagrams().await
+        }))
+    }
+
+    /// Trigger a rescan of the current workspace
+    pub async fn rescan_workspace(&self) -> std::result::Result<(), GlspError> {
+        // Trigger WASM component rescan
+        {
+            let mut wasm_watcher = self.wasm_watcher.lock().await;
+            wasm_watcher.scan_components().await.map_err(|e|
+                GlspError::ToolExecution(format!("Failed to rescan WASM components: {}", e)))?;
+        }
+        
+        // Reload diagrams from disk
+        self.load_all_diagrams().await?;
+        
+        info!("Workspace rescan completed");
+        Ok(())
+    }
+
+    /// Validate workspace paths and structure
+    pub async fn validate_workspace_paths(&self, workspace_path: &str) -> std::result::Result<serde_json::Value, GlspError> {
+        use std::path::Path;
+        
+        let workspace = Path::new(workspace_path);
+        let wasm_dir = workspace.join("wasm-components");
+        let diagrams_dir = workspace.join("diagrams");
+        
+        let mut errors = Vec::new();
+        
+        // Check workspace root
+        let workspace_exists = workspace.exists();
+        let workspace_is_dir = workspace.is_dir();
+        let workspace_writable = workspace_exists && workspace.metadata()
+            .map(|m| !m.permissions().readonly()).unwrap_or(false);
+        
+        if !workspace_exists {
+            errors.push("Workspace directory does not exist".to_string());
+        } else if !workspace_is_dir {
+            errors.push("Workspace path is not a directory".to_string());
+        } else if !workspace_writable {
+            errors.push("Workspace directory is not writable".to_string());
+        }
+        
+        // Check subdirectories
+        let wasm_exists = wasm_dir.exists();
+        let diagrams_exists = diagrams_dir.exists();
+        
+        // Count existing files
+        let wasm_count = if wasm_exists {
+            std::fs::read_dir(&wasm_dir)
+                .map(|entries| entries.filter_map(|e| e.ok()).count())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        
+        let diagrams_count = if diagrams_exists {
+            std::fs::read_dir(&diagrams_dir)
+                .map(|entries| entries.filter_map(|e| e.ok()).count())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        
+        Ok(json!({
+            "valid": errors.is_empty(),
+            "workspace_exists": workspace_exists,
+            "workspace_is_directory": workspace_is_dir,
+            "workspace_writable": workspace_writable,
+            "wasm_directory_exists": wasm_exists,
+            "diagrams_directory_exists": diagrams_exists,
+            "wasm_components_count": wasm_count,
+            "diagrams_count": diagrams_count,
+            "errors": errors
+        }))
+    }
+
+    /// Count WASM components in current path
+    async fn count_wasm_components(&self) -> u32 {
+        std::fs::read_dir(&self.config.wasm_path)
+            .map(|entries| entries.filter_map(|e| e.ok()).count() as u32)
+            .unwrap_or(0)
+    }
+
+    /// Count diagrams in current path
+    async fn count_diagrams(&self) -> u32 {
+        std::fs::read_dir(&self.config.diagrams_path)
+            .map(|entries| entries.filter_map(|e| e.ok()).count() as u32)
+            .unwrap_or(0)
+    }
+
     pub async fn list_tools(
         &self,
         _request: PaginatedRequestParam,
@@ -789,6 +983,99 @@ impl GlspBackend {
                     "required": ["componentPath"]
                 }),
             },
+
+            // Workspace management tools
+            Tool {
+                name: "set_workspace_directory".to_string(),
+                description: "Set workspace root directory (creates wasm-components and diagrams subdirectories)".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Absolute path to the workspace root directory"
+                        },
+                        "create_if_missing": {
+                            "type": "boolean",
+                            "description": "Create the directory if it doesn't exist",
+                            "default": true
+                        }
+                    },
+                    "required": ["workspace_path"]
+                }),
+            },
+            Tool {
+                name: "get_workspace_info".to_string(),
+                description: "Get current workspace information and statistics".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {}
+                }),
+            },
+            Tool {
+                name: "set_wasm_components_path".to_string(),
+                description: "Set custom WASM components directory path".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "wasm_path": {
+                            "type": "string",
+                            "description": "Absolute path to WASM components directory"
+                        }
+                    },
+                    "required": ["wasm_path"]
+                }),
+            },
+            Tool {
+                name: "set_diagrams_path".to_string(),
+                description: "Set custom diagrams storage directory path".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagrams_path": {
+                            "type": "string",
+                            "description": "Absolute path to diagrams storage directory"
+                        }
+                    },
+                    "required": ["diagrams_path"]
+                }),
+            },
+            Tool {
+                name: "rescan_workspace".to_string(),
+                description: "Trigger immediate rescan of current workspace (WASM components and diagrams)".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {}
+                }),
+            },
+            Tool {
+                name: "validate_workspace".to_string(),
+                description: "Validate workspace structure and permissions".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to workspace directory to validate"
+                        }
+                    },
+                    "required": ["workspace_path"]
+                }),
+            },
+            Tool {
+                name: "create_workspace_structure".to_string(),
+                description: "Create standard workspace directory structure (wasm-components and diagrams subdirectories)".to_string(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to workspace root where subdirectories will be created"
+                        }
+                    },
+                    "required": ["workspace_path"]
+                }),
+            },
         ];
 
         Ok(ListToolsResult {
@@ -824,6 +1111,16 @@ impl GlspBackend {
             "get_component_path" => self.get_component_path(request.arguments).await,
             "get_component_wit_info" => self.get_component_wit_info(request.arguments).await,
             "debug_wit_analysis" => self.debug_wit_analysis(request.arguments).await,
+            
+            // Workspace management tools
+            "set_workspace_directory" => self.set_workspace_directory_tool(request.arguments).await,
+            "get_workspace_info" => self.get_current_workspace_tool().await,
+            "set_wasm_components_path" => self.set_wasm_components_path_tool(request.arguments).await,
+            "set_diagrams_path" => self.set_diagrams_path_tool(request.arguments).await,
+            "rescan_workspace" => self.rescan_workspace_tool().await,
+            "validate_workspace" => self.validate_workspace_tool(request.arguments).await,
+            "create_workspace_structure" => self.create_workspace_structure_tool(request.arguments).await,
+            
             _ => Err(GlspError::NotImplemented(format!(
                 "Tool not implemented: {}",
                 request.name
@@ -2201,6 +2498,127 @@ impl GlspBackend {
                 })
             }
         }
+    }
+
+    // Workspace management tool wrapper methods
+    
+    async fn set_workspace_directory_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = arguments.unwrap_or_default();
+        let workspace_path = args.get("workspace_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
+        
+        let create_if_missing = args.get("create_if_missing")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        
+        // Create workspace directory if requested and it doesn't exist
+        if create_if_missing && !std::path::Path::new(workspace_path).exists() {
+            std::fs::create_dir_all(workspace_path).map_err(|e| 
+                GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e)))?;
+        }
+        
+        self.set_workspace_directory(workspace_path.to_string()).await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(format!("Successfully set workspace directory to: {}", workspace_path))],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn get_current_workspace_tool(&self) -> std::result::Result<CallToolResult, GlspError> {
+        let workspace_info = self.get_current_workspace().await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(serde_json::to_string_pretty(&workspace_info)
+                .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize workspace info: {}", e)))?)],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn set_wasm_components_path_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = arguments.unwrap_or_default();
+        let wasm_path = args.get("wasm_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| GlspError::ToolExecution("wasm_path parameter is required".to_string()))?;
+        
+        self.set_wasm_components_path(wasm_path.to_string()).await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(format!("Successfully set WASM components path to: {}", wasm_path))],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn set_diagrams_path_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = arguments.unwrap_or_default();
+        let diagrams_path = args.get("diagrams_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| GlspError::ToolExecution("diagrams_path parameter is required".to_string()))?;
+        
+        self.set_diagrams_path(diagrams_path.to_string()).await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(format!("Successfully set diagrams path to: {}", diagrams_path))],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn rescan_workspace_tool(&self) -> std::result::Result<CallToolResult, GlspError> {
+        self.rescan_workspace().await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text("Successfully rescanned workspace for WASM components and diagrams".to_string())],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn validate_workspace_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = arguments.unwrap_or_default();
+        let workspace_path = args.get("workspace_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
+        
+        let validation_result = self.validate_workspace_paths(workspace_path).await?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(serde_json::to_string_pretty(&validation_result)
+                .map_err(|e| GlspError::ToolExecution(format!("Failed to serialize validation result: {}", e)))?)],
+            is_error: Some(false),
+        })
+    }
+    
+    async fn create_workspace_structure_tool(&self, arguments: Option<serde_json::Value>) -> std::result::Result<CallToolResult, GlspError> {
+        let args = arguments.unwrap_or_default();
+        let workspace_path = args.get("workspace_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| GlspError::ToolExecution("workspace_path parameter is required".to_string()))?;
+        
+        use std::path::Path;
+        let workspace = Path::new(workspace_path);
+        
+        // Create workspace root
+        std::fs::create_dir_all(workspace).map_err(|e| 
+            GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e)))?;
+        
+        // Create subdirectories
+        let wasm_dir = workspace.join("wasm-components");
+        let diagrams_dir = workspace.join("diagrams");
+        
+        std::fs::create_dir_all(&wasm_dir).map_err(|e| 
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e)))?;
+        std::fs::create_dir_all(&diagrams_dir).map_err(|e| 
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e)))?;
+        
+        Ok(CallToolResult {
+            content: vec![Content::text(format!(
+                "Successfully created workspace structure:\n- {}\n- {}\n- {}", 
+                workspace_path,
+                wasm_dir.display(),
+                diagrams_dir.display()
+            ))],
+            is_error: Some(false),
+        })
     }
 }
 

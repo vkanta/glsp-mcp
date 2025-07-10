@@ -1049,4 +1049,31 @@ impl WasmFileWatcher {
 
         info!("=====================================");
     }
+
+    /// Change the watched path and restart filesystem monitoring
+    pub async fn change_watch_path(&mut self, new_path: PathBuf) -> anyhow::Result<()> {
+        info!("Changing WASM file watcher path from {:?} to {:?}", self.watch_path, new_path);
+        
+        // Update the path
+        self.watch_path = new_path;
+        
+        // Clear existing components since they're from the old path
+        self.components.clear();
+        
+        // Clear recent changes
+        self.recent_changes.lock().await.clear();
+        
+        // If we have a filesystem watcher, update its path
+        if let Some(fs_watcher_arc) = &self.filesystem_watcher {
+            let mut fs_watcher = fs_watcher_arc.write().await;
+            fs_watcher.change_watch_path(self.watch_path.clone()).await
+                .map_err(|e| anyhow::anyhow!("Failed to change filesystem watcher path: {}", e))?;
+        }
+        
+        // Perform initial scan of the new path
+        self.scan_components().await?;
+        
+        info!("WASM file watcher successfully changed to new path");
+        Ok(())
+    }
 }

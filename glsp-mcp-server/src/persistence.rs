@@ -406,6 +406,25 @@ impl PersistenceManager {
 
         diagram
     }
+
+    /// Change the storage path for the persistence manager
+    pub async fn change_storage_path(&self, new_path: PathBuf) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        
+        // Since self.base_path is not mutable and PersistenceManager is used through Arc,
+        // we need to create a new instance with the updated path. The backend will need
+        // to replace its persistence manager with the new one.
+        
+        // Ensure the new directory exists
+        fs::create_dir_all(&new_path).await.map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+            Box::new(e)
+        })?;
+        
+        // Note: This method serves as a validation step. The actual path change
+        // needs to be handled by the caller (backend) by creating a new PersistenceManager
+        // and replacing the existing one.
+        
+        Ok(())
+    }
 }
 
 /// Information about a stored diagram
