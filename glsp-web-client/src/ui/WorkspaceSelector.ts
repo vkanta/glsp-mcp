@@ -1,4 +1,6 @@
 import { detectEnvironment } from '../utils/environment.js';
+// Import CSS styles
+import './WorkspaceSelector.css';
 
 interface WorkspaceInfo {
     path: string;
@@ -31,6 +33,67 @@ export class WorkspaceSelector {
     private initialize(): void {
         this.createUI();
         this.loadCurrentWorkspace();
+    }
+
+    public createSidebarSection(): any {
+        const env = detectEnvironment();
+        
+        // Only show workspace selector in desktop mode
+        if (!env.isDesktop) {
+            return null;
+        }
+
+        // Create the workspace selector content
+        const content = document.createElement('div');
+        content.innerHTML = `
+            <div class="workspace-selector-sidebar">
+                <div class="current-workspace">
+                    <div class="workspace-info">
+                        <span class="workspace-icon">📁</span>
+                        <div class="workspace-details">
+                            <div id="workspace-name" class="workspace-name">Default Workspace</div>
+                            <div id="workspace-path" class="workspace-path">/default/path</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="workspace-actions">
+                    <button id="browse-workspace" class="workspace-action-btn">
+                        <span class="action-icon">🔍</span>
+                        Browse...
+                    </button>
+                    <button id="create-workspace" class="workspace-action-btn">
+                        <span class="action-icon">➕</span>
+                        Create...
+                    </button>
+                    <button id="validate-workspace" class="workspace-action-btn">
+                        <span class="action-icon">✓</span>
+                        Validate
+                    </button>
+                </div>
+                <div id="recent-workspaces" class="recent-workspaces">
+                    <h4>Recent Workspaces</h4>
+                    <div id="workspace-items" class="workspace-items">
+                        <!-- Recent workspace items will be populated here -->
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Set up container reference and attach event listeners
+        this.container = content;
+        this.attachEventListeners();
+        this.loadRecentWorkspaces();
+        this.loadCurrentWorkspace();
+
+        return {
+            id: 'workspace',
+            title: 'Workspace',
+            icon: '📁',
+            collapsible: true,
+            collapsed: false,
+            order: 0, // Show at top
+            content: content
+        };
     }
 
     private createUI(): void {
@@ -175,7 +238,7 @@ export class WorkspaceSelector {
             });
             
             // Add to recent workspaces
-            await window.__TAURI__.invoke('add_recent_workspace', { workspacePath });
+            await window.__TAURI__.invoke('add_recent_workspace', { workspace_path: workspacePath });
             
             // Update UI
             this.currentWorkspace = workspacePath;
@@ -260,9 +323,21 @@ export class WorkspaceSelector {
 
     private updateWorkspaceDisplay(): void {
         const workspaceName = this.container.querySelector('#workspace-name') as HTMLElement;
+        const workspacePath = this.container.querySelector('#workspace-path') as HTMLElement;
+        
         if (workspaceName && this.currentWorkspace) {
             const name = this.currentWorkspace.split('/').pop() || 'Default Workspace';
             workspaceName.textContent = name;
+        }
+        
+        if (workspacePath && this.currentWorkspace) {
+            // Show a shortened path for the sidebar
+            const pathParts = this.currentWorkspace.split('/');
+            const shortPath = pathParts.length > 3 ? 
+                `.../${pathParts.slice(-2).join('/')}` : 
+                this.currentWorkspace;
+            workspacePath.textContent = shortPath;
+            workspacePath.title = this.currentWorkspace; // Full path on hover
         }
     }
 

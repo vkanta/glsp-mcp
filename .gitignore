@@ -112,5 +112,8 @@ debug-*.js
 test-*.js
 *-test.js
 
+# Development configuration
+.claude/
+
 # External repositories (should be git submodules or separate clones)
 # mcp-loxone/ # Temporarily included with HTTP transport fixes

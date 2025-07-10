@@ -162,8 +162,27 @@ export class UIManager {
         // Initialize WASM component library section
         this.componentLibrarySection = new ComponentLibrarySection();
         
+        // Initialize workspace selector
+        const env = detectEnvironment();
+        if (env.isDesktop) {
+            this.workspaceSelector = new WorkspaceSelector(document.createElement('div'), (workspacePath) => {
+                console.log('Workspace changed to:', workspacePath);
+                // You can add additional handling here if needed
+            });
+        }
+        
         // Add sections to sidebar
         console.log('UIManager: Adding sidebar sections...');
+        
+        // Add workspace selector first (at top)
+        if (this.workspaceSelector) {
+            const workspaceSection = this.workspaceSelector.createSidebarSection();
+            if (workspaceSection) {
+                this.sidebar.addSection(workspaceSection);
+                console.log('UIManager: Workspace selector section added');
+            }
+        }
+        
         this.sidebar.addSection(this.diagramControlsSection.createSection());
         console.log('UIManager: Diagram controls section added');
         this.sidebar.addSection(this.toolboxSection.createSection());
