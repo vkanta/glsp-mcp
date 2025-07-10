@@ -1,0 +1,5 @@
+package test:simple@0.1.0;
+
+world simple {
+    export hello: func(name: string) -> string;
+}

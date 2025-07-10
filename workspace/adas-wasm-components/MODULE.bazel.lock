@@ -125,8 +125,6 @@
     "https://bcr.bazel.build/modules/rules_python/0.4.0/MODULE.bazel": "9208ee05fd48bf09ac60ed269791cf17fb343db56c8226a720fbb1cdf467166c",
     "https://bcr.bazel.build/modules/rules_python/0.40.0/MODULE.bazel": "9d1a3cd88ed7d8e39583d9ffe56ae8a244f67783ae89b60caafc9f5cf318ada7",
     "https://bcr.bazel.build/modules/rules_python/0.40.0/source.json": "939d4bd2e3110f27bfb360292986bb79fd8dcefb874358ccd6cdaa7bda029320",
-    "https://bcr.bazel.build/modules/rules_rust/0.62.0/MODULE.bazel": "6a15b57982e278793c684f426e19166e62e73f1bd45fe3b6bcedd0b901177b37",
-    "https://bcr.bazel.build/modules/rules_rust/0.62.0/source.json": "1b3a6551a585ee47cafa21550c5eb87c6f3a56bb9761f9e3421ff1102f220437",
     "https://bcr.bazel.build/modules/rules_shell/0.2.0/MODULE.bazel": "fda8a652ab3c7d8fee214de05e7a9916d8b28082234e8d2c0094505c5268ed3c",
     "https://bcr.bazel.build/modules/rules_shell/0.3.0/MODULE.bazel": "de4402cd12f4cc8fda2354fce179fdb068c0b9ca1ec2d2b17b3e21b24c1a937b",
     "https://bcr.bazel.build/modules/rules_shell/0.3.0/source.json": "c55ed591aa5009401ddf80ded9762ac32c358d2517ee7820be981e2de9756cf3",
@@ -239,9 +237,36 @@
         ]
       }
     },
+    "@@rules_wasm_component+//wasm:extensions.bzl%wasi_sdk": {
+      "general": {
+        "bzlTransitiveDigest": "edN/wpFR2B4nNnxKKEyYcwOm6E1wZ9p7IiHA7m/U+Zo=",
+        "usagesDigest": "VYTpO3rQyyI3NWuYGYT8Hw0uFz/yhZ9QL7EyDAIK0D0=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "wasi_sdk": {
+            "repoRuleId": "@@rules_wasm_component+//toolchains:wasi_sdk_toolchain.bzl%wasi_sdk_repository",
+            "attributes": {
+              "strategy": "download",
+              "version": "25",
+              "url": "",
+              "wasi_sdk_root": ""
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "rules_wasm_component+",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
     "@@rules_wasm_component+//wasm:extensions.bzl%wasm_toolchain": {
       "general": {
-        "bzlTransitiveDigest": "UC4IB7w0NFI5svzyC12Y1GIvjDJMcop4E2/EGEUMzdg=",
+        "bzlTransitiveDigest": "edN/wpFR2B4nNnxKKEyYcwOm6E1wZ9p7IiHA7m/U+Zo=",
         "usagesDigest": "XOChU5ZeGDqsmLBkwb+cUxLh91hYtzwSGKCDeawOu80=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

@@ -27,7 +27,8 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(./build-composed.sh:*)",
       "mcp__fetch__imageFetch",
-      "Bash(bazel build:*)"
+      "Bash(bazel build:*)",
+      "Bash(gh issue view:*)"
     ],
     "deny": []
   }
