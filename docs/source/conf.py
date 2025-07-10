@@ -24,7 +24,62 @@ sys.path.insert(0, os.path.abspath('../../glsp-mcp-server/src'))
 project = 'GLSP-Rust'
 copyright = '2024, GLSP-Rust Team'
 author = 'GLSP-Rust Team'
-release = '0.1.0'
+
+# Version configuration - Dynamic versioning support
+# DOCS_VERSION is set by the build pipeline (e.g., "main", "v0.1.0", "local")
+docs_build_env_version = os.environ.get('DOCS_VERSION', 'main')
+
+if docs_build_env_version.lower() in ['main', 'local']:
+    release = 'dev'  # Full version string for 'main' or 'local'
+    version = 'dev'  # Shorter X.Y version
+else:
+    # Process semantic versions like "v0.1.0" or "0.1.0"
+    parsed_release = docs_build_env_version.lstrip('v')
+    release = parsed_release  # Full version string, e.g., "0.1.0"
+    version_parts = parsed_release.split('.')
+    if len(version_parts) >= 2:
+        version = f"{version_parts[0]}.{version_parts[1]}"  # Shorter X.Y, e.g., "0.1"
+    else:
+        version = parsed_release  # Fallback if not in X.Y.Z or similar format
+
+# current_version is used by the theme for matching in the version switcher
+current_version = os.environ.get('DOCS_VERSION', 'main')
+# version_path_prefix is used by the theme to construct the URL to switcher.json
+version_path_prefix = os.environ.get('DOCS_VERSION_PATH_PREFIX', '/')
+
+# Function to get available versions for version switcher
+def get_versions():
+    versions = ['main']
+    try:
+        # Get all tags
+        result = subprocess.run(['git', 'tag'], stdout=subprocess.PIPE, universal_newlines=True)
+        if result.returncode == 0:
+            # Only include semantic version tags (x.y.z)
+            tags = result.stdout.strip().split('\n')
+            for tag in tags:
+                if re.match(r'^\d+\.\d+\.\d+$', tag):
+                    versions.append(tag)
+    except Exception as e:
+        print(f"Error getting versions: {e}")
+    
+    return sorted(versions, key=lambda v: v if v == 'main' else [int(x) for x in v.split('.')])
+
+# Available versions for the switcher
+versions = get_versions()
+
+# Write versions data for the index page to use for redirection
+versions_data = {
+    'current_version': current_version,
+    'versions': versions,
+    'version_path_prefix': version_path_prefix
+}
+
+# Ensure _static directory exists
+os.makedirs(os.path.join(os.path.dirname(__file__), '_static'), exist_ok=True)
+
+# Write versions data to a JSON file
+with open(os.path.join(os.path.dirname(__file__), '_static', 'versions.json'), 'w') as f:
+    json.dump(versions_data, f)
 
 # -- General configuration ---------------------------------------------------
 
@@ -60,7 +115,8 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'furo'
+# Using pydata_sphinx_theme for better version switching and navigation
+html_theme = 'pydata_sphinx_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -70,6 +126,51 @@ html_static_path = ['_static']
 # Configure table of contents
 html_show_sourcelink = False
 html_show_sphinx = False
+
+# Configure pydata_sphinx_theme options
+html_theme_options = {
+    # Configure the version switcher
+    "switcher": {
+        "json_url": f"{version_path_prefix}switcher.json",
+        "version_match": current_version,
+    },
+    # Put logo on far left, search and utilities on the right  
+    "navbar_start": ["navbar-logo"],
+    # Keep center empty to move main nav to sidebar
+    "navbar_center": [],
+    # Group version switcher with search and theme switcher on the right
+    "navbar_end": ["version-switcher", "search-button", "theme-switcher"], 
+    # Control navigation bar behavior
+    "navbar_align": "left", # Align content to left
+    # "use_navbar_nav_drop_shadow": True,  # Unsupported in current theme version
+    # Control the sidebar navigation
+    "navigation_with_keys": True,
+    "show_nav_level": 2, # Show more levels in the left sidebar nav
+    "show_toc_level": 2, # On-page TOC levels
+    # Collapse navigation to only show current page's children in sidebar
+    "collapse_navigation": True,
+    "show_prev_next": True,
+    # GitHub integration
+    "github_url": "https://github.com/glsp-rust/glsp-rust",
+    "use_edit_page_button": True,
+}
+
+# Sidebar configuration
+html_sidebars = {
+    "**": ["sidebar-nav-bs.html", "sidebar-ethical-ads.html"]
+}
+
+# Add version data to the context for templates
+html_context = {
+    'current_version': current_version,
+    'versions': versions,
+    'version_path_prefix': version_path_prefix,
+    'display_github': True,
+    'github_user': 'glsp-rust',
+    'github_repo': 'glsp-rust',
+    'github_version': 'main',
+    'conf_py_path': '/docs/source/',
+}
 
 # -- Options for sphinx_needs -----------------------------------------------
 
@@ -165,6 +266,92 @@ needs_types = [
         'prefix': 'SAFETY_',
         'color': '#F44336',
         'style': 'node'
+    },
+    {
+        'directive': 'arch_req',
+        'title': 'Architecture Requirement',
+        'prefix': 'ARCH_',
+        'color': '#2196F3',
+        'style': 'node'
+    },
+    {
+        'directive': 'arch_principle',
+        'title': 'Architecture Principle',
+        'prefix': 'PRINCIPLE_',
+        'color': '#3F51B5',
+        'style': 'node'
+    },
+    {
+        'directive': 'tech_stack',
+        'title': 'Technology Stack',
+        'prefix': 'TECH_',
+        'color': '#FF9800',
+        'style': 'node'
+    },
+    {
+        'directive': 'quality_attribute',
+        'title': 'Quality Attribute',
+        'prefix': 'QA_',
+        'color': '#4CAF50',
+        'style': 'node'
+    },
+    # Additional types from WRT configuration
+    {
+        'directive': 'constraint',
+        'title': 'Constraint',
+        'prefix': 'CNST_',
+        'color': '#4682B4',
+        'style': 'node'
+    },
+    {
+        'directive': 'panic',
+        'title': 'Panic',
+        'prefix': 'PANIC_',
+        'color': '#E74C3C',
+        'style': 'node'
+    },
+    {
+        'directive': 'src',
+        'title': 'Source File',
+        'prefix': 'SRC_',
+        'color': '#C6C6FF',
+        'style': 'node'
+    },
+    # Architecture-specific types
+    {
+        'directive': 'arch_component',
+        'title': 'Architectural Component',
+        'prefix': 'ARCH_COMP_',
+        'color': '#FF6B6B',
+        'style': 'node'
+    },
+    {
+        'directive': 'arch_interface',
+        'title': 'Interface',
+        'prefix': 'ARCH_IF_',
+        'color': '#4ECDC4',
+        'style': 'node'
+    },
+    {
+        'directive': 'arch_decision',
+        'title': 'Design Decision',
+        'prefix': 'ARCH_DEC_',
+        'color': '#45B7D1',
+        'style': 'node'
+    },
+    {
+        'directive': 'arch_constraint',
+        'title': 'Design Constraint',
+        'prefix': 'ARCH_CON_',
+        'color': '#96CEB4',
+        'style': 'node'
+    },
+    {
+        'directive': 'arch_pattern',
+        'title': 'Design Pattern',
+        'prefix': 'ARCH_PAT_',
+        'color': '#FECA57',
+        'style': 'node'
     }
 ]
 
@@ -181,7 +368,29 @@ needs_extra_options = [
     'simulation_type',
     'ui_component',
     'risk_level',
-    'priority'
+    'priority',
+    # Additional options from WRT configuration
+    'mitigation',
+    'implementation',
+    'item_status',
+    'handling_strategy',
+    'last_updated',
+    'file',
+    'crate',
+    'allocated_requirements',
+    'environment',
+    'deciders',
+    'alternatives',
+    'stability',
+    'protocol',
+    # Architecture directive options
+    'description',
+    'implications',
+    'technologies',
+    'category',
+    'metric',
+    'measurement',
+    'target',
 ]
 
 # Configure need layouts
@@ -245,6 +454,15 @@ needs_allow_unsafe_options = True
 
 # Disable warnings for unknown link targets to avoid the many outgoing link warnings
 needs_warnings_always_warn = False
+
+# Suppress specific warnings
+suppress_warnings = [
+    'toc.not_readable',
+    'ref.any',
+    'docutils',
+    'intersphinx.timeout',  # Suppress intersphinx timeout warnings
+    'config.cache',  # Suppress cache-related warnings
+]
 
 # Configure need statuses
 needs_statuses = [
@@ -367,9 +585,38 @@ needs_string_links = {
     },
 }
 
-# Move setup function to the end and make it simpler
+# Custom setup function with monkeypatch for handling NoneType errors
 def setup(app):
-    return {'version': '0.1', 'parallel_read_safe': True}
+    """Custom setup function to handle various sphinx-needs configurations."""
+    
+    # Monkeypatch to handle NoneType errors in sphinx-needs
+    def safe_str(value):
+        if value is None:
+            return ""
+        return str(value)
+    
+    # Register the extract_reqs function as a dynamic function
+    # Note: Dynamic functions are handled by sphinx-needs automatically
+    
+    # Add custom CSS for better styling
+    app.add_css_file('custom.css')
+    
+    # Add custom JavaScript for diagram interaction
+    app.add_js_file('diagram-zoom.js')
+    
+    # Configure additional metadata for builds
+    app.add_config_value('build_metadata', {}, 'env')
+    app.config.build_metadata = {
+        'build_date': '2024-01-01',
+        'version': release,
+        'environment': os.environ.get('BUILD_ENV', 'development')
+    }
+    
+    return {
+        'version': '0.1',
+        'parallel_read_safe': True,
+        'parallel_write_safe': True,
+    }
 
 # -- Options for MyST Parser -----------------------------------------------
 
@@ -407,24 +654,7 @@ coverage_show_missing_items = True
 coverage_ignore_functions = ['main']
 
 # -- HTML theme options -----------------------------------------------------
-
-html_theme_options = {
-    'sidebar_hide_name': True,
-    'navigation_with_keys': True,
-    'top_of_page_button': 'edit',
-    'source_repository': 'https://github.com/glsp-rust/glsp-rust',
-    'source_branch': 'main',
-    'source_directory': 'docs/source/',
-    # Fix for table of contents issues
-    'light_css_variables': {
-        'color-sidebar-background': '#f8f9fa',
-        'color-sidebar-background-border': '#dee2e6',
-    },
-    'dark_css_variables': {
-        'color-sidebar-background': '#1a1a1a',
-        'color-sidebar-background-border': '#333',
-    },
-}
+# (Theme options are already configured above in the main HTML section)
 
 # -- Additional configuration -----------------------------------------------
 
@@ -472,4 +702,110 @@ html_context = {
 needs_templates = {
     'req_template': '**Requirement**: {{content}}\n\n**Rationale**: {{rationale}}\n\n**Verification**: {{verification}}',
     'safety_template': '**Safety Requirement**: {{content}}\n\n**Safety Impact**: {{safety_impact}}\n\n**Verification**: {{verification}}',
+    'qualification_template': '**Qualification**: {{content}}\n\n**Mitigation**: {{mitigation}}\n\n**Implementation**: {{implementation}}',
+    'constraint_template': '**Constraint**: {{content}}\n\n**Handling Strategy**: {{handling_strategy}}\n\n**Last Updated**: {{last_updated}}',
+    'panic_template': '**Panic**: {{content}}\n\n**Mitigation**: {{mitigation}}\n\n**Status**: {{item_status}}',
 }
+
+# Configure custom links for sphinx-needs
+needs_extra_links = [
+    {
+        'option': 'implements',
+        'incoming': 'is implemented by',
+        'outgoing': 'implements',
+        'copy': False,
+        'style': 'dashed',
+        'color': '#2E8B57',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'depends_on',
+        'incoming': 'is dependency of',
+        'outgoing': 'depends on',
+        'copy': False,
+        'style': 'dotted',
+        'color': '#FF6347',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'validates',
+        'incoming': 'is validated by',
+        'outgoing': 'validates',
+        'copy': False,
+        'style': 'solid',
+        'color': '#4169E1',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'mitigates',
+        'incoming': 'is mitigated by',
+        'outgoing': 'mitigates',
+        'copy': False,
+        'style': 'dashed',
+        'color': '#FF1493',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'allocated_to',
+        'incoming': 'allocates',
+        'outgoing': 'allocated to',
+        'copy': False,
+        'style': 'solid',
+        'color': '#32CD32',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'impacts',
+        'incoming': 'is impacted by',
+        'outgoing': 'impacts',
+        'copy': False,
+        'style': 'dotted',
+        'color': '#FF8C00',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'variant_of',
+        'incoming': 'has variant',
+        'outgoing': 'is variant of',
+        'copy': False,
+        'style': 'dashed',
+        'color': '#9370DB',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'provides',
+        'incoming': 'is provided by',
+        'outgoing': 'provides',
+        'copy': False,
+        'style': 'solid',
+        'color': '#20B2AA',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+    {
+        'option': 'requires',
+        'incoming': 'is required by',
+        'outgoing': 'requires',
+        'copy': False,
+        'style': 'solid',
+        'color': '#DC143C',
+        'style_part': 'source_line',
+        'style_start': 'start_line',
+        'style_end': 'end_line',
+    },
+]

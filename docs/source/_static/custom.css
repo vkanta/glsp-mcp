@@ -1,49 +1,91 @@
-/* Custom CSS for GLSP-Rust documentation */
+/* Custom CSS for GLSP-Rust documentation with pydata_sphinx_theme */
 
-/* Furo theme fixes */
-.sidebar-drawer {
+/* Theme-specific adjustments */
+.bd-sidebar {
     --sidebar-width: 15rem;
 }
 
 /* Fix for content width with right sidebar */
-.content {
+.bd-content {
     max-width: calc(100vw - 30rem);
 }
 
-/* Fix table of contents in right sidebar */
-.toc-tree {
+/* Enhanced table of contents styling */
+.bd-toc {
     font-size: 0.9rem;
 }
 
-.toc-tree .current > a {
+.bd-toc .current > a {
     font-weight: 600;
-    color: var(--color-brand-primary);
+    color: var(--pst-color-primary);
 }
 
-/* Improve readability of code blocks */
+/* Navbar customizations */
+.navbar-nav .nav-link {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.navbar-nav .nav-link:hover {
+    background-color: var(--pst-color-surface);
+    color: var(--pst-color-primary);
+}
+
+/* Version switcher styling */
+.version-switcher {
+    margin-left: 1rem;
+}
+
+/* Search button styling */
+.search-button {
+    border: 1px solid var(--pst-color-border);
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--pst-color-surface);
+    transition: all 0.2s ease;
+}
+
+.search-button:hover {
+    background-color: var(--pst-color-on-surface);
+    border-color: var(--pst-color-primary);
+}
+
+/* Improve readability of code blocks - pydata_sphinx_theme */
 .highlight {
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
+    background-color: var(--pst-color-surface);
+    border: 1px solid var(--pst-color-border);
     border-radius: 0.375rem;
     padding: 1rem;
     margin: 1rem 0;
+    position: relative;
 }
 
-/* Dark mode support for code blocks */
-@media (prefers-color-scheme: dark) {
-    .highlight {
-        background-color: #1e1e1e;
-        border-color: #444;
-    }
+/* Enhanced inline code styling */
+code {
+    background-color: var(--pst-color-surface);
+    border: 1px solid var(--pst-color-border);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    font-family: 'Source Code Pro', 'Consolas', monospace;
+    font-size: 0.875em;
+    color: var(--pst-color-text);
 }
 
-/* Styling for sphinx-needs elements */
+/* Styling for sphinx-needs elements - pydata_sphinx_theme */
 .need {
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--pst-color-primary);
     padding: 1rem;
     margin: 1rem 0;
-    background-color: #f8f9fa;
+    background-color: var(--pst-color-surface);
     border-radius: 0.25rem;
+    border: 1px solid var(--pst-color-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.need:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .need-req {
@@ -98,53 +140,65 @@
     border-left-color: #F44336;
 }
 
-/* Improve table styling */
+/* Improve table styling - pydata_sphinx_theme */
 table {
     border-collapse: collapse;
     width: 100%;
     margin: 1rem 0;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 th, td {
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--pst-color-border);
     padding: 0.75rem;
     text-align: left;
+    color: var(--pst-color-text);
 }
 
 th {
-    background-color: #f8f9fa;
+    background-color: var(--pst-color-surface);
     font-weight: 600;
+    color: var(--pst-color-text-muted);
 }
 
-/* Improve admonition styling */
+tr:nth-child(even) {
+    background-color: var(--pst-color-surface);
+}
+
+/* Improve admonition styling - pydata_sphinx_theme */
 .admonition {
     margin: 1rem 0;
     padding: 1rem;
     border-radius: 0.375rem;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--pst-color-primary);
+    background-color: var(--pst-color-surface);
+    border: 1px solid var(--pst-color-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .admonition.note {
-    background-color: #e7f3ff;
-    border-left-color: #0066cc;
+    background-color: rgba(var(--pst-color-info-rgb), 0.1);
+    border-left-color: var(--pst-color-info);
 }
 
 .admonition.warning {
-    background-color: #fff3cd;
-    border-left-color: #ffc107;
+    background-color: rgba(var(--pst-color-warning-rgb), 0.1);
+    border-left-color: var(--pst-color-warning);
 }
 
 .admonition.danger {
-    background-color: #f8d7da;
-    border-left-color: #dc3545;
+    background-color: rgba(var(--pst-color-danger-rgb), 0.1);
+    border-left-color: var(--pst-color-danger);
 }
 
 .admonition.tip {
-    background-color: #d4edda;
-    border-left-color: #28a745;
+    background-color: rgba(var(--pst-color-success-rgb), 0.1);
+    border-left-color: var(--pst-color-success);
 }
 
-/* Improve navigation styling */
+/* Improve navigation styling - pydata_sphinx_theme */
 .toctree-wrapper {
     margin: 1rem 0;
 }
@@ -153,70 +207,80 @@ th {
     font-size: 1.1rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: #495057;
+    color: var(--pst-color-text-muted);
 }
 
-/* Improve inline code styling */
-code {
-    background-color: #f1f3f4;
-    border-radius: 0.25rem;
-    padding: 0.125rem 0.25rem;
-    font-family: 'Source Code Pro', 'Consolas', monospace;
-    font-size: 0.875em;
+/* Additional navigation enhancements */
+.bd-sidebar-primary {
+    background-color: var(--pst-color-surface);
+    border-right: 1px solid var(--pst-color-border);
 }
 
-/* PlantUML diagram styling - Fix for Furo theme */
+.bd-sidebar-secondary {
+    background-color: var(--pst-color-surface);
+    border-left: 1px solid var(--pst-color-border);
+}
+
+/* PlantUML diagram styling - Optimized for pydata_sphinx_theme */
 .plantuml {
     text-align: left;
     margin: 1.5rem 0;
     width: 100%;
     clear: both;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .plantuml img {
     max-width: 100%;
     height: auto;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--pst-color-border);
     border-radius: 0.375rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     cursor: zoom-in;
-    transition: transform 0.2s ease;
+    transition: all 0.2s ease;
+    background-color: var(--pst-color-surface);
 }
 
 .plantuml img:hover {
     transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-/* Fix for large diagrams - make them scrollable */
-.plantuml {
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-}
-
-/* Ensure diagrams don't interfere with right sidebar */
+/* Responsive diagram sizing */
 @media (min-width: 82rem) {
     .plantuml {
         max-width: calc(100vw - 20rem);
     }
 }
 
-/* Click to zoom functionality */
+@media (max-width: 768px) {
+    .plantuml {
+        margin: 1rem 0;
+    }
+    
+    .plantuml img {
+        border-radius: 0.25rem;
+    }
+}
+
+/* Click to zoom functionality - Enhanced for pydata_sphinx_theme */
 .plantuml img.zoomed {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) scale(1.5);
     z-index: 9999;
-    background: white;
+    background: var(--pst-color-surface);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    border: 2px solid #007bff;
+    border: 2px solid var(--pst-color-primary);
     cursor: zoom-out;
     max-width: 90vw;
     max-height: 90vh;
+    border-radius: 0.5rem;
 }
 
-.plantuml img.zoomed ~ .zoom-overlay {
+.zoom-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -224,6 +288,13 @@ code {
     height: 100vh;
     background: rgba(0, 0, 0, 0.8);
     z-index: 9998;
+    cursor: zoom-out;
+}
+
+/* Dark mode support for zoom functionality */
+[data-theme="dark"] .plantuml img.zoomed {
+    background: var(--pst-color-surface);
+    border-color: var(--pst-color-primary);
 }
 
 /* Responsive design improvements */
