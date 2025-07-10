@@ -2,7 +2,7 @@
   "build": {
     "distDir": "../../glsp-web-client/dist",
     "devPath": "http://localhost:5173",
-    "beforeBuildCommand": "cd ../../glsp-web-client && npm run build",
+    "beforeBuildCommand": "",
     "beforeDevCommand": "",
     "withGlobalTauri": true
   },
