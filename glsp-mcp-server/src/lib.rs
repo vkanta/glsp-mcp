@@ -70,22 +70,22 @@ pub async fn run_server(config: GlspConfig) -> Result<(), Box<dyn std::error::Er
     let backend = GlspBackend::initialize(config.clone()).await?;
 
     // Create server config with memory auth
-    let mut server_config = ServerConfig::default();
-    server_config.auth_config = AuthConfig::memory();
-
-    // Set transport configuration
-    server_config.transport_config = match config.transport.as_str() {
-        "http" => TransportConfig::http(config.port),
-        "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
-        "websocket" => TransportConfig::websocket(config.port),
-        "stdio" => TransportConfig::stdio(),
-        _ => {
-            info!(
-                "Unknown transport type: {}, defaulting to HTTP streaming",
-                config.transport
-            );
-            TransportConfig::streamable_http(config.port)
-        }
+    let server_config = ServerConfig {
+        auth_config: AuthConfig::memory(),
+        transport_config: match config.transport.as_str() {
+            "http" => TransportConfig::http(config.port),
+            "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
+            "websocket" => TransportConfig::websocket(config.port),
+            "stdio" => TransportConfig::stdio(),
+            _ => {
+                info!(
+                    "Unknown transport type: {}, defaulting to HTTP streaming",
+                    config.transport
+                );
+                TransportConfig::streamable_http(config.port)
+            }
+        },
+        ..Default::default()
     };
 
     // Create and run server using framework

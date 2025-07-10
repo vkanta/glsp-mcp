@@ -135,7 +135,7 @@ impl WasmSecurityScanner {
         // Read the WASM file
         let wasm_bytes = tokio::fs::read(path)
             .await
-            .with_context(|| format!("Failed to read WASM file: {:?}", path))?;
+            .with_context(|| format!("Failed to read WASM file: {path:?}"))?;
 
         let mut analysis = SecurityAnalysis {
             component_name: component_name.clone(),
@@ -171,7 +171,7 @@ impl WasmSecurityScanner {
                         issue: e.to_string(),
                     },
                     risk_level: SecurityRiskLevel::High,
-                    description: format!("Component analysis failed: {}", e),
+                    description: format!("Component analysis failed: {e}"),
                     recommendation: "Component may be malformed or corrupted. Verify integrity."
                         .to_string(),
                     location: None,
@@ -255,11 +255,10 @@ impl WasmSecurityScanner {
                     },
                     risk_level: SecurityRiskLevel::High,
                     description: format!(
-                        "Component imports potentially dangerous function: {}",
-                        import_path
+                        "Component imports potentially dangerous function: {import_path}"
                     ),
                     recommendation: "Verify this import is necessary and used safely".to_string(),
-                    location: Some(format!("Import: {}", import_path)),
+                    location: Some(format!("Import: {import_path}")),
                 });
             }
 
@@ -280,13 +279,12 @@ impl WasmSecurityScanner {
                     },
                     risk_level: SecurityRiskLevel::Critical,
                     description: format!(
-                        "Component imports function with execution capability: {}",
-                        import_path
+                        "Component imports function with execution capability: {import_path}"
                     ),
                     recommendation:
                         "Carefully review this import as it may allow arbitrary code execution"
                             .to_string(),
-                    location: Some(format!("Import: {}", import_path)),
+                    location: Some(format!("Import: {import_path}")),
                 });
             }
         }
@@ -457,9 +455,7 @@ impl WasmSecurityScanner {
         }
 
         // Escalate risk if multiple high-level issues
-        if critical_count > 0 {
-            SecurityRiskLevel::Critical
-        } else if high_count > 2 {
+        if critical_count > 0 || high_count > 2 {
             SecurityRiskLevel::Critical
         } else if high_count > 0 {
             SecurityRiskLevel::High
@@ -488,7 +484,7 @@ impl WasmSecurityScanner {
         ));
 
         if let Some(sig) = &analysis.trusted_signature {
-            report.push_str(&format!("Trusted Signature: {}\n", sig));
+            report.push_str(&format!("Trusted Signature: {sig}\n"));
         }
 
         report.push_str(&format!(
@@ -518,7 +514,7 @@ impl WasmSecurityScanner {
                 ));
                 report.push_str(&format!("     Recommendation: {}\n", issue.recommendation));
                 if let Some(location) = &issue.location {
-                    report.push_str(&format!("     Location: {}\n", location));
+                    report.push_str(&format!("     Location: {location}\n"));
                 }
                 report.push('\n');
             }

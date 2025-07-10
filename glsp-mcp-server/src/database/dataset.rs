@@ -377,8 +377,7 @@ impl<T: DatabaseInterface> DatasetManager for DatabaseDatasetManager<T> {
             Ok(())
         } else {
             Err(DatabaseError::SensorNotFound(format!(
-                "Dataset not found: {}",
-                dataset_id
+                "Dataset not found: {dataset_id}"
             )))
         }
     }
@@ -399,8 +398,7 @@ impl<T: DatabaseInterface> SensorSelector for DatabaseDatasetManager<T> {
             Ok(dataset.sensors)
         } else {
             Err(DatabaseError::SensorNotFound(format!(
-                "Dataset not found: {}",
-                dataset_id
+                "Dataset not found: {dataset_id}"
             )))
         }
     }
@@ -537,7 +535,7 @@ impl<T: DatabaseInterface> SensorSelector for DatabaseDatasetManager<T> {
             if available_ids.contains(sensor_id) {
                 compatible_sensors.push(sensor_id.clone());
             } else {
-                warnings.push(format!("Sensor not found in dataset: {}", sensor_id));
+                warnings.push(format!("Sensor not found in dataset: {sensor_id}"));
             }
         }
 

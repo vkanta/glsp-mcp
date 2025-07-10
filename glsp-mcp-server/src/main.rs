@@ -61,25 +61,24 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let backend = GlspBackend::initialize(config.clone()).await?;
 
     // Configure server with framework based on our config
-    let mut server_config = ServerConfig::default();
-
     // Use memory-only authentication (no persistent storage)
-    server_config.auth_config = AuthConfig::memory();
-
-    // Set transport configuration based on our config
     use pulseengine_mcp_transport::TransportConfig;
-    server_config.transport_config = match config.transport.as_str() {
-        "http" => TransportConfig::http(config.port),
-        "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
-        "websocket" => TransportConfig::websocket(config.port),
-        "stdio" => TransportConfig::stdio(),
-        _ => {
-            warn!(
-                "Unknown transport type: {}, defaulting to HTTP streaming",
-                config.transport
-            );
-            TransportConfig::streamable_http(config.port)
-        }
+    let server_config = ServerConfig {
+        auth_config: AuthConfig::memory(),
+        transport_config: match config.transport.as_str() {
+            "http" => TransportConfig::http(config.port),
+            "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
+            "websocket" => TransportConfig::websocket(config.port),
+            "stdio" => TransportConfig::stdio(),
+            _ => {
+                warn!(
+                    "Unknown transport type: {}, defaulting to HTTP streaming",
+                    config.transport
+                );
+                TransportConfig::streamable_http(config.port)
+            }
+        },
+        ..Default::default()
     };
 
     // Create and run server using framework

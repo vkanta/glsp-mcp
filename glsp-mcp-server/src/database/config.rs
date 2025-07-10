@@ -239,57 +239,86 @@ impl Default for FeatureConfig {
 impl DatabaseConfig {
     /// Create a PostgreSQL configuration
     pub fn postgresql(host: &str, port: u16, database: &str) -> Self {
-        let mut config = Self::default();
-        config.backend = DatabaseBackend::PostgreSQL;
-        config.connection.host = host.to_string();
-        config.connection.port = port;
-        config.connection.database = database.to_string();
-        config
+        Self {
+            backend: DatabaseBackend::PostgreSQL,
+            connection: ConnectionConfig {
+                host: host.to_string(),
+                port,
+                database: database.to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     /// Create an InfluxDB configuration
     pub fn influxdb(host: &str, port: u16, database: &str) -> Self {
-        let mut config = Self::default();
-        config.backend = DatabaseBackend::InfluxDB;
-        config.connection.host = host.to_string();
-        config.connection.port = port;
-        config.connection.database = database.to_string();
-        config.features.enable_time_series = true;
-        config.features.enable_streaming = true;
-        config
+        Self {
+            backend: DatabaseBackend::InfluxDB,
+            connection: ConnectionConfig {
+                host: host.to_string(),
+                port,
+                database: database.to_string(),
+                ..Default::default()
+            },
+            features: FeatureConfig {
+                enable_time_series: true,
+                enable_streaming: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     /// Create a Redis configuration
     pub fn redis(host: &str, port: u16) -> Self {
-        let mut config = Self::default();
-        config.backend = DatabaseBackend::Redis;
-        config.connection.host = host.to_string();
-        config.connection.port = port;
-        config.connection.database = "0".to_string(); // Redis database number
-        config.features.enable_streaming = true;
-        config.features.enable_transactions = false;
-        config
+        Self {
+            backend: DatabaseBackend::Redis,
+            connection: ConnectionConfig {
+                host: host.to_string(),
+                port,
+                database: "0".to_string(), // Redis database number
+                ..Default::default()
+            },
+            features: FeatureConfig {
+                enable_streaming: true,
+                enable_transactions: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     /// Create a SQLite configuration
     pub fn sqlite(path: &str) -> Self {
-        let mut config = Self::default();
-        config.backend = DatabaseBackend::SQLite;
-        config.connection.host = "localhost".to_string();
-        config.connection.port = 0;
-        config.connection.database = path.to_string();
-        config.pool.max_connections = 1; // SQLite is single-threaded
-        config
+        Self {
+            backend: DatabaseBackend::SQLite,
+            connection: ConnectionConfig {
+                host: "localhost".to_string(),
+                port: 0,
+                database: path.to_string(),
+                ..Default::default()
+            },
+            pool: PoolConfig {
+                max_connections: 1, // SQLite is single-threaded
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     /// Create a mock configuration for testing
     pub fn mock() -> Self {
-        let mut config = Self::default();
-        config.backend = DatabaseBackend::Mock;
-        config.connection.host = "mock".to_string();
-        config.connection.port = 0;
-        config.connection.database = "mock".to_string();
-        config
+        Self {
+            backend: DatabaseBackend::Mock,
+            connection: ConnectionConfig {
+                host: "mock".to_string(),
+                port: 0,
+                database: "mock".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     /// Build connection string for the configured backend
@@ -303,11 +332,11 @@ impl DatabaseConfig {
                 ];
 
                 if let Some(username) = &self.connection.username {
-                    parts.push(format!("user={}", username));
+                    parts.push(format!("user={username}"));
                 }
 
                 if let Some(password) = &self.connection.password {
-                    parts.push(format!("password={}", password));
+                    parts.push(format!("password={password}"));
                 }
 
                 if self.connection.ssl.enabled {
@@ -413,8 +442,7 @@ impl DatabaseConfig {
                 "mock" => DatabaseBackend::Mock,
                 _ => {
                     return Err(DatabaseError::ConfigurationError(format!(
-                        "Unknown database backend: {}",
-                        backend
+                        "Unknown database backend: {backend}"
                     )))
                 }
             };

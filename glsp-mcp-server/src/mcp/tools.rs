@@ -1932,8 +1932,7 @@ impl DiagramTools {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
                     text: format!(
-                        "Started execution of {}::{} with ID: {}",
-                        component_name, method, execution_id
+                        "Started execution of {component_name}::{method} with ID: {execution_id}"
                     ),
                 }],
                 is_error: None,
@@ -1941,7 +1940,7 @@ impl DiagramTools {
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to execute component: {}", e),
+                    text: format!("Failed to execute component: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -1967,7 +1966,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Execution {} not found", execution_id),
+                    text: format!("Execution {execution_id} not found"),
                 }],
                 is_error: Some(true),
             })
@@ -1993,7 +1992,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Execution {} not found or not completed", execution_id),
+                    text: format!("Execution {execution_id} not found or not completed"),
                 }],
                 is_error: Some(true),
             })
@@ -2035,7 +2034,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Cancelled execution {}", execution_id),
+                    text: format!("Cancelled execution {execution_id}"),
                 }],
                 is_error: None,
             })
@@ -2044,8 +2043,7 @@ impl DiagramTools {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
                     text: format!(
-                        "Execution {} not found or could not be cancelled",
-                        execution_id
+                        "Execution {execution_id} not found or could not be cancelled"
                     ),
                 }],
                 is_error: Some(true),
@@ -2123,7 +2121,7 @@ impl DiagramTools {
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to query sensor data: {}", e),
+                    text: format!("Failed to query sensor data: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2160,7 +2158,7 @@ impl DiagramTools {
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to list sensors: {}", e),
+                    text: format!("Failed to list sensors: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2198,14 +2196,14 @@ impl DiagramTools {
             Ok(None) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("No metadata found for sensor: {}", sensor_id),
+                    text: format!("No metadata found for sensor: {sensor_id}"),
                 }],
                 is_error: Some(true),
             }),
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to get sensor metadata: {}", e),
+                    text: format!("Failed to get sensor metadata: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2243,14 +2241,14 @@ impl DiagramTools {
             Ok(None) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("No statistics found for sensor: {}", sensor_id),
+                    text: format!("No statistics found for sensor: {sensor_id}"),
                 }],
                 is_error: Some(true),
             }),
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to get sensor statistics: {}", e),
+                    text: format!("Failed to get sensor statistics: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2303,7 +2301,7 @@ impl DiagramTools {
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to get time range: {}", e),
+                    text: format!("Failed to get time range: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2375,7 +2373,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Dataset '{}' not found", dataset_id),
+                    text: format!("Dataset '{dataset_id}' not found"),
                 }],
                 is_error: Some(true),
             })
@@ -2398,14 +2396,14 @@ impl DiagramTools {
             Ok(()) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Successfully activated dataset: {}", dataset_id),
+                    text: format!("Successfully activated dataset: {dataset_id}"),
                 }],
                 is_error: None,
             }),
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to activate dataset: {}", e),
+                    text: format!("Failed to activate dataset: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2495,7 +2493,7 @@ impl DiagramTools {
             Err(e) => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Failed to detect sensor gaps: {}", e),
+                    text: format!("Failed to detect sensor gaps: {e}"),
                 }],
                 is_error: Some(true),
             }),
@@ -2534,7 +2532,7 @@ impl DiagramTools {
 
         // Save component to file system
         let wasm_path = self.wasm_watcher.get_watch_path();
-        let component_filename = format!("{}.wasm", component_name);
+        let component_filename = format!("{component_name}.wasm");
         let component_path = wasm_path.join(&component_filename);
 
         // Check if component already exists
@@ -2543,8 +2541,7 @@ impl DiagramTools {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
                     text: format!(
-                        "Component '{}' already exists. Delete it first to re-upload.",
-                        component_name
+                        "Component '{component_name}' already exists. Delete it first to re-upload."
                     ),
                 }],
                 is_error: Some(true),
@@ -2566,7 +2563,7 @@ impl DiagramTools {
             "checksum": format!("{:x}", sha2::Sha256::digest(&wasm_bytes)),
         });
 
-        let metadata_path = wasm_path.join(format!("{}.json", component_name));
+        let metadata_path = wasm_path.join(format!("{component_name}.json"));
         fs::write(&metadata_path, serde_json::to_string_pretty(&metadata)?)
             .map_err(|e| anyhow::anyhow!("Failed to write metadata: {}", e))?;
 
@@ -2677,7 +2674,7 @@ impl DiagramTools {
                 validation_result["errors"]
                     .as_array_mut()
                     .unwrap()
-                    .push(json!(format!("Invalid WebAssembly format: {}", e)));
+                    .push(json!(format!("Invalid WebAssembly format: {e}")));
             }
         }
 
@@ -2708,7 +2705,7 @@ impl DiagramTools {
 
         // Read all .json metadata files
         use std::fs;
-        if let Ok(entries) = fs::read_dir(&wasm_path) {
+        if let Ok(entries) = fs::read_dir(wasm_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -2752,15 +2749,15 @@ impl DiagramTools {
             .ok_or_else(|| anyhow::anyhow!("Missing componentName"))?;
 
         let wasm_path = self.wasm_watcher.get_watch_path();
-        let component_path = wasm_path.join(format!("{}.wasm", component_name));
-        let metadata_path = wasm_path.join(format!("{}.json", component_name));
+        let component_path = wasm_path.join(format!("{component_name}.wasm"));
+        let metadata_path = wasm_path.join(format!("{component_name}.json"));
 
         // Check if component exists
         if !component_path.exists() && !metadata_path.exists() {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("Component '{}' not found", component_name),
+                    text: format!("Component '{component_name}' not found"),
                 }],
                 is_error: Some(true),
             });

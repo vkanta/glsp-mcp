@@ -59,7 +59,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create sensor_readings table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create sensor_readings table: {e}"))
         })?;
 
         // Create TimescaleDB hypertable with 1-day chunks for optimal performance
@@ -117,7 +117,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create sensor-time index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create sensor-time index: {e}"))
         })?;
 
         sqlx::query(
@@ -127,7 +127,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create timestamp index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create timestamp index: {e}"))
         })?;
 
         sqlx::query(
@@ -137,7 +137,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create quality index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create quality index: {e}"))
         })?;
 
         sqlx::query(
@@ -147,7 +147,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create data_type index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create data_type index: {e}"))
         })?;
 
         // Create sensor_metadata table with enhanced time-series tracking
@@ -175,7 +175,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create sensor_metadata table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create sensor_metadata table: {e}"))
         })?;
 
         // Create sensor statistics materialized view for performance
@@ -199,7 +199,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create sensor_statistics view: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create sensor_statistics view: {e}"))
         })?;
 
         // Create index on materialized view
@@ -210,7 +210,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create statistics index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create statistics index: {e}"))
         })?;
 
         // Create time-series aggregation tables for different time buckets
@@ -232,7 +232,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create hourly aggregation table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create hourly aggregation table: {e}"))
         })?;
 
         sqlx::query(
@@ -254,7 +254,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create daily aggregation table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create daily aggregation table: {e}"))
         })?;
 
         // Create configuration table
@@ -271,7 +271,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create config_store table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create config_store table: {e}"))
         })?;
 
         // Create dataset management tables
@@ -296,7 +296,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create datasets table: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create datasets table: {e}"))
         })?;
 
         // Create index on dataset time range for efficient queries
@@ -307,7 +307,7 @@ impl PostgreSQLBackend {
         .execute(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create dataset time index: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to create dataset time index: {e}"))
         })?;
 
         // Create continuous aggregates if TimescaleDB is available
@@ -388,12 +388,12 @@ impl DatabaseProvider for PostgreSQLBackend {
         );
 
         let pool = PgPool::connect(&connection_string).await.map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("PostgreSQL connection failed: {}", e))
+            DatabaseError::ConnectionFailed(format!("PostgreSQL connection failed: {e}"))
         })?;
 
         // Test the connection
         sqlx::query("SELECT 1").execute(&pool).await.map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("Connection test failed: {}", e))
+            DatabaseError::ConnectionFailed(format!("Connection test failed: {e}"))
         })?;
 
         self.pool = Some(pool);
@@ -496,7 +496,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .bind(&reading.checksum)
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {e}")))?;
 
         Ok(())
     }
@@ -512,7 +512,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         }
 
         let mut tx = pool.begin().await.map_err(|e| {
-            DatabaseError::TransactionFailed(format!("Failed to start transaction: {}", e))
+            DatabaseError::TransactionFailed(format!("Failed to start transaction: {e}"))
         })?;
 
         // Use individual inserts for better compatibility (can be optimized later)
@@ -545,7 +545,7 @@ impl SensorDataRepository for PostgreSQLBackend {
             .bind(&reading.checksum)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {e}")))?;
         }
 
         // Update sensor metadata with batch statistics
@@ -591,11 +591,11 @@ impl SensorDataRepository for PostgreSQLBackend {
             .bind(avg_quality)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to update metadata: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to update metadata: {e}")))?;
         }
 
         tx.commit().await.map_err(|e| {
-            DatabaseError::TransactionFailed(format!("Failed to commit transaction: {}", e))
+            DatabaseError::TransactionFailed(format!("Failed to commit transaction: {e}"))
         })?;
 
         Ok(())
@@ -619,20 +619,20 @@ impl SensorDataRepository for PostgreSQLBackend {
 
         // Sensor ID filter with optimized IN clause
         if !query.sensor_ids.is_empty() {
-            sql.push_str(&format!(" AND sensor_id = ANY(${})", bind_index));
+            sql.push_str(&format!(" AND sensor_id = ANY(${bind_index})"));
             bind_index += 1;
         }
 
         // Quality filter
         if query.min_quality.is_some() {
-            sql.push_str(&format!(" AND quality >= ${}", bind_index));
+            sql.push_str(&format!(" AND quality >= ${bind_index}"));
             bind_index += 1;
         }
 
         // Data type filter for efficient JSONB queries
         if let Some(ref data_types) = query.data_types {
             if !data_types.is_empty() {
-                sql.push_str(&format!(" AND data_type ?| ${}", bind_index));
+                sql.push_str(&format!(" AND data_type ?| ${bind_index}"));
                 bind_index += 1;
             }
         }
@@ -645,11 +645,10 @@ impl SensorDataRepository for PostgreSQLBackend {
                     r#"
                     SELECT DISTINCT ON (sensor_id, time_bucket) 
                            sensor_id, timestamp_us, data_type, payload, quality, metadata, checksum,
-                           time_bucket(INTERVAL '{} microseconds', to_timestamp(timestamp_us / 1000000)) as time_bucket
+                           time_bucket(INTERVAL '{downsample_interval_us} microseconds', to_timestamp(timestamp_us / 1000000)) as time_bucket
                     FROM sensor_readings 
                     WHERE timestamp_us >= $1 AND timestamp_us <= $2
-                    "#,
-                    downsample_interval_us
+                    "#
                 );
             }
         }
@@ -665,7 +664,7 @@ impl SensorDataRepository for PostgreSQLBackend {
 
         // Apply limit efficiently
         if let Some(_limit) = query.limit {
-            sql.push_str(&format!(" LIMIT ${}", bind_index));
+            sql.push_str(&format!(" LIMIT ${bind_index}"));
         }
 
         // Build query with parameters
@@ -684,7 +683,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         if let Some(ref data_types) = query.data_types {
             if !data_types.is_empty() {
                 let type_strings: Vec<String> =
-                    data_types.iter().map(|dt| format!("{:?}", dt)).collect();
+                    data_types.iter().map(|dt| format!("{dt:?}")).collect();
                 query_builder = query_builder.bind(type_strings);
             }
         }
@@ -697,7 +696,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         let rows = query_builder
             .fetch_all(pool)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
         let query_duration = start_time.elapsed();
         debug!(
@@ -751,7 +750,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .bind(timestamp_us)
         .fetch_optional(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to find reading: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to find reading: {e}")))?;
 
         if let Some(row) = row {
             let data_type: serde_json::Value = row.get("data_type");
@@ -792,7 +791,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .bind(sensor_id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get time range: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get time range: {e}")))?;
 
         if let Some(row) = row {
             let start_time: Option<i64> = row.get("start_time");
@@ -831,7 +830,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .fetch_optional(pool)
         .await
         .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to get global time range: {}", e))
+            DatabaseError::QueryFailed(format!("Failed to get global time range: {e}"))
         })?;
 
         if let Some(row) = row {
@@ -861,7 +860,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         let rows = sqlx::query("SELECT DISTINCT sensor_id FROM sensor_readings ORDER BY sensor_id")
             .fetch_all(pool)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list sensors: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list sensors: {e}")))?;
 
         Ok(rows.into_iter().map(|row| row.get("sensor_id")).collect())
     }
@@ -888,7 +887,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .bind(sensor_id)
         .fetch_one(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get statistics: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get statistics: {e}")))?;
 
         let avg_quality: Option<f64> = row.get("avg_quality");
         let reading_count: i64 = row.get("reading_count");
@@ -931,7 +930,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         .bind(end_time_us)
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete readings: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete readings: {e}")))?;
 
         Ok(result.rows_affected())
     }
@@ -973,7 +972,7 @@ impl TimeSeriesStore for PostgreSQLBackend {
         .bind(interval_us)
         .fetch_all(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Downsample query failed: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Downsample query failed: {e}")))?;
 
         let mut readings = Vec::new();
         for row in rows {
@@ -1077,7 +1076,7 @@ impl MetadataStore for PostgreSQLBackend {
         .bind(metadata.is_active)
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store metadata: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store metadata: {e}")))?;
 
         Ok(())
     }
@@ -1098,7 +1097,7 @@ impl MetadataStore for PostgreSQLBackend {
         .bind(sensor_id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get metadata: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get metadata: {e}")))?;
 
         if let Some(row) = row {
             let sensor_type: serde_json::Value = row.get("sensor_type");
@@ -1136,7 +1135,7 @@ impl MetadataStore for PostgreSQLBackend {
         )
         .fetch_all(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list metadata: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list metadata: {e}")))?;
 
         let mut metadata_list = Vec::new();
         for row in rows {
@@ -1173,7 +1172,7 @@ impl MetadataStore for PostgreSQLBackend {
             .bind(sensor_id)
             .execute(pool)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete metadata: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete metadata: {e}")))?;
 
         Ok(())
     }
@@ -1196,7 +1195,7 @@ impl MetadataStore for PostgreSQLBackend {
         .bind(value)
         .execute(pool)
         .await
-        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store config: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store config: {e}")))?;
 
         Ok(())
     }
@@ -1210,7 +1209,7 @@ impl MetadataStore for PostgreSQLBackend {
             .bind(key)
             .fetch_optional(pool)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get config: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get config: {e}")))?;
 
         Ok(row.map(|r| r.get("value")))
     }
@@ -1224,7 +1223,7 @@ impl MetadataStore for PostgreSQLBackend {
             .fetch_all(pool)
             .await
             .map_err(|e| {
-                DatabaseError::QueryFailed(format!("Failed to list config keys: {}", e))
+                DatabaseError::QueryFailed(format!("Failed to list config keys: {e}"))
             })?;
 
         Ok(rows.into_iter().map(|row| row.get("key")).collect())
@@ -1260,14 +1259,14 @@ impl DatabaseInterface for PostgreSQLBackend {
             .execute(pool)
             .await
             .map_err(|e| {
-                DatabaseError::QueryFailed(format!("Failed to analyze sensor_readings: {}", e))
+                DatabaseError::QueryFailed(format!("Failed to analyze sensor_readings: {e}"))
             })?;
 
         sqlx::query("ANALYZE sensor_metadata")
             .execute(pool)
             .await
             .map_err(|e| {
-                DatabaseError::QueryFailed(format!("Failed to analyze sensor_metadata: {}", e))
+                DatabaseError::QueryFailed(format!("Failed to analyze sensor_metadata: {e}"))
             })?;
 
         info!("Database optimization completed");

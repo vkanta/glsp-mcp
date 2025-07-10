@@ -290,7 +290,7 @@ impl SensorReading {
             self.timestamp_us / 1_000_000,
             ((self.timestamp_us % 1_000_000) * 1000) as u32,
         )
-        .unwrap_or_else(|| Utc::now())
+        .unwrap_or_else(Utc::now)
     }
 }
 

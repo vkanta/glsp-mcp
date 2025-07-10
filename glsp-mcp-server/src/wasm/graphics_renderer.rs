@@ -190,9 +190,9 @@ impl WasmGraphicsRenderer {
                     WASM Component Output\
                 </text>\
                 <text x=\"200\" y=\"170\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"12\" fill=\"#666\">\
-                    Component: {}\
+                    Component: {component_id}\
                 </text>\
-            </svg>", component_id),
+            </svg>"),
         })
     }
 

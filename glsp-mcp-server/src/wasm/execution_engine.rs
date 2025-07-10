@@ -297,7 +297,7 @@ impl WasmExecutionEngine {
         let module = match Self::load_component(&engine, &component_cache, &component_path).await {
             Ok(module) => module,
             Err(e) => {
-                let error_msg = format!("Failed to load component: {}", e);
+                let error_msg = format!("Failed to load component: {e}");
                 update_progress(
                     ExecutionStage::Error,
                     0.0,
@@ -367,7 +367,7 @@ impl WasmExecutionEngine {
                 }
             }
             Ok(Err(e)) => {
-                let error_msg = format!("Execution failed: {}", e);
+                let error_msg = format!("Execution failed: {e}");
                 update_progress(
                     ExecutionStage::Error,
                     0.0,
@@ -430,10 +430,10 @@ impl WasmExecutionEngine {
         // Read and compile component
         let wasm_bytes = tokio::fs::read(component_path)
             .await
-            .with_context(|| format!("Failed to read WASM file: {:?}", component_path))?;
+            .with_context(|| format!("Failed to read WASM file: {component_path:?}"))?;
 
         let module = Module::new(engine, &wasm_bytes)
-            .with_context(|| format!("Failed to compile WASM module: {:?}", component_path))?;
+            .with_context(|| format!("Failed to compile WASM module: {component_path:?}"))?;
 
         // Cache the module
         {
@@ -548,24 +548,28 @@ impl WasmExecutionEngine {
         &self,
         execution_id: &str,
     ) -> Option<crate::wasm::sensor_bridge::BridgeStatus> {
-        let executions = self.executions.lock().unwrap();
-        if let Some(exec_info) = executions.get(execution_id) {
-            if let Some(ref bridge) = exec_info.sensor_bridge {
-                return Some(bridge.get_status().await);
-            }
+        let bridge = {
+            let executions = self.executions.lock().unwrap();
+            executions.get(execution_id)?.sensor_bridge.clone()
+        };
+        if let Some(bridge) = bridge {
+            Some(bridge.get_status().await)
+        } else {
+            None
         }
-        None
     }
 
     /// Advance sensor bridge frame for an execution
     pub async fn advance_sensor_frame(&self, execution_id: &str) -> Result<bool> {
-        let executions = self.executions.lock().unwrap();
-        if let Some(exec_info) = executions.get(execution_id) {
-            if let Some(ref bridge) = exec_info.sensor_bridge {
-                return bridge.advance_frame().await;
-            }
+        let bridge = {
+            let executions = self.executions.lock().unwrap();
+            executions.get(execution_id).and_then(|exec_info| exec_info.sensor_bridge.clone())
+        };
+        if let Some(bridge) = bridge {
+            bridge.advance_frame().await
+        } else {
+            Err(anyhow!("Execution not found or no sensor bridge available"))
         }
-        Err(anyhow!("Execution not found or no sensor bridge available"))
     }
 
     /// Get current sensor frame for an execution
@@ -573,13 +577,15 @@ impl WasmExecutionEngine {
         &self,
         execution_id: &str,
     ) -> Result<Option<crate::wasm::sensor_bridge::SensorFrame>> {
-        let executions = self.executions.lock().unwrap();
-        if let Some(exec_info) = executions.get(execution_id) {
-            if let Some(ref bridge) = exec_info.sensor_bridge {
-                return bridge.get_current_frame().await;
-            }
+        let bridge = {
+            let executions = self.executions.lock().unwrap();
+            executions.get(execution_id).and_then(|exec_info| exec_info.sensor_bridge.clone())
+        };
+        if let Some(bridge) = bridge {
+            bridge.get_current_frame().await
+        } else {
+            Err(anyhow!("Execution not found or no sensor bridge available"))
         }
-        Err(anyhow!("Execution not found or no sensor bridge available"))
     }
 
     /// List all executions (active and recent)

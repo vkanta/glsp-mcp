@@ -58,8 +58,7 @@ impl InfluxDBBackend {
         let result = client.query(read_query).await;
         if let Err(e) = result {
             return Err(DatabaseError::QueryFailed(format!(
-                "Failed to create database: {}",
-                e
+                "Failed to create database: {e}"
             )));
         }
 
@@ -159,8 +158,7 @@ impl DatabaseProvider for InfluxDBBackend {
                 Ok(())
             }
             Err(e) => Err(DatabaseError::ConnectionFailed(format!(
-                "InfluxDB connection failed: {}",
-                e
+                "InfluxDB connection failed: {e}"
             ))),
         }
     }
@@ -236,7 +234,7 @@ impl SensorDataRepository for InfluxDBBackend {
         client
             .query(query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store reading: {e}")))?;
 
         Ok(())
     }
@@ -259,7 +257,7 @@ impl SensorDataRepository for InfluxDBBackend {
         // Execute all queries (InfluxDB client handles batching)
         for query in write_queries {
             client.query(query).await.map_err(|e| {
-                DatabaseError::QueryFailed(format!("Failed to store batch reading: {}", e))
+                DatabaseError::QueryFailed(format!("Failed to store batch reading: {e}"))
             })?;
         }
 
@@ -282,15 +280,15 @@ impl SensorDataRepository for InfluxDBBackend {
             let sensor_list = query
                 .sensor_ids
                 .iter()
-                .map(|s| format!("'{}'", s))
+                .map(|s| format!("'{s}'"))
                 .collect::<Vec<_>>()
                 .join(",");
-            influx_query.push_str(&format!(" AND sensor_id IN ({})", sensor_list));
+            influx_query.push_str(&format!(" AND sensor_id IN ({sensor_list})"));
         }
 
         // Add quality filter
         if let Some(min_quality) = query.min_quality {
-            influx_query.push_str(&format!(" AND quality >= {}", min_quality));
+            influx_query.push_str(&format!(" AND quality >= {min_quality}"));
         }
 
         // Add data type filter
@@ -298,10 +296,10 @@ impl SensorDataRepository for InfluxDBBackend {
             if !data_types.is_empty() {
                 let type_list = data_types
                     .iter()
-                    .map(|dt| format!("'{:?}'", dt))
+                    .map(|dt| format!("'{dt:?}'"))
                     .collect::<Vec<_>>()
                     .join(",");
-                influx_query.push_str(&format!(" AND data_type IN ({})", type_list));
+                influx_query.push_str(&format!(" AND data_type IN ({type_list})"));
             }
         }
 
@@ -310,7 +308,7 @@ impl SensorDataRepository for InfluxDBBackend {
 
         // Add limit
         if let Some(limit) = query.limit {
-            influx_query.push_str(&format!(" LIMIT {}", limit));
+            influx_query.push_str(&format!(" LIMIT {limit}"));
         }
 
         debug!("Executing InfluxQL query: {}", influx_query);
@@ -319,7 +317,7 @@ impl SensorDataRepository for InfluxDBBackend {
         let _result = client
             .query(read_query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
         // Note: The influxdb crate returns results as String, which would need custom parsing
         // For now, return empty results - a full implementation would parse the JSON response
@@ -354,13 +352,11 @@ impl SensorDataRepository for InfluxDBBackend {
 
         // Get first and last timestamps
         let first_query = format!(
-            "SELECT * FROM {} WHERE sensor_id = '{}' ORDER BY time ASC LIMIT 1",
-            SENSOR_READINGS_MEASUREMENT, sensor_id
+            "SELECT * FROM {SENSOR_READINGS_MEASUREMENT} WHERE sensor_id = '{sensor_id}' ORDER BY time ASC LIMIT 1"
         );
 
         let last_query = format!(
-            "SELECT * FROM {} WHERE sensor_id = '{}' ORDER BY time DESC LIMIT 1",
-            SENSOR_READINGS_MEASUREMENT, sensor_id
+            "SELECT * FROM {SENSOR_READINGS_MEASUREMENT} WHERE sensor_id = '{sensor_id}' ORDER BY time DESC LIMIT 1"
         );
 
         let _first = client.query(ReadQuery::new(first_query)).await.ok();
@@ -382,15 +378,14 @@ impl SensorDataRepository for InfluxDBBackend {
         })?;
 
         let query = format!(
-            "SHOW TAG VALUES FROM {} WITH KEY = \"sensor_id\"",
-            SENSOR_READINGS_MEASUREMENT
+            "SHOW TAG VALUES FROM {SENSOR_READINGS_MEASUREMENT} WITH KEY = \"sensor_id\""
         );
         let read_query = ReadQuery::new(query);
 
         let _result = client
             .query(read_query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list sensors: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list sensors: {e}")))?;
 
         // Note: Would need to parse results
         warn!("InfluxDB sensor list query not fully implemented");
@@ -427,15 +422,14 @@ impl SensorDataRepository for InfluxDBBackend {
         })?;
 
         let delete_query = format!(
-            "DELETE FROM {} WHERE sensor_id = '{}' AND time >= {}us AND time <= {}us",
-            SENSOR_READINGS_MEASUREMENT, sensor_id, start_time_us, end_time_us
+            "DELETE FROM {SENSOR_READINGS_MEASUREMENT} WHERE sensor_id = '{sensor_id}' AND time >= {start_time_us}us AND time <= {end_time_us}us"
         );
 
         let read_query = ReadQuery::new(delete_query);
         client
             .query(read_query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete readings: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete readings: {e}")))?;
 
         // InfluxDB doesn't return affected rows for DELETE
         Ok(0)
@@ -536,7 +530,7 @@ impl MetadataStore for InfluxDBBackend {
         client
             .query(query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store metadata: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store metadata: {e}")))?;
 
         Ok(())
     }
@@ -584,15 +578,14 @@ impl MetadataStore for InfluxDBBackend {
         })?;
 
         let delete_query = format!(
-            "DELETE FROM {} WHERE sensor_id = '{}'",
-            SENSOR_METADATA_MEASUREMENT, sensor_id
+            "DELETE FROM {SENSOR_METADATA_MEASUREMENT} WHERE sensor_id = '{sensor_id}'"
         );
 
         let read_query = ReadQuery::new(delete_query);
         client
             .query(read_query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete metadata: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete metadata: {e}")))?;
 
         Ok(())
     }
@@ -615,7 +608,7 @@ impl MetadataStore for InfluxDBBackend {
         client
             .query(query)
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store config: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to store config: {e}")))?;
 
         Ok(())
     }

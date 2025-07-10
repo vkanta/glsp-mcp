@@ -955,12 +955,10 @@ impl WitAnalyzer {
                         },
                         severity: WitValidationSeverity::Info,
                         message: format!(
-                            "ADAS component might benefit from '{}' interface",
-                            expected_dep
+                            "ADAS component might benefit from '{expected_dep}' interface"
                         ),
                         suggestion: Some(format!(
-                            "Consider adding {} dependency if needed",
-                            expected_dep
+                            "Consider adding {expected_dep} dependency if needed"
                         )),
                         location: Some("Dependency analysis".to_string()),
                     });

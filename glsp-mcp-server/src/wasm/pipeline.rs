@@ -498,7 +498,7 @@ impl WasmPipelineEngine {
                 graph
                     .parallel_groups
                     .entry(group_name.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(stage.stage_id.clone());
             }
         }

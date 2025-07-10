@@ -60,20 +60,24 @@ mod tests {
 
     #[test]
     fn test_glsp_config_database_conversion() {
-        let mut config = GlspConfig::default();
-
         // Test disabled database
-        config.enable_database = false;
+        let config = GlspConfig {
+            enable_database: false,
+            ..Default::default()
+        };
         let db_config = config.to_database_config().unwrap();
         assert!(matches!(db_config.backend, config::DatabaseBackend::Mock));
 
         // Test PostgreSQL backend
-        config.enable_database = true;
-        config.database_backend = "postgresql".to_string();
-        config.database_host = "localhost".to_string();
-        config.database_port = 5432;
-        config.database_name = "test_db".to_string();
-        config.database_user = Some("test_user".to_string());
+        let config = GlspConfig {
+            enable_database: true,
+            database_backend: "postgresql".to_string(),
+            database_host: "localhost".to_string(),
+            database_port: 5432,
+            database_name: "test_db".to_string(),
+            database_user: Some("test_user".to_string()),
+            ..Default::default()
+        };
 
         let db_config = config.to_database_config().unwrap();
         assert!(matches!(
@@ -88,9 +92,11 @@ mod tests {
 
     #[test]
     fn test_glsp_config_invalid_backend() {
-        let mut config = GlspConfig::default();
-        config.enable_database = true;
-        config.database_backend = "invalid_backend".to_string();
+        let config = GlspConfig {
+            enable_database: true,
+            database_backend: "invalid_backend".to_string(),
+            ..Default::default()
+        };
 
         let result = config.to_database_config();
         assert!(result.is_err());
@@ -160,9 +166,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_environment_variable_password_loading() {
-        let mut config = GlspConfig::default();
-        config.enable_database = true;
-        config.database_backend = "mock".to_string();
+        let config = GlspConfig {
+            enable_database: true,
+            database_backend: "mock".to_string(),
+            ..Default::default()
+        };
 
         // Test with password in environment
         env::set_var("GLSP_DB_PASSWORD", "secret_password");
@@ -194,9 +202,11 @@ mod tests {
         ];
 
         for (backend_name, expected_backend) in backends {
-            let mut config = GlspConfig::default();
-            config.enable_database = true;
-            config.database_backend = backend_name.to_string();
+            let config = GlspConfig {
+                enable_database: true,
+                database_backend: backend_name.to_string(),
+                ..Default::default()
+            };
 
             let db_config = config.to_database_config().unwrap();
             assert_eq!(db_config.backend, expected_backend);

@@ -45,14 +45,14 @@ impl RedisBackend {
         ))?;
 
         client.get_connection().map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("Failed to get Redis connection: {}", e))
+            DatabaseError::ConnectionFailed(format!("Failed to get Redis connection: {e}"))
         })
     }
 
     /// Initialize the Redis backend
     pub async fn initialize(&mut self) -> DatabaseResult<()> {
         let client = redis::Client::open(self.url.as_str()).map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("Failed to create Redis client: {}", e))
+            DatabaseError::ConnectionFailed(format!("Failed to create Redis client: {e}"))
         })?;
 
         self.client = Some(client);
@@ -87,10 +87,7 @@ impl DatabaseProvider for RedisBackend {
     async fn health_check(&self) -> DatabaseResult<DatabaseHealth> {
         let start = std::time::Instant::now();
         let is_healthy = match self.get_connection().await {
-            Ok(mut conn) => match redis::cmd("PING").query::<String>(&mut conn) {
-                Ok(_) => true,
-                Err(_) => false,
-            },
+            Ok(mut conn) => redis::cmd("PING").query::<String>(&mut conn).is_ok(),
             Err(_) => false,
         };
         let latency_ms = start.elapsed().as_millis() as f32;
@@ -117,7 +114,7 @@ impl DatabaseProvider for RedisBackend {
             self.url
                 .replace("redis://", "")
                 .split('@')
-                .last()
+                .next_back()
                 .unwrap_or("unknown")
         )
     }
@@ -134,7 +131,7 @@ impl RedisBackend {
     ) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
 
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
         let session_data = serde_json::json!({
             "user_id": user_id,
             "created_at": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
@@ -144,7 +141,7 @@ impl RedisBackend {
 
         use redis::Commands;
         conn.set_ex::<_, _, ()>(&session_key, session_data.to_string(), ttl.as_secs())
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to create session: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to create session: {e}")))?;
 
         Ok(())
     }
@@ -155,15 +152,14 @@ impl RedisBackend {
     ) -> DatabaseResult<Option<HashMap<String, String>>> {
         let mut conn = self.get_connection().await?;
 
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
 
         use redis::Commands;
         match conn.get::<String, String>(session_key) {
             Ok(data) => {
                 let session_data: serde_json::Value = serde_json::from_str(&data).map_err(|e| {
                     DatabaseError::SerializationError(format!(
-                        "Failed to parse session data: {}",
-                        e
+                        "Failed to parse session data: {e}"
                     ))
                 })?;
 
@@ -184,11 +180,11 @@ impl RedisBackend {
     pub async fn delete_session(&mut self, session_id: &str) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
 
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
 
         use redis::Commands;
         conn.del::<_, ()>(&session_key)
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete session: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to delete session: {e}")))?;
 
         Ok(())
     }
@@ -196,11 +192,11 @@ impl RedisBackend {
     pub async fn extend_session(&mut self, session_id: &str, ttl: Duration) -> DatabaseResult<()> {
         let mut conn = self.get_connection().await?;
 
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
 
         use redis::Commands;
         conn.expire::<_, ()>(&session_key, ttl.as_secs() as i64)
-            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to extend session: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to extend session: {e}")))?;
 
         Ok(())
     }

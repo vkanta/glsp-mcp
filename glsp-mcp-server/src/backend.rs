@@ -466,7 +466,7 @@ impl GlspBackend {
             let db_config = self.config.to_database_config()?;
             match crate::database::DatabaseFactory::create(db_config).await {
                 Ok(backend) => Ok(BoxedDatasetManager::new(backend)),
-                Err(e) => Err(format!("Failed to create dataset manager: {}", e)),
+                Err(e) => Err(format!("Failed to create dataset manager: {e}")),
             }
         } else {
             Err("Database not enabled".to_string())
@@ -524,15 +524,13 @@ impl GlspBackend {
         let workspace = Path::new(&workspace_path);
         if !workspace.exists() {
             return Err(GlspError::ToolExecution(format!(
-                "Workspace directory does not exist: {}",
-                workspace_path
+                "Workspace directory does not exist: {workspace_path}"
             )));
         }
 
         if !workspace.is_dir() {
             return Err(GlspError::ToolExecution(format!(
-                "Path is not a directory: {}",
-                workspace_path
+                "Path is not a directory: {workspace_path}"
             )));
         }
 
@@ -545,10 +543,10 @@ impl GlspBackend {
 
         // Create directories if they don't exist
         std::fs::create_dir_all(&wasm_path).map_err(|e| {
-            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e))
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {e}"))
         })?;
         std::fs::create_dir_all(&diagrams_path).map_err(|e| {
-            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {e}"))
         })?;
 
         // Update paths
@@ -569,7 +567,7 @@ impl GlspBackend {
         let path = Path::new(&wasm_path);
         if !path.exists() {
             std::fs::create_dir_all(path).map_err(|e| {
-                GlspError::ToolExecution(format!("Failed to create WASM directory: {}", e))
+                GlspError::ToolExecution(format!("Failed to create WASM directory: {e}"))
             })?;
         }
 
@@ -580,7 +578,7 @@ impl GlspBackend {
                 .change_watch_path(path.to_path_buf())
                 .await
                 .map_err(|e| {
-                    GlspError::ToolExecution(format!("Failed to update filesystem watcher: {}", e))
+                    GlspError::ToolExecution(format!("Failed to update filesystem watcher: {e}"))
                 })?;
         }
 
@@ -591,7 +589,7 @@ impl GlspBackend {
                 .change_watch_path(path.to_path_buf())
                 .await
                 .map_err(|e| {
-                    GlspError::ToolExecution(format!("Failed to update WASM watcher: {}", e))
+                    GlspError::ToolExecution(format!("Failed to update WASM watcher: {e}"))
                 })?;
         }
 
@@ -609,7 +607,7 @@ impl GlspBackend {
         let path = Path::new(&diagrams_path);
         if !path.exists() {
             std::fs::create_dir_all(path).map_err(|e| {
-                GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+                GlspError::ToolExecution(format!("Failed to create diagrams directory: {e}"))
             })?;
         }
 
@@ -619,7 +617,7 @@ impl GlspBackend {
             .change_storage_path(path.to_path_buf())
             .await
             .map_err(|e| {
-                GlspError::ToolExecution(format!("Failed to update persistence manager: {}", e))
+                GlspError::ToolExecution(format!("Failed to update persistence manager: {e}"))
             })?;
 
         info!("Diagrams path set to: {}", diagrams_path);
@@ -664,7 +662,7 @@ impl GlspBackend {
         {
             let mut wasm_watcher = self.wasm_watcher.lock().await;
             wasm_watcher.scan_components().await.map_err(|e| {
-                GlspError::ToolExecution(format!("Failed to rescan WASM components: {}", e))
+                GlspError::ToolExecution(format!("Failed to rescan WASM components: {e}"))
             })?;
         }
 
@@ -1351,10 +1349,10 @@ impl GlspBackend {
                     Some(json!({
                         "name": component_name,
                         "path": path.to_string_lossy(),
-                        "description": format!("WASM component: {}", component_name),
+                        "description": format!("WASM component: {component_name}"),
                         "status": "available",
                         "interfaces": 2, // Default interface count
-                        "uri": format!("wasm://component/{}", component_name)
+                        "uri": format!("wasm://component/{component_name}")
                     }))
                 })
                 .collect();
@@ -2610,7 +2608,7 @@ impl GlspBackend {
         // Create workspace directory if requested and it doesn't exist
         if create_if_missing && !std::path::Path::new(workspace_path).exists() {
             std::fs::create_dir_all(workspace_path).map_err(|e| {
-                GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e))
+                GlspError::ToolExecution(format!("Failed to create workspace directory: {e}"))
             })?;
         }
 
@@ -2619,8 +2617,7 @@ impl GlspBackend {
 
         Ok(CallToolResult {
             content: vec![Content::text(format!(
-                "Successfully set workspace directory to: {}",
-                workspace_path
+                "Successfully set workspace directory to: {workspace_path}"
             ))],
             is_error: Some(false),
         })
@@ -2632,7 +2629,7 @@ impl GlspBackend {
         Ok(CallToolResult {
             content: vec![Content::text(
                 serde_json::to_string_pretty(&workspace_info).map_err(|e| {
-                    GlspError::ToolExecution(format!("Failed to serialize workspace info: {}", e))
+                    GlspError::ToolExecution(format!("Failed to serialize workspace info: {e}"))
                 })?,
             )],
             is_error: Some(false),
@@ -2655,8 +2652,7 @@ impl GlspBackend {
 
         Ok(CallToolResult {
             content: vec![Content::text(format!(
-                "Successfully set WASM components path to: {}",
-                wasm_path
+                "Successfully set WASM components path to: {wasm_path}"
             ))],
             is_error: Some(false),
         })
@@ -2678,8 +2674,7 @@ impl GlspBackend {
 
         Ok(CallToolResult {
             content: vec![Content::text(format!(
-                "Successfully set diagrams path to: {}",
-                diagrams_path
+                "Successfully set diagrams path to: {diagrams_path}"
             ))],
             is_error: Some(false),
         })
@@ -2714,8 +2709,7 @@ impl GlspBackend {
             content: vec![Content::text(
                 serde_json::to_string_pretty(&validation_result).map_err(|e| {
                     GlspError::ToolExecution(format!(
-                        "Failed to serialize validation result: {}",
-                        e
+                        "Failed to serialize validation result: {e}"
                     ))
                 })?,
             )],
@@ -2740,7 +2734,7 @@ impl GlspBackend {
 
         // Create workspace root
         std::fs::create_dir_all(workspace).map_err(|e| {
-            GlspError::ToolExecution(format!("Failed to create workspace directory: {}", e))
+            GlspError::ToolExecution(format!("Failed to create workspace directory: {e}"))
         })?;
 
         // Create subdirectories
@@ -2748,10 +2742,10 @@ impl GlspBackend {
         let diagrams_dir = workspace.join("diagrams");
 
         std::fs::create_dir_all(&wasm_dir).map_err(|e| {
-            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {}", e))
+            GlspError::ToolExecution(format!("Failed to create wasm-components directory: {e}"))
         })?;
         std::fs::create_dir_all(&diagrams_dir).map_err(|e| {
-            GlspError::ToolExecution(format!("Failed to create diagrams directory: {}", e))
+            GlspError::ToolExecution(format!("Failed to create diagrams directory: {e}"))
         })?;
 
         Ok(CallToolResult {
