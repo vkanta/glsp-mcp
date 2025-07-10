@@ -104,5 +104,13 @@ jspm_packages/
 # Sphinx documentation build output
 docs/build/
 
+# Bazel build outputs
+bazel-*
+
+# Development and test files
+debug-*.js
+test-*.js
+*-test.js
+
 # External repositories (should be git submodules or separate clones)
 # mcp-loxone/ # Temporarily included with HTTP transport fixes

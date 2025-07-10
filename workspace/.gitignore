@@ -3,6 +3,10 @@ build/
 docs/build/
 adas-wasm-components/docs/build/
 
+# Bazel build outputs
+bazel-*
+adas-wasm-components/bazel-*
+
 # Temporary files
 *.tmp
 *.temp
