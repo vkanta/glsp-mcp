@@ -1,6 +1,67 @@
 use glsp_mcp_server::{run_server, GlspConfig};
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{info, warn};
+use std::net::TcpListener;
+
+// Global state to track the allocated server port
+static SERVER_PORT: std::sync::OnceLock<Arc<RwLock<u16>>> = std::sync::OnceLock::new();
+
+/// Try to find an available port starting from the preferred port
+fn find_available_port(preferred_port: u16, fallback_ports: &[u16]) -> Result<u16, std::io::Error> {
+    // First try the preferred port
+    if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", preferred_port)) {
+        drop(listener);
+        return Ok(preferred_port);
+    }
+    
+    // Try fallback ports
+    for &port in fallback_ports {
+        if let Ok(listener) = TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            drop(listener);
+            return Ok(port);
+        }
+    }
+    
+    // If all specified ports fail, let the OS assign a random available port
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    drop(listener);
+    Ok(port)
+}
+
+/// Get the server port (reading from environment variable or using default)
+fn get_server_port() -> u16 {
+    // Check environment variable first
+    if let Ok(port_str) = std::env::var("GLSP_SERVER_PORT") {
+        if let Ok(port) = port_str.parse::<u16>() {
+            return port;
+        }
+    }
+    
+    // Try to find an available port
+    let preferred_port = 3000;
+    let fallback_ports = [3001, 3002, 3003, 8080, 8081, 8082, 9000, 9001];
+    
+    match find_available_port(preferred_port, &fallback_ports) {
+        Ok(port) => {
+            info!("Found available port: {}", port);
+            port
+        }
+        Err(e) => {
+            warn!("Failed to find available port: {}, using default 3000", e);
+            preferred_port
+        }
+    }
+}
+
+/// Get the currently allocated server port
+pub async fn get_allocated_server_port() -> u16 {
+    let port_lock = SERVER_PORT.get_or_init(|| Arc::new(RwLock::new(0)));
+    let port = port_lock.read().await;
+    *port
+}
 
 /// Start the embedded MCP server for the Tauri application
 pub async fn start_embedded_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -16,10 +77,17 @@ pub async fn start_embedded_server() -> Result<(), Box<dyn std::error::Error + S
 pub async fn start_embedded_server_with_workspace(workspace_path: Option<String>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting embedded MCP server for Tauri application");
 
+    // Allocate port dynamically
+    let port = get_server_port();
+    
+    // Store the allocated port for later use
+    let port_lock = SERVER_PORT.get_or_init(|| Arc::new(RwLock::new(0)));
+    *port_lock.write().await = port;
+
     let config = if let Some(workspace) = workspace_path {
         info!("Using workspace directory: {}", workspace);
         GlspConfig {
-            port: 3000,
+            port,
             transport: "http-streaming".to_string(),
             wasm_path: format!("{}/wasm-components", workspace),
             diagrams_path: format!("{}/diagrams", workspace),
@@ -36,7 +104,7 @@ pub async fn start_embedded_server_with_workspace(workspace_path: Option<String>
     } else {
         info!("Using default app data directory");
         GlspConfig {
-            port: 3000,
+            port,
             transport: "http-streaming".to_string(),
             wasm_path: get_app_dir("wasm-components"),
             diagrams_path: get_app_dir("diagrams"),

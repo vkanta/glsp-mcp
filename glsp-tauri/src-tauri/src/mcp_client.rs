@@ -47,7 +47,7 @@ pub struct McpContent {
 /// Simple MCP client for communicating with the embedded GLSP server
 #[derive(Debug)]
 pub struct McpClient {
-    base_url: String,
+    base_url: std::sync::Arc<std::sync::Mutex<String>>,
     client: reqwest::Client,
     next_id: std::sync::atomic::AtomicU64,
     session_id: std::sync::Mutex<Option<String>>,
@@ -56,11 +56,17 @@ pub struct McpClient {
 impl McpClient {
     pub fn new(server_port: u16) -> Self {
         Self {
-            base_url: format!("http://localhost:{}/messages", server_port),
+            base_url: std::sync::Arc::new(std::sync::Mutex::new(format!("http://localhost:{}/messages", server_port))),
             client: reqwest::Client::new(),
             next_id: std::sync::atomic::AtomicU64::new(1),
             session_id: std::sync::Mutex::new(None),
         }
+    }
+    
+    /// Update the server port if it changes
+    pub fn update_port(&self, new_port: u16) {
+        let mut url = self.base_url.lock().unwrap();
+        *url = format!("http://localhost:{}/messages", new_port);
     }
 
     fn next_request_id(&self) -> u64 {
@@ -83,8 +89,9 @@ impl McpClient {
             id: self.next_request_id(),
         };
 
+        let base_url = self.base_url.lock().unwrap().clone();
         let mut req_builder = self.client
-            .post(&self.base_url)
+            .post(&base_url)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .json(&request);
@@ -133,8 +140,9 @@ impl McpClient {
 
         debug!("Sending MCP request: {:?}", request);
 
+        let base_url = self.base_url.lock().unwrap().clone();
         let mut req_builder = self.client
-            .post(&self.base_url)
+            .post(&base_url)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .json(&request);
@@ -313,7 +321,14 @@ impl McpClient {
 
     /// Check if the MCP server is healthy
     pub async fn health_check(&self) -> Result<bool, String> {
-        let health_url = format!("http://localhost:{}/health", 3000); // Assuming port 3000
+        let base_url = self.base_url.lock().unwrap().clone();
+        // Extract port from base URL
+        let port = base_url.split(':').nth(2)
+            .and_then(|s| s.split('/').next())
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(3000);
+        
+        let health_url = format!("http://localhost:{}/health", port);
         
         match self.client.get(&health_url).send().await {
             Ok(response) => Ok(response.status().is_success()),

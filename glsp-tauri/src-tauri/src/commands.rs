@@ -30,10 +30,13 @@ pub struct WorkspaceInfo {
 #[command]
 pub async fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatus, String> {
     let is_healthy = state.mcp_client.health_check().await.unwrap_or(false);
+    let port = crate::server_adapter::get_allocated_server_port().await;
+    let actual_port = if port > 0 { port } else { 3000 };
+    
     Ok(ServerStatus {
         running: is_healthy,
-        port: 3000,
-        url: "http://localhost:3000".to_string(),
+        port: actual_port,
+        url: format!("http://localhost:{}", actual_port),
     })
 }
 

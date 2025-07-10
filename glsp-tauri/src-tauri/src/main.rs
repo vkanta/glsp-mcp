@@ -32,11 +32,20 @@ async fn main() {
         }
     });
 
-    // Wait a moment for server to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    // Wait for server to allocate port and start
+    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+    
+    // Get the allocated server port
+    let server_port = server_adapter::get_allocated_server_port().await;
+    if server_port == 0 {
+        eprintln!("Warning: Server port not allocated yet, using default 3000");
+    }
+    let port = if server_port > 0 { server_port } else { 3000 };
+    
+    tracing::info!("Creating MCP client for port: {}", port);
 
     // Create MCP client and app state
-    let mcp_client = Arc::new(mcp_client::McpClient::new(3000));
+    let mcp_client = Arc::new(mcp_client::McpClient::new(port));
     
     // Initialize MCP client session
     if let Err(e) = mcp_client.initialize().await {
