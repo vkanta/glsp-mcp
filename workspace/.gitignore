@@ -1,5 +1,7 @@
 # Sphinx documentation build output
 build/
+docs/build/
+adas-wasm-components/docs/build/
 
 # Temporary files
 *.tmp
