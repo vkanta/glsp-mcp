@@ -274,4 +274,3 @@ Requirements Summary
    :types: sensor_req
    :columns: id, title, sensor_type, asil_level, status
    :style: table
-   :sort: sensor_type,id
