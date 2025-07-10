@@ -1,6 +1,0 @@
-package adas:test@0.1.0;
-
-// Test simple composition with one component
-let camera = new root:component { ... };
-
-export camera...;

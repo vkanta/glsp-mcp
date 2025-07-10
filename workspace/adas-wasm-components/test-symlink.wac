@@ -1,6 +1,0 @@
-package adas:symlink-test@0.1.0;
-
-// Test if wac works with symbolic links
-let camera = new camera-test:component { ... };
-
-export camera as camera-sensor;

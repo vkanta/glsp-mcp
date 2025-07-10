@@ -1,0 +1,64 @@
+[package]
+name = "adas-build"
+version = "0.1.0"
+edition = "2021"
+description = "ADAS WebAssembly Components Build System"
+license = "Apache-2.0"
+
+[[bin]]
+name = "adas-build"
+path = "src/main.rs"
+
+[dependencies]
+# Core dependencies
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# CLI and logging
+clap = { version = "4.0", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indicatif = "0.17"
+colored = "2.0"
+
+# File system and paths
+walkdir = "2.0"
+glob = "0.3"
+which = "6.0"
+
+# Async runtime for parallel builds
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# Process execution
+tokio-process-stream = "0.4"
+command-group = "5.0"
+
+# Component metadata (workspace dependency)
+component-metadata = { path = "../component-metadata" }
+
+# WAC composition
+wac-graph = { version = "0.8", optional = true }
+wac-parser = { version = "0.8", optional = true }
+wasmparser = "0.218"
+wasm-encoder = "0.218"
+
+# Checksums and caching
+sha2 = "0.10"
+directories = "5.0"
+
+[dev-dependencies]
+tempfile = "3.0"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[features]
+default = ["wac-composition"]
+wac-composition = ["wac-graph", "wac-parser"]
+
+[package.metadata.adas]
+component-type = "build-system"
+description = "Orchestrates building, validation, and composition of ADAS components"
