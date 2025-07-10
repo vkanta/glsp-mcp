@@ -1,0 +1,25 @@
+{
+  "name": "glsp-tauri",
+  "version": "1.0.0",
+  "description": "WASM Component Designer - Desktop Application",
+  "scripts": {
+    "tauri": "tauri",
+    "build": "cd ../glsp-web-client && npm run build && cd ../glsp-tauri && tauri build",
+    "dev": "tauri dev",
+    "build:win": "tauri build --target x86_64-pc-windows-msvc",
+    "build:mac": "tauri build --target universal-apple-darwin",
+    "build:linux": "tauri build --target x86_64-unknown-linux-gnu"
+  },
+  "keywords": [
+    "wasm",
+    "component",
+    "designer",
+    "desktop",
+    "tauri"
+  ],
+  "author": "MCP-GLSP Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.0"
+  }
+}

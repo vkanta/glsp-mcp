@@ -1,0 +1,28 @@
+[package]
+name = "glsp-desktop"
+version = "1.0.0"
+edition = "2021"
+description = "WASM Component Designer - Desktop Application"
+authors = ["MCP-GLSP Team"]
+license = "MIT"
+repository = "https://github.com/your-org/glsp-rust"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "shell-open", "dialog-open", "dialog-save", "fs-create-dir", "fs-exists", "fs-read-dir", "fs-read-file", "fs-write-file", "path-all"] }
+glsp-mcp-server = { path = "../../glsp-mcp-server", default-features = false, features = ["postgresql"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "5.0"
+anyhow = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+
+# Features
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

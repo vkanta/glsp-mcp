@@ -1,0 +1,96 @@
+{
+  "build": {
+    "distDir": "../../glsp-web-client/dist",
+    "devPath": "http://localhost:5173",
+    "beforeBuildCommand": "cd ../../glsp-web-client && npm run build",
+    "beforeDevCommand": "",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "WASM Component Designer",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": true
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "exists": true
+      },
+      "path": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "DeveloperTool",
+      "copyright": "© 2024 MCP-GLSP Team",
+      "identifier": "com.mcp-glsp.designer",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "longDescription": "A revolutionary AI-native WASM component designer with integrated diagram creation and WebAssembly Interface Types (WIT) analysis.",
+      "shortDescription": "WASM Component Designer",
+      "resources": [],
+      "targets": "all",
+      "externalBin": [],
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "10.13",
+        "exceptionDomain": "",
+        "license": "MIT"
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": "",
+        "wix": {
+          "language": "en-US"
+        }
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "title": "WASM Component Designer",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "maximized": false,
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "center": true
+      }
+    ]
+  }
+}
