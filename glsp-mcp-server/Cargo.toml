@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# PulseEngine MCP Framework dependencies from crates.io (0.4.4)
+# PulseEngine MCP Framework dependencies from crates.io (0.4.4) - with memory auth
 pulseengine-mcp-protocol = "0.4.4"
-pulseengine-mcp-transport = "0.4.4"
-pulseengine-mcp-server = "0.4.4"
+pulseengine-mcp-transport = { version = "0.4.4", default-features = false }
+pulseengine-mcp-server = { version = "0.4.4", default-features = false }
+pulseengine-mcp-auth = "0.4.4"
 
 # CLI framework for enhanced developer experience
 pulseengine-mcp-cli = "0.4.4"
@@ -58,6 +59,10 @@ base64 = "0.21"
 
 # CLI argument parsing
 clap = { version = "4.0", features = ["derive"] }
+
+# Direct HTTP server dependencies
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.5", features = ["cors"] }
 
 [lib]
 name = "glsp_mcp_server"
