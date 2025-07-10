@@ -57,3 +57,44 @@ pub use pulseengine_mcp_protocol::{
     ListResourcesResult, ListToolsResult, PaginatedRequestParam, Prompt, ProtocolVersion,
     ReadResourceRequestParam, Request, Resource, Response, ServerCapabilities, Tool,
 };
+
+use pulseengine_mcp_server::{McpServer, ServerConfig};
+use pulseengine_mcp_transport::TransportConfig;
+use pulseengine_mcp_auth::config::AuthConfig;
+use tracing::info;
+
+/// Run the MCP server with the given configuration
+/// This is useful for embedding the server in other applications like Tauri
+pub async fn run_server(config: GlspConfig) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Initializing GLSP backend...");
+    let backend = GlspBackend::initialize(config.clone()).await?;
+
+    // Create server config with memory auth
+    let mut server_config = ServerConfig::default();
+    server_config.auth_config = AuthConfig::memory();
+    
+    
+    // Set transport configuration
+    server_config.transport_config = match config.transport.as_str() {
+        "http" => TransportConfig::http(config.port),
+        "http-streaming" | "streaming" => TransportConfig::streamable_http(config.port),
+        "websocket" => TransportConfig::websocket(config.port),
+        "stdio" => TransportConfig::stdio(),
+        _ => {
+            info!(
+                "Unknown transport type: {}, defaulting to HTTP streaming",
+                config.transport
+            );
+            TransportConfig::streamable_http(config.port)
+        }
+    };
+    
+    // Create and run server using framework
+    let mut server = McpServer::new(backend, server_config).await?;
+
+    info!("GLSP MCP Server listening on port {}", config.port);
+    server.run().await?;
+
+    info!("GLSP MCP Server shutdown complete");
+    Ok(())
+}
