@@ -233,12 +233,12 @@ export class WorkspaceSelector {
         try {
             // Set workspace directory using MCP (no server restart needed)
             const result = await window.__TAURI__.invoke('set_workspace_directory', { 
-                workspace_path: workspacePath, 
-                create_if_missing: true 
+                workspacePath: workspacePath, 
+                createIfMissing: true 
             });
             
             // Add to recent workspaces
-            await window.__TAURI__.invoke('add_recent_workspace', { workspace_path: workspacePath });
+            await window.__TAURI__.invoke('add_recent_workspace', { workspacePath: workspacePath });
             
             // Update UI
             this.currentWorkspace = workspacePath;
@@ -367,7 +367,7 @@ export class WorkspaceSelector {
             const result = await window.__TAURI__.invoke('select_workspace_directory');
             if (result) {
                 // Create workspace structure
-                await window.__TAURI__.invoke('create_workspace_structure', { workspace_path: result });
+                await window.__TAURI__.invoke('create_workspace_structure', { workspacePath: result });
                 await this.selectWorkspace(result);
                 this.showSuccess(`Created workspace structure at: ${result}`);
             }
@@ -385,7 +385,7 @@ export class WorkspaceSelector {
 
         try {
             const validationResult = await window.__TAURI__.invoke('validate_workspace', { 
-                workspace_path: this.currentWorkspace 
+                workspacePath: this.currentWorkspace 
             });
             
             if (validationResult.valid) {
