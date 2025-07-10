@@ -102,6 +102,7 @@ export class AppController {
 
         this.mountUI();
         this.setupViewModeManager();
+        this.logEnvironmentInfo();
 
         this.initialize();
     }
@@ -1231,5 +1232,16 @@ export class AppController {
      */
     public getAvailableViewModes(): string[] {
         return this.viewModeManager.getAvailableViewModes().map(mode => mode.id);
+    }
+    
+    /**
+     * Log environment information for debugging
+     */
+    private logEnvironmentInfo(): void {
+        import('./utils/environment.js').then(({ logEnvironmentInfo }) => {
+            logEnvironmentInfo();
+        }).catch(error => {
+            console.log('Failed to load environment info:', error);
+        });
     }
 }

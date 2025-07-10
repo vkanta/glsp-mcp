@@ -48,6 +48,8 @@ import { DiagramNameDialog } from './dialogs/specialized/DiagramNameDialog.js';
 import { ConfirmDialog } from './dialogs/base/ConfirmDialog.js';
 import { AlertDialog } from './dialogs/base/AlertDialog.js';
 import { PromptDialog } from './dialogs/base/PromptDialog.js';
+import { WorkspaceSelector } from './WorkspaceSelector.js';
+import { detectEnvironment } from '../utils/environment.js';
 
 export class UIManager {
     private toolbarElement: HTMLElement;
@@ -69,6 +71,7 @@ export class UIManager {
     private toolboxSection?: ToolboxSection;
     private propertiesSection?: PropertiesSection;
     private componentLibrarySection?: ComponentLibrarySection;
+    private workspaceSelector?: WorkspaceSelector;
 
     constructor() {
         console.log('UIManager: Creating UI elements');
@@ -204,7 +207,18 @@ export class UIManager {
         const currentNodeType = this.currentNodeType;
         const currentEdgeType = this.currentEdgeType;
         
+        const env = detectEnvironment();
+        console.log('UIManager: detectEnvironment result:', env);
+        const workspaceHtml = env.isDesktop ? `
+            <div class="toolbar-group">
+                <label>Workspace:</label>
+                <div id="workspace-selector-container"></div>
+            </div>
+        ` : '';
+        console.log('UIManager: workspaceHtml generated:', workspaceHtml);
+        
         const newHTML = `
+            ${workspaceHtml}
             <div class="toolbar-group">
                 <label>Diagram Type: (${new Date().getSeconds()}s)</label>
                 <select id="diagram-type-select">
@@ -250,6 +264,23 @@ export class UIManager {
         
         // console.log('Generated HTML for toolbar:', newHTML);
         toolbar.innerHTML = newHTML;
+        
+        // Initialize workspace selector if in desktop mode
+        console.log('UIManager: Environment isDesktop:', env.isDesktop);
+        if (env.isDesktop) {
+            const workspaceContainer = toolbar.querySelector('#workspace-selector-container') as HTMLElement;
+            console.log('UIManager: Workspace container found:', !!workspaceContainer);
+            if (workspaceContainer) {
+                console.log('UIManager: Creating WorkspaceSelector');
+                this.workspaceSelector = new WorkspaceSelector(workspaceContainer, (workspacePath) => {
+                    console.log('Workspace changed to:', workspacePath);
+                    // You can add additional handling here if needed
+                });
+                console.log('UIManager: WorkspaceSelector created successfully');
+            } else {
+                console.log('UIManager: workspace-selector-container not found in toolbar');
+            }
+        }
         
         // Restore current values
         this.currentMode = currentMode;

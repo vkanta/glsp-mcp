@@ -146,8 +146,18 @@ export class McpClient {
     private streamingActive: boolean = false;
     private streamListeners: Map<string, ((data: unknown) => void)[]> = new Map();
 
-    constructor(baseUrl: string = 'http://127.0.0.1:3000') {
-        this.baseUrl = baseUrl;
+    constructor(baseUrl?: string) {
+        // Use environment-appropriate base URL if not provided
+        if (baseUrl) {
+            this.baseUrl = baseUrl;
+        } else {
+            // Import dynamically to avoid circular dependencies
+            import('../utils/environment.js').then(({ getApiBaseUrl }) => {
+                this.baseUrl = getApiBaseUrl();
+            });
+            // Fallback for immediate use
+            this.baseUrl = (window as any).__TAURI__ ? 'http://localhost:3000' : 'http://127.0.0.1:3000';
+        }
     }
 
     private nextId(): number {

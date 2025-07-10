@@ -1,0 +1,250 @@
+/* Workspace Selector Styles */
+.workspace-selector {
+    position: relative;
+    display: inline-block;
+}
+
+.workspace-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 6px;
+    color: #e2e8f0;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.workspace-button:hover {
+    background: #4a5568;
+    border-color: #718096;
+}
+
+.workspace-button:active {
+    transform: translateY(1px);
+}
+
+.workspace-icon {
+    font-size: 16px;
+}
+
+.workspace-arrow {
+    font-size: 12px;
+    transition: transform 0.2s ease;
+}
+
+.workspace-button:hover .workspace-arrow {
+    transform: rotate(180deg);
+}
+
+.workspace-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    min-width: 400px;
+    background: #2d3748;
+    border: 1px solid #4a5568;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    margin-top: 4px;
+    animation: slideDown 0.2s ease;
+}
+
+.workspace-dropdown.hidden {
+    display: none;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #4a5568;
+}
+
+.workspace-header h3 {
+    margin: 0;
+    color: #e2e8f0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.workspace-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.browse-button,
+.create-button,
+.validate-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.2s ease;
+}
+
+.browse-button {
+    background: #3182ce;
+}
+
+.browse-button:hover {
+    background: #2c5282;
+}
+
+.create-button {
+    background: #38a169;
+}
+
+.create-button:hover {
+    background: #2f855a;
+}
+
+.validate-button {
+    background: #d69e2e;
+}
+
+.validate-button:hover {
+    background: #b7791f;
+}
+
+.browse-icon,
+.create-icon,
+.validate-icon {
+    font-size: 12px;
+}
+
+.workspace-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.recent-workspaces {
+    padding: 12px 16px;
+}
+
+.recent-workspaces h4 {
+    margin: 0 0 12px 0;
+    color: #a0aec0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.workspace-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.workspace-item {
+    padding: 12px;
+    background: #1a202c;
+    border: 1px solid #2d3748;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.workspace-item:hover {
+    background: #2d3748;
+    border-color: #4a5568;
+}
+
+.workspace-item-main {
+    margin-bottom: 8px;
+}
+
+.workspace-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.workspace-item-path {
+    font-size: 12px;
+    color: #a0aec0;
+    font-family: monospace;
+}
+
+.workspace-item-stats {
+    display: flex;
+    gap: 12px;
+}
+
+.stat {
+    font-size: 12px;
+    color: #718096;
+}
+
+.no-workspaces {
+    color: #718096;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .workspace-dropdown {
+        min-width: 300px;
+    }
+    
+    .workspace-item-stats {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+/* Dark theme adjustments */
+.dark .workspace-button {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+}
+
+.dark .workspace-button:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+}
+
+.dark .workspace-dropdown {
+    background: #374151;
+    border-color: #4b5563;
+}
+
+.dark .workspace-header {
+    border-bottom-color: #4b5563;
+}
+
+.dark .workspace-item {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .workspace-item:hover {
+    background: #374151;
+    border-color: #4b5563;
+}
