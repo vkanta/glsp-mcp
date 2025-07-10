@@ -1,7 +1,7 @@
 """Behavior Prediction AI Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,7 +20,7 @@ wit_library(
 )
 
 # Build AI component with WASI-NN support
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "behavior_prediction_ai",
     srcs = [
         "src/lib.rs",
@@ -28,7 +28,7 @@ rust_wasm_component(
         "src/trajectory.rs", 
         "src/wasi_nn_interface.rs",
     ],
-    wit_bindgen = ":behavior_prediction_interfaces",
+    wit = ":behavior_prediction_interfaces",
     profiles = ["debug", "release", "optimized"],
     deps = [
         # Add AI-specific dependencies
@@ -58,6 +58,6 @@ rust_wasm_component_test(
 # For compatibility with existing system
 alias(
     name = "adas_behavior_prediction_ai",
-    actual = ":behavior_prediction_ai_main", 
+    actual = ":behavior_prediction_ai_release", 
     visibility = ["//visibility:public"],
 )

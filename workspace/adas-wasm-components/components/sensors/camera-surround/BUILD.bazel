@@ -1,7 +1,7 @@
 """Camera Surround ECU Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,10 +20,10 @@ wit_library(
 )
 
 # Build camera surround component
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "camera_surround_ecu",
     srcs = ["src/lib.rs"],
-    wit_bindgen = ":camera_surround_interfaces",
+    wit = ":camera_surround_interfaces",
     profiles = ["debug", "release"],
     deps = [
         # Add Rust dependencies here
@@ -46,6 +46,6 @@ rust_wasm_component_test(
 # For compatibility with existing system
 alias(
     name = "adas_camera_surround_ecu", 
-    actual = ":camera_surround_ecu_main",
+    actual = ":camera_surround_ecu_release",
     visibility = ["//visibility:public"],
 )

@@ -104,6 +104,7 @@ pub struct WasmExecutionEngine {
 
 #[derive(Debug)]
 struct ExecutionInfo {
+    #[allow(dead_code)]
     context: ExecutionContext,
     start_time: Instant,
     progress: ExecutionProgress,

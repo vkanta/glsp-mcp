@@ -1,7 +1,7 @@
 """Object Detection AI Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,26 +20,11 @@ wit_library(
 )
 
 # Build AI component with WASI-NN support
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "object_detection_ai",
     srcs = ["src/lib.rs"],
-    wit_bindgen = ":object_detection_interfaces",
-    profiles = ["debug", "release", "optimized"],
-    deps = [
-        # Add AI-specific dependencies
-        # "@crates//:ndarray",
-        # "@crates//:image",
-    ],
-    crate_features = [
-        "wasi-nn",
-        "object-detection",
-        "yolov5",
-    ],
-    # AI components need more optimization
-    rustc_flags = [
-        "-C", "opt-level=3",
-        "-C", "target-cpu=native",
-    ],
+    wit = ":object_detection_interfaces",
+    profiles = ["debug", "release"],
 )
 
 # Test the AI component  
@@ -58,6 +43,6 @@ filegroup(
 # For compatibility with existing system
 alias(
     name = "adas_object_detection_ai",
-    actual = ":object_detection_ai_main", 
+    actual = ":object_detection_ai_release", 
     visibility = ["//visibility:public"],
 )

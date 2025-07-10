@@ -1,7 +1,7 @@
 """HMI Interface System Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,10 +20,10 @@ wit_library(
 )
 
 # Build HMI interface component
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "hmi_interface_ecu",
     srcs = ["src/lib.rs"],
-    wit_bindgen = ":hmi_interface_interfaces",
+    wit = ":hmi_interface_interfaces",
     profiles = ["debug", "release"],
     deps = [
         # Add Rust dependencies here
@@ -51,6 +51,6 @@ rust_wasm_component_test(
 # For compatibility with existing system
 alias(
     name = "adas_hmi_interface_ecu", 
-    actual = ":hmi_interface_ecu_main",
+    actual = ":hmi_interface_ecu_release",
     visibility = ["//visibility:public"],
 )

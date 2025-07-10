@@ -120,8 +120,10 @@ impl GlspConfig {
             }
         };
 
-        let mut config = DatabaseConfig::default();
-        config.backend = backend;
+        let mut config = DatabaseConfig {
+            backend,
+            ..Default::default()
+        };
         config.connection.host = self.database_host.clone();
         config.connection.port = self.database_port;
         config.connection.database = self.database_name.clone();

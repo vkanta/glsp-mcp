@@ -1,7 +1,7 @@
 """ADAS Orchestrator Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,7 +20,7 @@ wit_library(
 )
 
 # Build orchestrator component
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "adas_orchestrator_ecu",
     srcs = [
         "src/lib.rs",
@@ -28,26 +28,8 @@ rust_wasm_component(
         "src/data_flow.rs",
         "src/pipeline.rs",
     ],
-    wit_bindgen = ":orchestrator_interfaces",
+    wit = ":orchestrator_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:futures",
-        # "@crates//:serde",
-        # "@crates//:log",
-    ],
-    crate_features = [
-        "adas-orchestration",
-        "component-management",
-        "data-flow-control",
-        "pipeline-execution",
-        "fixed-execution-order",
-    ],
-    # Orchestrator needs reliable coordination
-    rustc_flags = [
-        "-C", "opt-level=2",
-        "-C", "panic=abort",
-    ],
 )
 
 # Test the orchestrator component
@@ -59,6 +41,6 @@ rust_wasm_component_test(
 # For compatibility with existing system
 alias(
     name = "adas_orchestrator", 
-    actual = ":adas_orchestrator_ecu_main",
+    actual = ":adas_orchestrator_ecu_release",
     visibility = ["//visibility:public"],
 )

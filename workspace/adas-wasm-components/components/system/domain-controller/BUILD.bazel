@@ -1,7 +1,7 @@
 """Domain Controller System Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component", "rust_wasm_component_test")
+load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,10 +20,10 @@ wit_library(
 )
 
 # Build domain controller component
-rust_wasm_component(
+rust_wasm_component_bindgen(
     name = "domain_controller_ecu",
     srcs = ["src/lib.rs"],
-    wit_bindgen = ":domain_controller_interfaces",
+    wit = ":domain_controller_interfaces",
     profiles = ["debug", "release"],
     deps = [
         # Add Rust dependencies here
@@ -52,6 +52,6 @@ rust_wasm_component_test(
 # For compatibility with existing system
 alias(
     name = "adas_domain_controller_ecu", 
-    actual = ":domain_controller_ecu_main",
+    actual = ":domain_controller_ecu_release",
     visibility = ["//visibility:public"],
 )

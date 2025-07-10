@@ -48,6 +48,11 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
     versions = ["1.82.0"],
+    extra_target_triples = [
+        "wasm32-wasip2",
+        "wasm32-wasip1", 
+        "wasm32-unknown-unknown",
+    ],
 )
 use_repo(rust, "rust_toolchains")
 

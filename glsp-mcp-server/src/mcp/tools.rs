@@ -50,6 +50,7 @@ impl Default for DiagramTools {
     }
 }
 
+#[allow(dead_code)]
 impl DiagramTools {
     pub fn new() -> Self {
         // Default WASM watch path - can be configured via CLI args
