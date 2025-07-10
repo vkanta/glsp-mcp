@@ -101,5 +101,8 @@ jspm_packages/
 # TernJS port file
 .tern-port
 
+# Sphinx documentation build output
+docs/build/
+
 # External repositories (should be git submodules or separate clones)
 # mcp-loxone/ # Temporarily included with HTTP transport fixes
