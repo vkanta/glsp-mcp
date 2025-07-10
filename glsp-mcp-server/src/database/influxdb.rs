@@ -377,9 +377,8 @@ impl SensorDataRepository for InfluxDBBackend {
             DatabaseError::ConnectionFailed("Not connected to InfluxDB".to_string())
         })?;
 
-        let query = format!(
-            "SHOW TAG VALUES FROM {SENSOR_READINGS_MEASUREMENT} WITH KEY = \"sensor_id\""
-        );
+        let query =
+            format!("SHOW TAG VALUES FROM {SENSOR_READINGS_MEASUREMENT} WITH KEY = \"sensor_id\"");
         let read_query = ReadQuery::new(query);
 
         let _result = client
@@ -577,9 +576,8 @@ impl MetadataStore for InfluxDBBackend {
             DatabaseError::ConnectionFailed("Not connected to InfluxDB".to_string())
         })?;
 
-        let delete_query = format!(
-            "DELETE FROM {SENSOR_METADATA_MEASUREMENT} WHERE sensor_id = '{sensor_id}'"
-        );
+        let delete_query =
+            format!("DELETE FROM {SENSOR_METADATA_MEASUREMENT} WHERE sensor_id = '{sensor_id}'");
 
         let read_query = ReadQuery::new(delete_query);
         client

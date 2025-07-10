@@ -2708,9 +2708,7 @@ impl GlspBackend {
         Ok(CallToolResult {
             content: vec![Content::text(
                 serde_json::to_string_pretty(&validation_result).map_err(|e| {
-                    GlspError::ToolExecution(format!(
-                        "Failed to serialize validation result: {e}"
-                    ))
+                    GlspError::ToolExecution(format!("Failed to serialize validation result: {e}"))
                 })?,
             )],
             is_error: Some(false),

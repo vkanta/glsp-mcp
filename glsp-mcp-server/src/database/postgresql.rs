@@ -136,9 +136,7 @@ impl PostgreSQLBackend {
         )
         .execute(pool)
         .await
-        .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create quality index: {e}"))
-        })?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to create quality index: {e}")))?;
 
         sqlx::query(
             "CREATE INDEX IF NOT EXISTS idx_sensor_readings_data_type 
@@ -295,9 +293,7 @@ impl PostgreSQLBackend {
         )
         .execute(pool)
         .await
-        .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to create datasets table: {e}"))
-        })?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to create datasets table: {e}")))?;
 
         // Create index on dataset time range for efficient queries
         sqlx::query(
@@ -392,9 +388,10 @@ impl DatabaseProvider for PostgreSQLBackend {
         })?;
 
         // Test the connection
-        sqlx::query("SELECT 1").execute(&pool).await.map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("Connection test failed: {e}"))
-        })?;
+        sqlx::query("SELECT 1")
+            .execute(&pool)
+            .await
+            .map_err(|e| DatabaseError::ConnectionFailed(format!("Connection test failed: {e}")))?;
 
         self.pool = Some(pool);
         info!("Connected to PostgreSQL database");
@@ -829,9 +826,7 @@ impl SensorDataRepository for PostgreSQLBackend {
         )
         .fetch_optional(pool)
         .await
-        .map_err(|e| {
-            DatabaseError::QueryFailed(format!("Failed to get global time range: {e}"))
-        })?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Failed to get global time range: {e}")))?;
 
         if let Some(row) = row {
             let start_time: Option<i64> = row.get("start_time");
@@ -1222,9 +1217,7 @@ impl MetadataStore for PostgreSQLBackend {
         let rows = sqlx::query("SELECT key FROM config_store ORDER BY key")
             .fetch_all(pool)
             .await
-            .map_err(|e| {
-                DatabaseError::QueryFailed(format!("Failed to list config keys: {e}"))
-            })?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Failed to list config keys: {e}")))?;
 
         Ok(rows.into_iter().map(|row| row.get("key")).collect())
     }

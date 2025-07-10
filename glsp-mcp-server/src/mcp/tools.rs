@@ -2042,9 +2042,7 @@ impl DiagramTools {
             Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!(
-                        "Execution {execution_id} not found or could not be cancelled"
-                    ),
+                    text: format!("Execution {execution_id} not found or could not be cancelled"),
                 }],
                 is_error: Some(true),
             })

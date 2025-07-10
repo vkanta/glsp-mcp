@@ -158,9 +158,7 @@ impl RedisBackend {
         match conn.get::<String, String>(session_key) {
             Ok(data) => {
                 let session_data: serde_json::Value = serde_json::from_str(&data).map_err(|e| {
-                    DatabaseError::SerializationError(format!(
-                        "Failed to parse session data: {e}"
-                    ))
+                    DatabaseError::SerializationError(format!("Failed to parse session data: {e}"))
                 })?;
 
                 let mut result = HashMap::new();

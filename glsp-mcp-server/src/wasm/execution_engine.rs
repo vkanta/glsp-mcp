@@ -563,7 +563,9 @@ impl WasmExecutionEngine {
     pub async fn advance_sensor_frame(&self, execution_id: &str) -> Result<bool> {
         let bridge = {
             let executions = self.executions.lock().unwrap();
-            executions.get(execution_id).and_then(|exec_info| exec_info.sensor_bridge.clone())
+            executions
+                .get(execution_id)
+                .and_then(|exec_info| exec_info.sensor_bridge.clone())
         };
         if let Some(bridge) = bridge {
             bridge.advance_frame().await
@@ -579,7 +581,9 @@ impl WasmExecutionEngine {
     ) -> Result<Option<crate::wasm::sensor_bridge::SensorFrame>> {
         let bridge = {
             let executions = self.executions.lock().unwrap();
-            executions.get(execution_id).and_then(|exec_info| exec_info.sensor_bridge.clone())
+            executions
+                .get(execution_id)
+                .and_then(|exec_info| exec_info.sensor_bridge.clone())
         };
         if let Some(bridge) = bridge {
             bridge.get_current_frame().await
