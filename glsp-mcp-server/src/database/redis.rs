@@ -6,10 +6,10 @@ use crate::database::{
     config::DatabaseConfig,
     error::{DatabaseError, DatabaseResult},
     models::*,
-    traits::{DatabaseProvider, SensorDataRepository, TimeSeriesStore, MetadataStore},
+    traits::{DatabaseProvider, MetadataStore, SensorDataRepository, TimeSeriesStore},
 };
-use pulseengine_mcp_auth::SessionManager;
 use async_trait::async_trait;
+use pulseengine_mcp_auth::SessionManager;
 // Note: Serde traits reserved for future JSON serialization features
 #[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
@@ -94,7 +94,14 @@ impl DatabaseProvider for RedisBackend {
 
     fn connection_info(&self) -> String {
         // Return sanitized connection info (no credentials)
-        format!("Redis at {}", self.url.replace("redis://", "").split('@').last().unwrap_or("unknown"))
+        format!(
+            "Redis at {}",
+            self.url
+                .replace("redis://", "")
+                .split('@')
+                .last()
+                .unwrap_or("unknown")
+        )
     }
 }
 
@@ -309,7 +316,10 @@ impl MetadataStore for RedisBackend {
         ))
     }
 
-    async fn get_sensor_metadata(&self, _sensor_id: &str) -> DatabaseResult<Option<SensorMetadata>> {
+    async fn get_sensor_metadata(
+        &self,
+        _sensor_id: &str,
+    ) -> DatabaseResult<Option<SensorMetadata>> {
         Err(DatabaseError::UnsupportedOperation(
             "Redis backend does not support metadata queries".to_string(),
         ))
