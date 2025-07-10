@@ -57,7 +57,8 @@ impl DatabaseFactory {
             DatabaseBackend::Redis => {
                 #[cfg(feature = "redis")]
                 {
-                    let backend = crate::database::redis::RedisBackend::new(config).await?;
+                    let mut backend = crate::database::redis::RedisBackend::new(&config)?;
+                    backend.initialize().await?;
                     Ok(Box::new(backend))
                 }
                 #[cfg(not(feature = "redis"))]

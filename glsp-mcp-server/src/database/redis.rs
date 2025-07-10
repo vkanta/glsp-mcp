@@ -6,9 +6,12 @@ use crate::database::{
     config::DatabaseConfig,
     error::{DatabaseError, DatabaseResult},
     models::*,
-    traits::{DatabaseBackend, SessionManager},
+    traits::{DatabaseProvider, SensorDataRepository, TimeSeriesStore, MetadataStore},
 };
+use pulseengine_mcp_auth::SessionManager;
 use async_trait::async_trait;
+// Note: Serde traits reserved for future JSON serialization features
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -46,7 +49,57 @@ impl RedisBackend {
 }
 
 #[async_trait]
-impl DatabaseBackend for RedisBackend {
+impl DatabaseProvider for RedisBackend {
+    async fn connect(&mut self) -> DatabaseResult<()> {
+        self.initialize().await
+    }
+
+    async fn disconnect(&mut self) -> DatabaseResult<()> {
+        self.close().await
+    }
+
+    fn is_connected(&self) -> bool {
+        self.client.is_some()
+    }
+
+    async fn health_check(&self) -> DatabaseResult<DatabaseHealth> {
+        let start = std::time::Instant::now();
+        let is_healthy = match self.get_connection().await {
+            Ok(mut conn) => {
+                use redis::Commands;
+                match conn.ping::<String>() {
+                    Ok(_) => true,
+                    Err(_) => false,
+                }
+            }
+            Err(_) => false,
+        };
+        let latency_ms = start.elapsed().as_millis() as f32;
+
+        Ok(DatabaseHealth {
+            is_connected: is_healthy,
+            latency_ms,
+            version: Some("Redis (unknown version)".to_string()),
+            active_connections: Some(if self.is_connected() { 1 } else { 0 }),
+            total_connections: Some(1),
+            last_error: None,
+            uptime_seconds: None,
+            memory_usage_mb: None,
+        })
+    }
+
+    fn database_type(&self) -> &'static str {
+        "Redis"
+    }
+
+    fn connection_info(&self) -> String {
+        // Return sanitized connection info (no credentials)
+        format!("Redis at {}", self.url.replace("redis://", "").split('@').last().unwrap_or("unknown"))
+    }
+}
+
+impl RedisBackend {
+    /// Initialize the Redis backend
     async fn initialize(&mut self) -> DatabaseResult<()> {
         let client = redis::Client::open(self.url.as_str()).map_err(|e| {
             DatabaseError::ConnectionError(format!("Failed to create Redis client: {}", e))
@@ -60,53 +113,10 @@ impl DatabaseBackend for RedisBackend {
         Ok(())
     }
 
-    async fn health_check(&self) -> DatabaseResult<bool> {
-        match self.get_connection().await {
-            Ok(mut conn) => {
-                use redis::Commands;
-                match conn.ping::<String>() {
-                    Ok(_) => Ok(true),
-                    Err(_) => Ok(false),
-                }
-            }
-            Err(_) => Ok(false),
-        }
-    }
-
+    /// Close the Redis connection
     async fn close(&mut self) -> DatabaseResult<()> {
         self.client = None;
         Ok(())
-    }
-
-    async fn write_sensor_data(&mut self, _data: &SensorData) -> DatabaseResult<()> {
-        // Redis is primarily used for caching, not sensor data storage
-        Err(DatabaseError::UnsupportedOperation(
-            "Redis backend does not support sensor data storage".to_string(),
-        ))
-    }
-
-    async fn read_sensor_data(&self, _query: &SensorQuery) -> DatabaseResult<Vec<SensorData>> {
-        // Redis is primarily used for caching, not sensor data queries
-        Err(DatabaseError::UnsupportedOperation(
-            "Redis backend does not support sensor data queries".to_string(),
-        ))
-    }
-
-    async fn write_simulation_state(&mut self, _state: &SimulationState) -> DatabaseResult<()> {
-        // Redis can store simulation state as JSON
-        Err(DatabaseError::UnsupportedOperation(
-            "Simulation state storage not yet implemented for Redis".to_string(),
-        ))
-    }
-
-    async fn read_simulation_state(
-        &self,
-        _simulation_id: &str,
-    ) -> DatabaseResult<Option<SimulationState>> {
-        // Redis can retrieve simulation state
-        Err(DatabaseError::UnsupportedOperation(
-            "Simulation state retrieval not yet implemented for Redis".to_string(),
-        ))
     }
 }
 
@@ -197,6 +207,130 @@ impl SessionManager for RedisBackend {
             .map_err(|e| DatabaseError::WriteError(format!("Failed to extend session: {}", e)))?;
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl SensorDataRepository for RedisBackend {
+    async fn store_reading(&mut self, _reading: &SensorReading) -> DatabaseResult<()> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data storage".to_string(),
+        ))
+    }
+
+    async fn store_batch(&mut self, _batch: &SensorBatch) -> DatabaseResult<()> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data storage".to_string(),
+        ))
+    }
+
+    async fn query_readings(&self, _query: &SensorQuery) -> DatabaseResult<Vec<SensorReading>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data queries".to_string(),
+        ))
+    }
+
+    async fn get_reading_at_time(
+        &self,
+        _sensor_id: &str,
+        _timestamp_us: i64,
+    ) -> DatabaseResult<Option<SensorReading>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data queries".to_string(),
+        ))
+    }
+
+    async fn delete_readings(
+        &mut self,
+        _sensor_id: &str,
+        _start_time_us: i64,
+        _end_time_us: i64,
+    ) -> DatabaseResult<u64> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor data deletion".to_string(),
+        ))
+    }
+}
+
+#[async_trait]
+impl TimeSeriesStore for RedisBackend {
+    async fn downsample(
+        &self,
+        _sensor_id: &str,
+        _start_time_us: i64,
+        _end_time_us: i64,
+        _interval_us: i64,
+    ) -> DatabaseResult<Vec<SensorReading>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support time-series operations".to_string(),
+        ))
+    }
+
+    async fn interpolate(
+        &self,
+        _sensor_id: &str,
+        _timestamps_us: &[i64],
+    ) -> DatabaseResult<Vec<SensorReading>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support interpolation".to_string(),
+        ))
+    }
+
+    async fn aggregate(
+        &self,
+        _sensor_id: &str,
+        _start_time_us: i64,
+        _end_time_us: i64,
+        _window_size_us: i64,
+    ) -> DatabaseResult<Vec<SensorStatistics>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support aggregation".to_string(),
+        ))
+    }
+
+    async fn detect_gaps(
+        &self,
+        _sensor_id: &str,
+        _start_time_us: i64,
+        _end_time_us: i64,
+        _max_gap_us: i64,
+    ) -> DatabaseResult<Vec<TimeRange>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support gap detection".to_string(),
+        ))
+    }
+}
+
+#[async_trait]
+impl MetadataStore for RedisBackend {
+    async fn store_sensor_metadata(&mut self, _metadata: &SensorMetadata) -> DatabaseResult<()> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support metadata storage".to_string(),
+        ))
+    }
+
+    async fn get_sensor_metadata(&self, _sensor_id: &str) -> DatabaseResult<Option<SensorMetadata>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support metadata queries".to_string(),
+        ))
+    }
+
+    async fn list_sensor_metadata(&self) -> DatabaseResult<Vec<SensorMetadata>> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support sensor listing".to_string(),
+        ))
+    }
+
+    async fn update_sensor_metadata(&mut self, _metadata: &SensorMetadata) -> DatabaseResult<()> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support metadata updates".to_string(),
+        ))
+    }
+
+    async fn delete_sensor_metadata(&mut self, _sensor_id: &str) -> DatabaseResult<()> {
+        Err(DatabaseError::UnsupportedOperation(
+            "Redis backend does not support metadata deletion".to_string(),
+        ))
     }
 }
 

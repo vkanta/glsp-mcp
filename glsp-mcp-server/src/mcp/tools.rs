@@ -1646,7 +1646,10 @@ impl DiagramTools {
                     "memoryUsageMb": exec.memory_usage_mb,
                     "completedAt": exec.completed_at,
                     "graphicsOutput": exec.graphics_output,
-                    "outputData": exec.output_data.map(|d| base64::encode(&d))
+                    "outputData": exec.output_data.map(|d| {
+                        use base64::prelude::*;
+                        BASE64_STANDARD.encode(&d)
+                    })
                 })
             })
             .collect()
@@ -1691,7 +1694,10 @@ impl DiagramTools {
                     "memoryUsageMb": result.memory_usage_mb,
                     "completedAt": result.completed_at,
                     "graphicsOutput": result.graphics_output,
-                    "outputData": result.output_data.map(|d| base64::encode(&d))
+                    "outputData": result.output_data.map(|d| {
+                        use base64::prelude::*;
+                        BASE64_STANDARD.encode(&d)
+                    })
                 })
             })
     }
