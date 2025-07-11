@@ -94,7 +94,7 @@ impl McpClient {
         };
 
         let base_url = self.base_url.lock().unwrap().clone();
-        let mut req_builder = self
+        let req_builder = self
             .client
             .post(&base_url)
             .header("Content-Type", "application/json")
