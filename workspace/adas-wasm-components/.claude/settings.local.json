@@ -28,7 +28,9 @@
       "Bash(./build-composed.sh:*)",
       "mcp__fetch__imageFetch",
       "Bash(bazel build:*)",
-      "Bash(gh issue view:*)"
+      "Bash(gh issue view:*)",
+      "Bash(bazel query:*)",
+      "Bash(bazel config:*)"
     ],
     "deny": []
   }
