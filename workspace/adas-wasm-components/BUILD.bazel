@@ -104,3 +104,50 @@ wac_compose(
     profile = "release",
     use_symlinks = True,
 )
+
+# Convenience targets for building component categories
+alias(
+    name = "all-sensors",
+    actual = "//components/sensors:all",
+)
+
+alias(
+    name = "all-ai",
+    actual = "//components/ai:all",
+)
+
+alias(
+    name = "all-fusion",
+    actual = "//components/fusion:all",
+)
+
+alias(
+    name = "all-control",
+    actual = "//components/control:all",
+)
+
+alias(
+    name = "all-system",
+    actual = "//components/system:all",
+)
+
+alias(
+    name = "all-integration",
+    actual = "//components/integration:all",
+)
+
+# Build all WASM components
+filegroup(
+    name = "all-components",
+    srcs = [
+        "//components/sensors:all",
+        "//components/ai:all",
+        "//components/fusion:all",
+        "//components/control:all",
+        "//components/system:all",
+        "//components/integration:all",
+        "//components/input:all",
+        "//components/graphics:all",
+        "//components/orchestrator:all",
+    ],
+)

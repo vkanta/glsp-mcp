@@ -1,3 +1,5 @@
+package adas:object-detection@0.1.0;
+
 /// AI Component World for Object Detection with WASI-NN
 world ai-component {
     /// Import common types
