@@ -63,8 +63,12 @@ jobs:
         if: steps.check-dist.outputs.dist_exists == 'true'
         run: cargo clippy --package glsp-desktop --all-targets --all-features -- -D warnings
       
-      - name: Run tests
-        run: cargo test --all
+      - name: Run tests on server
+        run: cargo test --package glsp-mcp-server
+      
+      - name: Run tests on Tauri
+        if: steps.check-dist.outputs.dist_exists == 'true'
+        run: cargo test --package glsp-desktop
 
   build-web-client:
     name: Build Web Client
