@@ -46,14 +46,22 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       
-      - name: Run clippy
+      - name: Run clippy on server
+        run: cargo clippy --package glsp-mcp-server --all-targets --all-features -- -D warnings
+      
+      - name: Check if web client dist exists
+        id: check-dist
         run: |
-          # Run clippy on main server package
-          cargo clippy --package glsp-mcp-server --all-targets --all-features -- -D warnings
-          # Only run clippy on Tauri if dist exists (it's built in separate job)
           if [ -d "glsp-web-client/dist" ]; then
-            cargo clippy --package glsp-desktop --all-targets --all-features -- -D warnings
+            echo "dist_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "dist_exists=false" >> $GITHUB_OUTPUT
           fi
+        shell: bash
+      
+      - name: Run clippy on Tauri
+        if: steps.check-dist.outputs.dist_exists == 'true'
+        run: cargo clippy --package glsp-desktop --all-targets --all-features -- -D warnings
       
       - name: Run tests
         run: cargo test --all
