@@ -54,12 +54,12 @@ pub use mcp::{prompts, protocol, resources, tools};
 pub use backend::*;
 pub use model::*;
 pub use persistence::PersistenceManager;
-pub use tools::DiagramTools;
 pub use pulseengine_mcp_protocol::{
     CallToolRequestParam, CallToolResult, Content, Error, Implementation, ListPromptsResult,
     ListResourcesResult, ListToolsResult, PaginatedRequestParam, Prompt, ProtocolVersion,
     ReadResourceRequestParam, Request, Resource, Response, ServerCapabilities, Tool,
 };
+pub use tools::DiagramTools;
 
 use pulseengine_mcp_auth::config::AuthConfig;
 use pulseengine_mcp_server::{McpServer, ServerConfig};
