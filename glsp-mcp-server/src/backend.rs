@@ -210,6 +210,7 @@ impl From<GlspError> for Error {
 ///
 /// ```rust,no_run
 /// use glsp_mcp_server::{GlspBackend, GlspConfig};
+/// use clap::Parser;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -17,6 +17,7 @@
 //!
 //! ```rust,no_run
 //! use glsp_mcp_server::{GlspBackend, GlspConfig};
+//! use clap::Parser;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,6 +53,8 @@ pub use mcp::{prompts, protocol, resources, tools};
 // Re-export core types for external users
 pub use backend::*;
 pub use model::*;
+pub use persistence::PersistenceManager;
+pub use tools::DiagramTools;
 pub use pulseengine_mcp_protocol::{
     CallToolRequestParam, CallToolResult, Content, Error, Implementation, ListPromptsResult,
     ListResourcesResult, ListToolsResult, PaginatedRequestParam, Prompt, ProtocolVersion,
