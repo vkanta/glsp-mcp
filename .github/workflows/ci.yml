@@ -47,7 +47,13 @@ jobs:
         run: cargo fmt -- --check
       
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          # Run clippy on main server package
+          cargo clippy --package glsp-mcp-server --all-targets --all-features -- -D warnings
+          # Only run clippy on Tauri if dist exists (it's built in separate job)
+          if [ -d "glsp-web-client/dist" ]; then
+            cargo clippy --package glsp-desktop --all-targets --all-features -- -D warnings
+          fi
       
       - name: Run tests
         run: cargo test --all
