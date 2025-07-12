@@ -1,58 +1,27 @@
-"""Safety Monitor System Component - Bazel Build"""
+"""Safety Monitor Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
 load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for system component
+# WIT interfaces for component
 wit_library(
-    name = "safety_monitor_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "safety_monitor_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:safety-monitor",
 )
 
-# Build safety monitor component
+# Build component
 rust_wasm_component_bindgen(
     name = "safety_monitor_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":safety_monitor_interfaces",
+    wit = ":safety_monitor_ecu_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:log",
-    ],
-    crate_features = [
-        "adas-safety",
-        "system-monitor",
-        "fault-detection",
-        "asil-compliance",
-    ],
-    # Safety-critical components need highest reliability
-    rustc_flags = [
-        "-C", "opt-level=2",
-        "-C", "panic=abort",
-        "-C", "debug-assertions=on",
-    ],
 )
 
-# Test the system component
+# Test the component
 rust_wasm_component_test(
-    name = "safety_monitor_test",
+    name = "safety_monitor_ecu_test",
     component = ":safety_monitor_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_safety_monitor_ecu", 
-    actual = ":safety_monitor_ecu_release",
-    visibility = ["//visibility:public"],
 )

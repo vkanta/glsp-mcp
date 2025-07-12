@@ -5,47 +5,23 @@ load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rus
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for radar component
+# WIT interfaces for component
 wit_library(
-    name = "radar_corner_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "radar_corner_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:radar-corner",
 )
 
-# Build radar corner component
+# Build component
 rust_wasm_component_bindgen(
     name = "radar_corner_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":radar_corner_interfaces",
+    wit = ":radar_corner_ecu_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:log", 
-    ],
-    crate_features = [
-        "adas-radar",
-        "sensor-interface",
-        "corner-detection",
-    ],
 )
 
-# Test the radar component
+# Test the component
 rust_wasm_component_test(
-    name = "radar_corner_test",
+    name = "radar_corner_ecu_test",
     component = ":radar_corner_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_radar_corner_ecu", 
-    actual = ":radar_corner_ecu_release",
-    visibility = ["//visibility:public"],
 )

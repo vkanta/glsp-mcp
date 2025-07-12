@@ -1,0 +1,5 @@
+package adas:vehicle-control@0.1.0;
+
+world vehicle-control {
+    export process-frame: func() -> string;
+}

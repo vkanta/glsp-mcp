@@ -1,0 +1,5 @@
+package adas:video-ai-pipeline@0.1.0;
+
+world video-ai-pipeline {
+    export process-frame: func() -> string;
+}

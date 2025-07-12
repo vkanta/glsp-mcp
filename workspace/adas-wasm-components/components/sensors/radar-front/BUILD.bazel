@@ -8,14 +8,7 @@ package(default_visibility = ["//visibility:public"])
 # WIT interfaces for radar component
 wit_library(
     name = "radar_front_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    srcs = ["wit/world.wit"],
     package_name = "adas:radar-front",
 )
 
@@ -25,16 +18,6 @@ rust_wasm_component_bindgen(
     srcs = ["src/lib.rs"],
     wit = ":radar_front_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:log", 
-    ],
-    crate_features = [
-        "adas-radar",
-        "sensor-interface",
-        "doppler-processing",
-    ],
 )
 
 # Test the radar component

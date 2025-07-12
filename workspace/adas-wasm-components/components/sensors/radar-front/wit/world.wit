@@ -1,0 +1,5 @@
+package adas:radar-front@0.1.0;
+
+world radar-front {
+    export process-frame: func() -> string;
+}

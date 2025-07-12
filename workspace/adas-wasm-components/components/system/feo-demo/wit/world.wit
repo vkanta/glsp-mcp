@@ -1,0 +1,5 @@
+package adas:feo-demo@0.1.0;
+
+world feo-demo {
+    export process-frame: func() -> string;
+}

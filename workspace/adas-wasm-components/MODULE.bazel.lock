@@ -239,7 +239,7 @@
     },
     "@@rules_wasm_component+//wasm:extensions.bzl%wasi_sdk": {
       "general": {
-        "bzlTransitiveDigest": "edN/wpFR2B4nNnxKKEyYcwOm6E1wZ9p7IiHA7m/U+Zo=",
+        "bzlTransitiveDigest": "V3cQWLACNsqp9UVDkCv/mD0/maBqRzW+ep/u6KJuNo0=",
         "usagesDigest": "VYTpO3rQyyI3NWuYGYT8Hw0uFz/yhZ9QL7EyDAIK0D0=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -266,7 +266,7 @@
     },
     "@@rules_wasm_component+//wasm:extensions.bzl%wasm_toolchain": {
       "general": {
-        "bzlTransitiveDigest": "edN/wpFR2B4nNnxKKEyYcwOm6E1wZ9p7IiHA7m/U+Zo=",
+        "bzlTransitiveDigest": "V3cQWLACNsqp9UVDkCv/mD0/maBqRzW+ep/u6KJuNo0=",
         "usagesDigest": "XOChU5ZeGDqsmLBkwb+cUxLh91hYtzwSGKCDeawOu80=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

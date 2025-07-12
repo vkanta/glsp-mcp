@@ -1,0 +1,9 @@
+"""Integration components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/integration/video-ai-pipeline:video_ai_pipeline_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

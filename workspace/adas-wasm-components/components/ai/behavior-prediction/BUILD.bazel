@@ -5,59 +5,23 @@ load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rus
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for AI component
+# WIT interfaces for component
 wit_library(
-    name = "behavior_prediction_interfaces", 
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control",
-        "//:adas_data", 
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "behavior_prediction_ai_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:behavior-prediction",
 )
 
-# Build AI component with WASI-NN support
+# Build component
 rust_wasm_component_bindgen(
     name = "behavior_prediction_ai",
-    srcs = [
-        "src/lib.rs",
-        "src/social_lstm.rs",
-        "src/trajectory.rs", 
-        "src/wasi_nn_interface.rs",
-    ],
-    wit = ":behavior_prediction_interfaces",
+    srcs = ["src/lib.rs"],
+    wit = ":behavior_prediction_ai_interfaces",
     profiles = ["debug", "release", "optimized"],
-    deps = [
-        # Add AI-specific dependencies
-        # "@crates//:ndarray",
-        # "@crates//:nalgebra",
-    ],
-    crate_features = [
-        "wasi-nn",
-        "behavior-prediction",
-        "social-lstm",
-        "trajectory-prediction",
-    ],
-    # AI components need high optimization
-    rustc_flags = [
-        "-C", "opt-level=3",
-        "-C", "target-cpu=native",
-        "-C", "lto=fat",
-    ],
 )
 
-# Test the AI component  
+# Test the component
 rust_wasm_component_test(
-    name = "behavior_prediction_test",
+    name = "behavior_prediction_ai_test",
     component = ":behavior_prediction_ai",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_behavior_prediction_ai",
-    actual = ":behavior_prediction_ai_release", 
-    visibility = ["//visibility:public"],
 )

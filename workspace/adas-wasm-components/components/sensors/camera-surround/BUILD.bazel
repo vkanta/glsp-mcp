@@ -5,47 +5,23 @@ load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rus
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for camera component
+# WIT interfaces for component
 wit_library(
-    name = "camera_surround_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "camera_surround_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:camera-surround",
 )
 
-# Build camera surround component
+# Build component
 rust_wasm_component_bindgen(
     name = "camera_surround_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":camera_surround_interfaces",
+    wit = ":camera_surround_ecu_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:log", 
-    ],
-    crate_features = [
-        "adas-camera",
-        "sensor-interface",
-        "surround-view",
-    ],
 )
 
-# Test the camera component
+# Test the component
 rust_wasm_component_test(
-    name = "camera_surround_test",
+    name = "camera_surround_ecu_test",
     component = ":camera_surround_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_camera_surround_ecu", 
-    actual = ":camera_surround_ecu_release",
-    visibility = ["//visibility:public"],
 )

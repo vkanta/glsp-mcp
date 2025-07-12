@@ -1,0 +1,5 @@
+package adas:tracking-prediction@0.1.0;
+
+world tracking-prediction {
+    export process-frame: func() -> string;
+}

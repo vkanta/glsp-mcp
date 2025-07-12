@@ -1,16 +1,13 @@
-use crate::exports::hello;
+// The bindings are generated as a separate crate based on the BUILD target name
+use simple_component_bindings::Guest;
 
-wit_bindgen::generate!({
-    world: "simple",
-    exports: {
-        "hello": HelloComponent,
-    },
-});
+struct Component;
 
-pub struct HelloComponent;
-
-impl hello::Guest for HelloComponent {
+impl Guest for Component {
     fn hello(name: String) -> String {
         format!("Hello, {}!", name)
     }
 }
+
+// Export the component using the generated macro with proper path
+simple_component_bindings::export!(Component with_types_in simple_component_bindings);

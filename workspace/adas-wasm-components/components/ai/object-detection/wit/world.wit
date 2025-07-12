@@ -1,0 +1,5 @@
+package adas:object-detection@0.1.0;
+
+world object-detection {
+    export process-frame: func() -> string;
+}

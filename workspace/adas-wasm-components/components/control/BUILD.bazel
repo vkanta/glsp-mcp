@@ -1,0 +1,10 @@
+"""Control components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/control/planning-decision:planning_decision_ecu_release",
+        "//components/control/vehicle-control:vehicle_control_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

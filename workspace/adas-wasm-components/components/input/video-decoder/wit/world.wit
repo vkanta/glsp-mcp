@@ -1,0 +1,5 @@
+package adas:video-decoder@0.1.0;
+
+world video-decoder {
+    export process-frame: func() -> string;
+}

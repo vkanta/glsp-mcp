@@ -1,0 +1,5 @@
+package adas:ultrasonic@0.1.0;
+
+world ultrasonic {
+    export process-frame: func() -> string;
+}

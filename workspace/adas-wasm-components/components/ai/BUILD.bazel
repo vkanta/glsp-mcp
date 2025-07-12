@@ -1,0 +1,10 @@
+"""AI components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/ai/object-detection:object_detection_ai_release",
+        "//components/ai/behavior-prediction:behavior_prediction_ai_release",
+    ],
+    visibility = ["//visibility:public"],
+)

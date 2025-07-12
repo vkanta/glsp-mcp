@@ -8,14 +8,7 @@ package(default_visibility = ["//visibility:public"])
 # WIT interfaces for camera component
 wit_library(
     name = "camera_front_interfaces",
-    srcs = ["wit/world.wit"],  # Use only the world file
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    srcs = ["wit/world.wit"],
     package_name = "adas:camera-front",
 )
 

@@ -1,57 +1,27 @@
-"""Domain Controller System Component - Bazel Build"""
+"""Domain Controller Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
 load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for system component
+# WIT interfaces for component
 wit_library(
-    name = "domain_controller_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "domain_controller_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:domain-controller",
 )
 
-# Build domain controller component
+# Build component
 rust_wasm_component_bindgen(
     name = "domain_controller_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":domain_controller_interfaces",
+    wit = ":domain_controller_ecu_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:tokio",
-        # "@crates//:log",
-    ],
-    crate_features = [
-        "adas-system",
-        "domain-control",
-        "resource-management",
-        "coordination",
-    ],
-    # Domain controllers need balanced performance
-    rustc_flags = [
-        "-C", "opt-level=2",
-    ],
 )
 
-# Test the system component
+# Test the component
 rust_wasm_component_test(
-    name = "domain_controller_test",
+    name = "domain_controller_ecu_test",
     component = ":domain_controller_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_domain_controller_ecu", 
-    actual = ":domain_controller_ecu_release",
-    visibility = ["//visibility:public"],
 )

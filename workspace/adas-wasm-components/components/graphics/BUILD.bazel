@@ -1,0 +1,9 @@
+"""Graphics components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/graphics/adas-visualizer:adas_visualizer_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,5 @@
+package adas:domain-controller@0.1.0;
+
+world domain-controller {
+    export process-frame: func() -> string;
+}

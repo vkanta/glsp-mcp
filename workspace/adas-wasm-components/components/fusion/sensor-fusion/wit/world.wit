@@ -1,0 +1,5 @@
+package adas:sensor-fusion@0.1.0;
+
+world sensor-fusion {
+    export process-frame: func() -> string;
+}

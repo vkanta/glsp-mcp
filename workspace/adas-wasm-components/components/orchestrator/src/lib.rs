@@ -1,11 +1,8 @@
 // ADAS Orchestrator - The middleware that connects all components
 // Implements data flow coordination and component lifecycle management
 
-wit_bindgen::generate!({
-    world: "orchestrator",
-    path: "wit/",
-    generate_all,
-});
+// The bindings are generated as a separate crate based on the BUILD target name
+use adas_orchestrator_ecu_bindings::Guest;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};

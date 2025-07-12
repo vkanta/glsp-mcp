@@ -1,0 +1,9 @@
+"""Input components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/input/video-decoder:video_decoder_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

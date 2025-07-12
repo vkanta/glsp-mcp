@@ -1,0 +1,14 @@
+"""Sensors component group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/sensors/camera-front:camera_front_ecu_release",
+        "//components/sensors/camera-surround:camera_surround_ecu_release",
+        "//components/sensors/lidar:lidar_ecu_release",
+        "//components/sensors/radar-front:radar_front_ecu_release",
+        "//components/sensors/radar-corner:radar_corner_ecu_release",
+        "//components/sensors/ultrasonic:ultrasonic_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

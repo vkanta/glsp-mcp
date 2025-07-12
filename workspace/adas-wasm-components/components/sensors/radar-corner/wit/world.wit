@@ -1,0 +1,5 @@
+package adas:radar-corner@0.1.0;
+
+world radar-corner {
+    export process-frame: func() -> string;
+}

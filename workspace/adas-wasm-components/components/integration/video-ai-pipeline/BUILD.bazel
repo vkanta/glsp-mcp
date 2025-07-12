@@ -1,57 +1,27 @@
-"""Video AI Pipeline Integration Component - Bazel Build"""
+"""Video AI Pipeline Component - Bazel Build"""
 
 load("@rules_wasm_component//wit:defs.bzl", "wit_library")
 load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for integration component
+# WIT interfaces for component
 wit_library(
-    name = "video_ai_pipeline_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "video_ai_pipeline_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:video-ai-pipeline",
 )
 
-# Build integration pipeline component
+# Build component
 rust_wasm_component_bindgen(
     name = "video_ai_pipeline_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":video_ai_pipeline_interfaces",
+    wit = ":video_ai_pipeline_ecu_interfaces",
     profiles = ["debug", "release", "optimized"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:tokio",
-        # "@crates//:serde",
-        # "@crates//:log",
-    ],
-    crate_features = [
-        "adas-integration",
-        "pipeline-orchestration",
-        "video-ai-processing",
-        "component-coordination",
-    ],
-    # Integration components need balanced performance
-    rustc_flags = [
-        "-C", "opt-level=2",
-    ],
 )
 
-# Test the integration component
+# Test the component
 rust_wasm_component_test(
-    name = "video_ai_pipeline_test",
+    name = "video_ai_pipeline_ecu_test",
     component = ":video_ai_pipeline_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_video_ai_pipeline_ecu", 
-    actual = ":video_ai_pipeline_ecu_release",
-    visibility = ["//visibility:public"],
 )

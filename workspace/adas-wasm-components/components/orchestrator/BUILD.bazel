@@ -43,4 +43,12 @@ alias(
     name = "adas_orchestrator", 
     actual = ":adas_orchestrator_ecu_release",
     visibility = ["//visibility:public"],
+)# Orchestrator components group
+
+filegroup(
+    name = "all",
+    srcs = [
+        ":adas_orchestrator_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
 )

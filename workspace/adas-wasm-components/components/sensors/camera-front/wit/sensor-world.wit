@@ -1,0 +1,134 @@
+package adas:camera-front@0.1.0;
+
+/// Camera Front Sensor Component
+/// Self-contained world with all necessary types
+world sensor-component {
+    /// Basic types needed for sensor operation
+    /// Health status for system monitoring
+    enum health-status {
+        ok,
+        warning,
+        error,
+        critical,
+        offline,
+        degraded,
+    }
+
+    /// Test result enumeration
+    enum test-result {
+        passed,
+        failed,
+        error,
+        timeout,
+        not-run,
+        warning,
+    }
+
+    /// Power modes for sensor operation
+    enum power-mode {
+        low-power,
+        standard,
+        high-performance,
+        emergency,
+    }
+
+    /// Performance metrics
+    record performance-metrics {
+        latency-avg-ms: f32,
+        latency-max-ms: f32,
+        cpu-utilization: f32,
+        memory-usage-mb: u32,
+        throughput-hz: f32,
+        error-rate: f32,
+    }
+
+    /// Sensor configuration
+    record sensor-config {
+        power-mode: power-mode,
+        update-rate-hz: f32,
+        resolution-width: u32,
+        resolution-height: u32,
+    }
+
+    /// Health report structure
+    record health-report {
+        component-id: string,
+        overall-health: health-status,
+        subsystem-health: list<subsystem-health>,
+        timestamp: u64,
+    }
+
+    record subsystem-health {
+        subsystem-name: string,
+        status: health-status,
+        details: string,
+    }
+
+    /// Diagnostic test execution
+    record test-execution {
+        test-name: string,
+        test-result: test-result,
+        details: string,
+        execution-time-ms: f32,
+    }
+
+    /// Diagnostic result
+    record diagnostic-result {
+        test-results: list<test-execution>,
+        overall-score: f32,
+        recommendations: list<string>,
+        timestamp: u64,
+    }
+
+    /// Extended performance with resource usage
+    record extended-performance {
+        base-metrics: performance-metrics,
+        component-specific: list<metric>,
+        resource-usage: resource-usage,
+        timestamp: u64,
+    }
+
+    record metric {
+        name: string,
+        value: f64,
+        unit: string,
+        description: string,
+    }
+
+    record resource-usage {
+        cpu-cores-used: f32,
+        memory-allocated-mb: u32,
+        memory-peak-mb: u32,
+        disk-io-mb: f32,
+        network-io-mb: f32,
+        gpu-utilization: f32,
+        gpu-memory-mb: u32,
+    }
+
+    /// Import sensor control functions
+    import sensor-control: interface {
+        initialize: func(config: sensor-config) -> result<_, string>;
+        start: func() -> result<_, string>;
+        stop: func() -> result<_, string>;
+        update-config: func(config: sensor-config) -> result<_, string>;
+        get-status: func() -> health-status;
+        get-performance: func() -> performance-metrics;
+    }
+
+    /// Import health monitoring functions
+    import health-monitoring: interface {
+        get-health: func() -> health-report;
+        run-diagnostic: func() -> result<diagnostic-result, string>;
+        get-last-diagnostic: func() -> option<diagnostic-result>;
+    }
+
+    /// Import performance monitoring functions
+    import performance-monitoring: interface {
+        get-performance: func() -> extended-performance;
+        get-performance-history: func(duration-seconds: u32) -> list<extended-performance>;
+        reset-counters: func();
+    }
+
+    /// Export camera-specific functionality
+    export process-frame: func() -> string;
+}

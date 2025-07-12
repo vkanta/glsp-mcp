@@ -1,0 +1,11 @@
+"""Fusion components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/fusion/sensor-fusion:sensor_fusion_ecu_release",
+        "//components/fusion/perception-fusion:perception_fusion_ecu_release",
+        "//components/fusion/tracking-prediction:tracking_prediction_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)

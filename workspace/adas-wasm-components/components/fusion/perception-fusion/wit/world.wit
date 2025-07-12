@@ -1,0 +1,5 @@
+package adas:perception-fusion@0.1.0;
+
+world perception-fusion {
+    export process-frame: func() -> string;
+}

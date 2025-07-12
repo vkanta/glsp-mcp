@@ -1,0 +1,5 @@
+package adas:lidar@0.1.0;
+
+world lidar {
+    export process-frame: func() -> string;
+}

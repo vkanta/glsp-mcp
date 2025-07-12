@@ -1,0 +1,5 @@
+package adas:safety-monitor@0.1.0;
+
+world safety-monitor {
+    export process-frame: func() -> string;
+}

@@ -1,0 +1,5 @@
+package adas:hmi-interface@0.1.0;
+
+world hmi-interface {
+    export process-frame: func() -> string;
+}

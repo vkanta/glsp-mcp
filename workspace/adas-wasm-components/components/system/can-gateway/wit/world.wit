@@ -1,0 +1,5 @@
+package adas:can-gateway@0.1.0;
+
+world can-gateway {
+    export process-frame: func() -> string;
+}

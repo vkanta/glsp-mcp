@@ -1,0 +1,5 @@
+package adas:behavior-prediction@0.1.0;
+
+world behavior-prediction {
+    export process-frame: func() -> string;
+}

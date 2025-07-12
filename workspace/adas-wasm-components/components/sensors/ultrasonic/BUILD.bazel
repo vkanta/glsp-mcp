@@ -5,47 +5,23 @@ load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rus
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for ultrasonic component
+# WIT interfaces for component
 wit_library(
-    name = "ultrasonic_interfaces",
-    srcs = ["wit/component.wit"],
-    deps = [
-        "//:adas_common_types",
-        "//:adas_control", 
-        "//:adas_data",
-        "//:adas_diagnostics",
-        "//:adas_orchestration",
-    ],
+    name = "ultrasonic_ecu_interfaces",
+    srcs = ["wit/world.wit"],
     package_name = "adas:ultrasonic",
 )
 
-# Build ultrasonic component
+# Build component
 rust_wasm_component_bindgen(
     name = "ultrasonic_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":ultrasonic_interfaces",
+    wit = ":ultrasonic_ecu_interfaces",
     profiles = ["debug", "release"],
-    deps = [
-        # Add Rust dependencies here
-        # "@crates//:serde",
-        # "@crates//:log", 
-    ],
-    crate_features = [
-        "adas-ultrasonic",
-        "sensor-interface",
-        "proximity-detection",
-    ],
 )
 
-# Test the ultrasonic component
+# Test the component
 rust_wasm_component_test(
-    name = "ultrasonic_test",
+    name = "ultrasonic_ecu_test",
     component = ":ultrasonic_ecu",
-)
-
-# For compatibility with existing system
-alias(
-    name = "adas_ultrasonic_ecu", 
-    actual = ":ultrasonic_ecu_release",
-    visibility = ["//visibility:public"],
 )

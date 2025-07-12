@@ -1,0 +1,5 @@
+package adas:camera-surround@0.1.0;
+
+world camera-surround {
+    export process-frame: func() -> string;
+}

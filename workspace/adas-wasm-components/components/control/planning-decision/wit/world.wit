@@ -1,0 +1,5 @@
+package adas:planning-decision@0.1.0;
+
+world planning-decision {
+    export process-frame: func() -> string;
+}

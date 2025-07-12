@@ -1,0 +1,13 @@
+"""System components group"""
+
+filegroup(
+    name = "all",
+    srcs = [
+        "//components/system/safety-monitor:safety_monitor_ecu_release",
+        "//components/system/domain-controller:domain_controller_ecu_release",
+        "//components/system/can-gateway:can_gateway_ecu_release",
+        "//components/system/hmi-interface:hmi_interface_ecu_release",
+        "//components/system/feo-demo:feo_demo_ecu_release",
+    ],
+    visibility = ["//visibility:public"],
+)
