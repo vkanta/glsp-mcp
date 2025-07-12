@@ -14,7 +14,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use wasmtime::*;
+use wasmtime::{Config, Engine, Instance, Module, OptLevel, Store};
 
 /// Execution context for a WASM component
 #[derive(Debug, Clone, Serialize, Deserialize)]
