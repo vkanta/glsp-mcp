@@ -26,6 +26,22 @@ pub mod influxdb;
 #[cfg(feature = "redis")]
 pub mod redis;
 
+// Ensure modules exist even when features disabled to avoid compilation issues
+#[cfg(not(feature = "postgresql"))]
+pub mod postgresql {
+    //! Stub PostgreSQL module when feature is disabled
+}
+
+#[cfg(not(feature = "influxdb"))]
+pub mod influxdb {
+    //! Stub InfluxDB module when feature is disabled
+}
+
+#[cfg(not(feature = "redis"))]
+pub mod redis {
+    //! Stub Redis module when feature is disabled
+}
+
 // Re-exports for convenience
 pub use config::DatabaseConfig;
 pub use dataset::*;
