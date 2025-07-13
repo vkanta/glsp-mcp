@@ -7,24 +7,34 @@
 use crate::database::{
     config::DatabaseConfig, models::*, traits::*, DatabaseError, DatabaseResult,
 };
+#[cfg(feature = "influxdb")]
 use async_trait::async_trait;
+#[cfg(feature = "influxdb")]
 use base64::Engine as _;
+#[cfg(feature = "influxdb")]
 use chrono::Utc;
+#[cfg(feature = "influxdb")]
 use influxdb::{Client, ReadQuery, Timestamp, WriteQuery};
+#[cfg(feature = "influxdb")]
 use tracing::{debug, info, warn};
 
 /// InfluxDB measurement names
+#[cfg(feature = "influxdb")]
 const SENSOR_READINGS_MEASUREMENT: &str = "sensor_readings";
+#[cfg(feature = "influxdb")]
 const SENSOR_METADATA_MEASUREMENT: &str = "sensor_metadata";
+#[cfg(feature = "influxdb")]
 const CONFIG_STORE_MEASUREMENT: &str = "config_store";
 
 /// InfluxDB backend for time-series sensor data
+#[cfg(feature = "influxdb")]
 pub struct InfluxDBBackend {
     config: DatabaseConfig,
     client: Option<Client>,
     database_name: String,
 }
 
+#[cfg(feature = "influxdb")]
 impl InfluxDBBackend {
     /// Create a new InfluxDB backend
     pub async fn new(config: DatabaseConfig) -> DatabaseResult<Self> {
@@ -127,6 +137,7 @@ impl InfluxDBBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "influxdb")]
 impl DatabaseProvider for InfluxDBBackend {
     async fn connect(&mut self) -> DatabaseResult<()> {
         if self.client.is_some() {
@@ -223,6 +234,7 @@ impl DatabaseProvider for InfluxDBBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "influxdb")]
 impl SensorDataRepository for InfluxDBBackend {
     async fn store_reading(&mut self, reading: &SensorReading) -> DatabaseResult<()> {
         let client = self.client.as_ref().ok_or_else(|| {
@@ -436,6 +448,7 @@ impl SensorDataRepository for InfluxDBBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "influxdb")]
 impl TimeSeriesStore for InfluxDBBackend {
     async fn downsample(
         &self,
@@ -497,6 +510,7 @@ impl TimeSeriesStore for InfluxDBBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "influxdb")]
 impl MetadataStore for InfluxDBBackend {
     async fn store_sensor_metadata(&mut self, metadata: &SensorMetadata) -> DatabaseResult<()> {
         let client = self.client.as_ref().ok_or_else(|| {
@@ -623,6 +637,7 @@ impl MetadataStore for InfluxDBBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "influxdb")]
 impl DatabaseInterface for InfluxDBBackend {
     fn supported_features(&self) -> DatabaseFeatures {
         DatabaseFeatures {

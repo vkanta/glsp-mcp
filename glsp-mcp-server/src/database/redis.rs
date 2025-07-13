@@ -2,6 +2,7 @@
 //!
 //! Provides Redis-based storage for caching and session management.
 
+#[cfg(feature = "redis")]
 use crate::database::{
     config::DatabaseConfig,
     error::{DatabaseError, DatabaseResult},
@@ -10,14 +11,19 @@ use crate::database::{
         DatabaseInterface, DatabaseProvider, MetadataStore, SensorDataRepository, TimeSeriesStore,
     },
 };
+#[cfg(feature = "redis")]
 use async_trait::async_trait;
 // Note: Serde traits reserved for future JSON serialization features
+#[cfg(feature = "redis")]
 #[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "redis")]
 use std::collections::HashMap;
+#[cfg(feature = "redis")]
 use std::time::{Duration, SystemTime};
 
 /// Redis database backend implementation
+#[cfg(feature = "redis")]
 #[derive(Debug, Clone)]
 pub struct RedisBackend {
     url: String,
@@ -26,6 +32,7 @@ pub struct RedisBackend {
     connection_timeout: Duration,
 }
 
+#[cfg(feature = "redis")]
 impl RedisBackend {
     /// Create a new Redis backend instance
     pub fn new(config: &DatabaseConfig) -> DatabaseResult<Self> {
@@ -71,6 +78,7 @@ impl RedisBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "redis")]
 impl DatabaseProvider for RedisBackend {
     async fn connect(&mut self) -> DatabaseResult<()> {
         self.initialize().await
@@ -120,6 +128,7 @@ impl DatabaseProvider for RedisBackend {
     }
 }
 
+#[cfg(feature = "redis")]
 impl RedisBackend {
     /// Session management functionality for Redis backend
     /// These methods provide session storage capabilities using Redis
@@ -201,6 +210,7 @@ impl RedisBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "redis")]
 impl SensorDataRepository for RedisBackend {
     async fn store_reading(&mut self, _reading: &SensorReading) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotSupported {
@@ -267,6 +277,7 @@ impl SensorDataRepository for RedisBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "redis")]
 impl TimeSeriesStore for RedisBackend {
     async fn downsample(
         &self,
@@ -316,6 +327,7 @@ impl TimeSeriesStore for RedisBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "redis")]
 impl MetadataStore for RedisBackend {
     async fn store_sensor_metadata(&mut self, _metadata: &SensorMetadata) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotSupported {
@@ -370,6 +382,7 @@ impl MetadataStore for RedisBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "redis")]
 impl DatabaseInterface for RedisBackend {
     fn supported_features(&self) -> crate::database::traits::DatabaseFeatures {
         crate::database::traits::DatabaseFeatures {
