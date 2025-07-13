@@ -4,17 +4,24 @@
 use crate::database::{
     config::DatabaseConfig, models::*, traits::*, DatabaseError, DatabaseResult,
 };
+
+#[cfg(feature = "postgresql")]
 use async_trait::async_trait;
+#[cfg(feature = "postgresql")]
 use chrono::Utc;
+#[cfg(feature = "postgresql")]
 use sqlx::{PgPool, Row};
+#[cfg(feature = "postgresql")]
 use tracing::{debug, info, warn};
 
 /// PostgreSQL database backend with TimescaleDB time-series support
+#[cfg(feature = "postgresql")]
 pub struct PostgreSQLBackend {
     config: DatabaseConfig,
     pool: Option<PgPool>,
 }
 
+#[cfg(feature = "postgresql")]
 impl PostgreSQLBackend {
     /// Create a new PostgreSQL backend
     pub async fn new(config: DatabaseConfig) -> DatabaseResult<Self> {
@@ -368,6 +375,7 @@ impl PostgreSQLBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "postgresql")]
 impl DatabaseProvider for PostgreSQLBackend {
     async fn connect(&mut self) -> DatabaseResult<()> {
         if self.pool.is_some() {
@@ -465,6 +473,7 @@ impl DatabaseProvider for PostgreSQLBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "postgresql")]
 impl SensorDataRepository for PostgreSQLBackend {
     async fn store_reading(&mut self, reading: &SensorReading) -> DatabaseResult<()> {
         let pool = self.pool.as_ref().ok_or_else(|| {
@@ -932,6 +941,7 @@ impl SensorDataRepository for PostgreSQLBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "postgresql")]
 impl TimeSeriesStore for PostgreSQLBackend {
     async fn downsample(
         &self,
@@ -1029,6 +1039,7 @@ impl TimeSeriesStore for PostgreSQLBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "postgresql")]
 impl MetadataStore for PostgreSQLBackend {
     async fn store_sensor_metadata(&mut self, metadata: &SensorMetadata) -> DatabaseResult<()> {
         let pool = self.pool.as_ref().ok_or_else(|| {
@@ -1224,6 +1235,7 @@ impl MetadataStore for PostgreSQLBackend {
 }
 
 #[async_trait]
+#[cfg(feature = "postgresql")]
 impl DatabaseInterface for PostgreSQLBackend {
     fn supported_features(&self) -> DatabaseFeatures {
         let mut features = DatabaseFeatures::full();
