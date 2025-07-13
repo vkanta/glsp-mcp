@@ -74,7 +74,7 @@ path = "src/main.rs"
 
 [features]
 default = ["postgresql"]
-postgresql = ["sqlx"]
+postgresql = ["dep:sqlx"]
 influxdb = ["dep:influxdb"]
 redis = ["dep:redis"]
 all-databases = ["postgresql", "influxdb", "redis"]
