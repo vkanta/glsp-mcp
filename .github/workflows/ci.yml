@@ -47,7 +47,7 @@ jobs:
         run: cargo fmt -- --check
       
       - name: Run clippy on server
-        run: cargo clippy --package glsp-mcp-server --all-targets --features all-databases -- -D warnings
+        run: cargo clippy --package glsp-mcp-server --all-targets --features postgresql,influxdb,redis -- -D warnings
       
       - name: Check if web client dist exists
         id: check-dist
