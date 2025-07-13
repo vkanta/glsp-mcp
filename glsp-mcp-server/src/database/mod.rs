@@ -30,16 +30,56 @@ pub mod redis;
 #[cfg(not(feature = "postgresql"))]
 pub mod postgresql {
     //! Stub PostgreSQL module when feature is disabled
+    
+    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
+    
+    pub struct PostgreSQLBackend;
+    
+    impl PostgreSQLBackend {
+        pub async fn new(_config: DatabaseConfig) -> DatabaseResult<Self> {
+            Err(DatabaseError::FeatureNotSupported {
+                feature: "PostgreSQL backend not compiled in".to_string(),
+            })
+        }
+    }
 }
 
 #[cfg(not(feature = "influxdb"))]
 pub mod influxdb {
     //! Stub InfluxDB module when feature is disabled
+    
+    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
+    
+    pub struct InfluxDBBackend;
+    
+    impl InfluxDBBackend {
+        pub async fn new(_config: DatabaseConfig) -> DatabaseResult<Self> {
+            Err(DatabaseError::FeatureNotSupported {
+                feature: "InfluxDB backend not compiled in".to_string(),
+            })
+        }
+    }
 }
 
 #[cfg(not(feature = "redis"))]
 pub mod redis {
     //! Stub Redis module when feature is disabled
+    
+    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
+    
+    pub struct RedisBackend;
+    
+    impl RedisBackend {
+        pub fn new(_config: &DatabaseConfig) -> DatabaseResult<Self> {
+            Err(DatabaseError::FeatureNotSupported {
+                feature: "Redis backend not compiled in".to_string(),
+            })
+        }
+        
+        pub async fn initialize(&mut self) -> DatabaseResult<()> {
+            Ok(())
+        }
+    }
 }
 
 // Re-exports for convenience
