@@ -30,11 +30,11 @@ pub mod redis;
 #[cfg(not(feature = "postgresql"))]
 pub mod postgresql {
     //! Stub PostgreSQL module when feature is disabled
-    
-    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
-    
+
+    use crate::database::{config::DatabaseConfig, DatabaseError, DatabaseResult};
+
     pub struct PostgreSQLBackend;
-    
+
     impl PostgreSQLBackend {
         pub async fn new(_config: DatabaseConfig) -> DatabaseResult<Self> {
             Err(DatabaseError::FeatureNotSupported {
@@ -47,11 +47,11 @@ pub mod postgresql {
 #[cfg(not(feature = "influxdb"))]
 pub mod influxdb {
     //! Stub InfluxDB module when feature is disabled
-    
-    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
-    
+
+    use crate::database::{config::DatabaseConfig, DatabaseError, DatabaseResult};
+
     pub struct InfluxDBBackend;
-    
+
     impl InfluxDBBackend {
         pub async fn new(_config: DatabaseConfig) -> DatabaseResult<Self> {
             Err(DatabaseError::FeatureNotSupported {
@@ -64,18 +64,18 @@ pub mod influxdb {
 #[cfg(not(feature = "redis"))]
 pub mod redis {
     //! Stub Redis module when feature is disabled
-    
-    use crate::database::{DatabaseError, DatabaseResult, config::DatabaseConfig};
-    
+
+    use crate::database::{config::DatabaseConfig, DatabaseError, DatabaseResult};
+
     pub struct RedisBackend;
-    
+
     impl RedisBackend {
         pub fn new(_config: &DatabaseConfig) -> DatabaseResult<Self> {
             Err(DatabaseError::FeatureNotSupported {
                 feature: "Redis backend not compiled in".to_string(),
             })
         }
-        
+
         pub async fn initialize(&mut self) -> DatabaseResult<()> {
             Ok(())
         }

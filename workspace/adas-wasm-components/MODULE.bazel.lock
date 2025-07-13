@@ -267,7 +267,7 @@
     "@@rules_wasm_component+//wasm:extensions.bzl%wasm_toolchain": {
       "general": {
         "bzlTransitiveDigest": "V3cQWLACNsqp9UVDkCv/mD0/maBqRzW+ep/u6KJuNo0=",
-        "usagesDigest": "XOChU5ZeGDqsmLBkwb+cUxLh91hYtzwSGKCDeawOu80=",
+        "usagesDigest": "sCSbVLLuTpeaT4wruzpnRMJxHnibbkPvCO4K8KZNOHI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},

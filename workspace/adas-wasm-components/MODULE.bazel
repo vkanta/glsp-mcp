@@ -32,11 +32,12 @@ git_override(
     commit = "1945773a",  # Latest fix including rust_toolchain
 )
 
-# Configure WASM toolchain to download tools (more reliable)
+# Configure WASM toolchain to download standard tools for now (test if issue is resolved in newer version)
 wasm_toolchain = use_extension("@rules_wasm_component//wasm:extensions.bzl", "wasm_toolchain")
 wasm_toolchain.register(
     name = "adas_tools",
     strategy = "download",  # Download prebuilt tools
+    version = "1.235.0",  # Use latest version to see if issue is already fixed
 )
 use_repo(wasm_toolchain, "adas_tools_toolchains")
 
