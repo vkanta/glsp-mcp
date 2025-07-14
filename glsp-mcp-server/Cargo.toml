@@ -73,7 +73,7 @@ name = "server"
 path = "src/main.rs"
 
 [features]
-default = ["postgresql"]
+default = []
 postgresql = ["dep:sqlx"]
 influxdb = ["dep:influxdb"]
 redis = ["dep:redis"]
