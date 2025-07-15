@@ -14,11 +14,10 @@ pub use execution_engine::{
 pub use filesystem_watcher::{FileSystemWatcher, WasmChangeType, WasmComponentChange};
 pub use graphics_renderer::{CanvasCommand, GraphicsConfig, ImageFormat, WasmGraphicsRenderer};
 pub use pipeline::{
-    BackoffStrategy, DataConnection, DataMapping, DataTransform, ExecutionMode,
-    ExecutionStats, PersistenceSettings, PipelineConfig, PipelineExecution, PipelineSettings,
-    PipelineStage, PipelineState, RetryConfig, StageExecutionSettings, StageResult, StageStats,
-    WasmPipelineEngine,
-    ConnectionType as PipelineConnectionType,
+    BackoffStrategy, ConnectionType as PipelineConnectionType, DataConnection, DataMapping,
+    DataTransform, ExecutionMode, ExecutionStats, PersistenceSettings, PipelineConfig,
+    PipelineExecution, PipelineSettings, PipelineStage, PipelineState, RetryConfig,
+    StageExecutionSettings, StageResult, StageStats, WasmPipelineEngine,
 };
 pub use security_scanner::{
     SecurityAnalysis, SecurityIssue, SecurityIssueType, SecurityRiskLevel, WasmSecurityScanner,
@@ -1285,17 +1284,16 @@ impl ComponentGroup {
     pub fn remove_component(&mut self, component_id: &str) -> bool {
         if let Some(pos) = self.component_ids.iter().position(|id| id == component_id) {
             self.component_ids.remove(pos);
-            
+
             // Remove any connections involving this component
             self.internal_connections.retain(|conn| {
                 conn.source_component != component_id && conn.target_component != component_id
             });
-            
+
             // Remove any external interfaces from this component
-            self.external_interfaces.retain(|iface| {
-                iface.source_component != component_id
-            });
-            
+            self.external_interfaces
+                .retain(|iface| iface.source_component != component_id);
+
             self.updated_at = Utc::now();
             true
         } else {
@@ -1306,8 +1304,9 @@ impl ComponentGroup {
     /// Add an internal connection between components
     pub fn add_connection(&mut self, connection: InterfaceConnection) {
         // Validate that both components are in the group
-        if self.component_ids.contains(&connection.source_component) 
-            && self.component_ids.contains(&connection.target_component) {
+        if self.component_ids.contains(&connection.source_component)
+            && self.component_ids.contains(&connection.target_component)
+        {
             self.internal_connections.push(connection);
             self.updated_at = Utc::now();
         }
@@ -1337,7 +1336,7 @@ impl ComponentGroup {
         // Check that all component IDs exist
         for component_id in &self.component_ids {
             if !components.contains_key(component_id) {
-                issues.push(format!("Component '{}' not found", component_id));
+                issues.push(format!("Component '{component_id}' not found"));
                 interface_compatibility = false;
             }
         }
@@ -1345,11 +1344,17 @@ impl ComponentGroup {
         // Check that all connections reference valid components and interfaces
         for connection in &self.internal_connections {
             if !self.component_ids.contains(&connection.source_component) {
-                issues.push(format!("Connection source component '{}' not in group", connection.source_component));
+                issues.push(format!(
+                    "Connection source component '{}' not in group",
+                    connection.source_component
+                ));
                 interface_compatibility = false;
             }
             if !self.component_ids.contains(&connection.target_component) {
-                issues.push(format!("Connection target component '{}' not in group", connection.target_component));
+                issues.push(format!(
+                    "Connection target component '{}' not in group",
+                    connection.target_component
+                ));
                 interface_compatibility = false;
             }
         }
@@ -1357,7 +1362,10 @@ impl ComponentGroup {
         // Check that all external interfaces reference valid components
         for interface in &self.external_interfaces {
             if !self.component_ids.contains(&interface.source_component) {
-                issues.push(format!("External interface source component '{}' not in group", interface.source_component));
+                issues.push(format!(
+                    "External interface source component '{}' not in group",
+                    interface.source_component
+                ));
                 interface_compatibility = false;
             }
         }
@@ -1374,8 +1382,12 @@ impl ComponentGroup {
 
 impl ComponentGroupInfo {
     /// Create component group info from a group and component map
-    pub fn from_group(group: ComponentGroup, all_components: &HashMap<String, WasmComponent>) -> Self {
-        let components = group.component_ids
+    pub fn from_group(
+        group: ComponentGroup,
+        all_components: &HashMap<String, WasmComponent>,
+    ) -> Self {
+        let components = group
+            .component_ids
             .iter()
             .filter_map(|id| all_components.get(id).cloned())
             .collect();
@@ -1392,33 +1404,27 @@ impl ComponentGroupInfo {
     /// Generate Bazel configuration for this component group
     pub fn generate_bazel_config(&self) -> String {
         let group_name = self.group.name.replace(' ', "_").to_lowercase();
-        
+
         let mut config = format!(
             "# Generated Bazel configuration for component group: {}\n",
             self.group.name
         );
         config.push_str("load(\"//bazel:wasm_component_rules.bzl\", \"wac_compose\")\n\n");
-        
-        config.push_str(&format!(
-            "wac_compose(\n    name = \"{}\",\n",
-            group_name
-        ));
-        
+
+        config.push_str(&format!("wac_compose(\n    name = \"{group_name}\",\n"));
+
         config.push_str("    components = [\n");
         for component in &self.components {
             config.push_str(&format!("        \"//{}:component\",\n", component.name));
         }
         config.push_str("    ],\n");
-        
-        config.push_str(&format!(
-            "    wac_config = \"{}.wac.toml\",\n",
-            group_name
-        ));
-        config.push_str(&format!("    output = \"{}.wasm\",\n", group_name));
+
+        config.push_str(&format!("    wac_config = \"{group_name}.wac.toml\",\n"));
+        config.push_str(&format!("    output = \"{group_name}.wasm\",\n"));
         config.push_str("    validate_timing = True,\n");
         config.push_str("    validate_safety = True,\n");
         config.push_str(")\n");
-        
+
         config
     }
 
@@ -1429,15 +1435,21 @@ impl ComponentGroupInfo {
             self.group.name
         );
         config.push_str("[package]\n");
-        config.push_str(&format!("name = \"{}\"\n", self.group.name.replace(' ', "-").to_lowercase()));
+        config.push_str(&format!(
+            "name = \"{}\"\n",
+            self.group.name.replace(' ', "-").to_lowercase()
+        ));
         config.push_str("version = \"0.1.0\"\n\n");
-        
+
         config.push_str("[dependencies]\n");
         for component in &self.components {
-            config.push_str(&format!("{} = {{ path = \"{}\" }}\n", component.name, component.path));
+            config.push_str(&format!(
+                "{} = {{ path = \"{}\" }}\n",
+                component.name, component.path
+            ));
         }
-        config.push_str("\n");
-        
+        config.push('\n');
+
         config.push_str("[compose]\n");
         for connection in &self.group.internal_connections {
             config.push_str(&format!(
@@ -1448,7 +1460,211 @@ impl ComponentGroupInfo {
                 connection.target_interface
             ));
         }
-        
+
         config
     }
+
+    /// Generate enhanced Bazel BUILD.bazel file content with proper rules_wasm_component integration
+    pub fn generate_enhanced_build_file(
+        &self,
+        profile: &str,
+        optimizations: bool,
+        validation: bool,
+    ) -> String {
+        let group_name = self.group.name.replace(' ', "_").to_lowercase();
+        let target_name = format!("{group_name}_composition");
+
+        let mut config = format!(
+            "# Generated BUILD.bazel for component group: {}\n# Generated by GLSP Component Grouping System\n\n",
+            self.group.name
+        );
+
+        config.push_str("load(\"@rules_wasm_component//wac:defs.bzl\", \"wac_compose\")\n");
+        if validation {
+            config.push_str("load(\"@rules_wasm_component//wasm:defs.bzl\", \"wasm_validate\")\n");
+        }
+        config.push('\n');
+
+        // Main composition rule
+        config.push_str("wac_compose(\n");
+        config.push_str(&format!("    name = \"{target_name}\",\n"));
+        config.push_str("    components = {\n");
+
+        for component in &self.components {
+            let component_target = component.name.to_lowercase().replace(' ', "_");
+            config.push_str(&format!(
+                "        \"{component_target}\": \":{component_target}_{profile}\",\n"
+            ));
+        }
+
+        config.push_str("    },\n");
+        config.push_str("    composition_file = \"production.wac\",\n");
+        config.push_str(&format!("    profile = \"{profile}\",\n"));
+
+        if optimizations {
+            config.push_str("    tags = [\"optimize\"],\n");
+        }
+
+        config.push_str("    visibility = [\"//visibility:public\"],\n");
+        config.push_str(")\n\n");
+
+        // Validation target
+        if validation {
+            config.push_str("wasm_validate(\n");
+            config.push_str(&format!("    name = \"{target_name}_validate\",\n"));
+            config.push_str(&format!("    src = \":{target_name}\",\n"));
+            config.push_str("    validate_connections = True,\n");
+            config.push_str("    lint_wit = True,\n");
+            config.push_str(")\n\n");
+        }
+
+        // Individual component targets (assuming they exist)
+        config.push_str("# Individual component targets (assuming they exist)\n");
+        for component in &self.components {
+            let component_target = component.name.to_lowercase().replace(' ', "_");
+            config.push_str(&format!("# Component: {}\n", component.name));
+            config.push_str("rust_wasm_component(\n");
+            config.push_str(&format!("    name = \"{component_target}_{profile}\",\n"));
+            config.push_str(&format!(
+                "    srcs = [\"src/{component_target}/lib.rs\"],\n"
+            ));
+            config.push_str(&format!("    wit_bindgen = \":{component_target}_wit\",\n"));
+            config.push_str(&format!("    profile = \"{profile}\",\n"));
+
+            if optimizations && profile == "release" {
+                config.push_str("    strip_debug_info = True,\n");
+            }
+
+            config.push_str("    visibility = [\"//visibility:public\"],\n");
+            config.push_str(")\n\n");
+        }
+
+        config
+    }
+
+    /// Write BUILD.bazel file to workspace directory
+    pub async fn write_build_file_to_workspace(
+        &self,
+        workspace_path: &std::path::Path,
+        profile: &str,
+        optimizations: bool,
+        validation: bool,
+    ) -> Result<std::path::PathBuf, anyhow::Error> {
+        let group_name = self.group.name.replace(' ', "_").to_lowercase();
+        let target_dir = workspace_path.join(&group_name);
+
+        // Create target directory
+        tokio::fs::create_dir_all(&target_dir).await?;
+
+        // Generate BUILD.bazel content
+        let build_content = self.generate_enhanced_build_file(profile, optimizations, validation);
+
+        // Write BUILD.bazel file
+        let build_file_path = target_dir.join("BUILD.bazel");
+        tokio::fs::write(&build_file_path, build_content).await?;
+
+        tracing::info!("Generated BUILD.bazel file at: {:?}", build_file_path);
+        Ok(build_file_path)
+    }
+
+    /// Write WAC configuration file to workspace directory
+    pub async fn write_wac_file_to_workspace(
+        &self,
+        workspace_path: &std::path::Path,
+    ) -> Result<std::path::PathBuf, anyhow::Error> {
+        let group_name = self.group.name.replace(' ', "_").to_lowercase();
+        let target_dir = workspace_path.join(&group_name);
+
+        // Create target directory
+        tokio::fs::create_dir_all(&target_dir).await?;
+
+        // Generate WAC content
+        let wac_content = self.generate_wac_config();
+
+        // Write production.wac file
+        let wac_file_path = target_dir.join("production.wac");
+        tokio::fs::write(&wac_file_path, wac_content).await?;
+
+        tracing::info!("Generated production.wac file at: {:?}", wac_file_path);
+        Ok(wac_file_path)
+    }
+
+    /// Write both BUILD.bazel and WAC files to workspace with comprehensive configuration
+    pub async fn deploy_to_workspace(
+        &self,
+        workspace_path: &std::path::Path,
+        config: &DeploymentConfig,
+    ) -> Result<DeploymentResult, anyhow::Error> {
+        let mut files_written = Vec::new();
+        let mut errors = Vec::new();
+
+        // Write BUILD.bazel file if requested
+        if config.generate_build_file {
+            match self
+                .write_build_file_to_workspace(
+                    workspace_path,
+                    &config.profile,
+                    config.optimizations.enable_optimizations,
+                    config.validation.validate_components,
+                )
+                .await
+            {
+                Ok(path) => files_written.push(path),
+                Err(e) => errors.push(format!("Failed to write BUILD.bazel: {e}")),
+            }
+        }
+
+        // Write WAC file if requested
+        if config.generate_wac_file {
+            match self.write_wac_file_to_workspace(workspace_path).await {
+                Ok(path) => files_written.push(path),
+                Err(e) => errors.push(format!("Failed to write production.wac: {e}")),
+            }
+        }
+
+        let success = errors.is_empty();
+        Ok(DeploymentResult {
+            files_written,
+            errors,
+            success,
+        })
+    }
+}
+
+/// Deployment configuration for component groups
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentConfig {
+    pub group_id: String,
+    pub group_name: String,
+    pub profile: String,
+    pub target_name: String,
+    pub package_name: String,
+    pub generate_wac_file: bool,
+    pub generate_build_file: bool,
+    pub optimizations: OptimizationConfig,
+    pub validation: ValidationConfig,
+}
+
+/// Optimization settings for deployment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationConfig {
+    pub enable_optimizations: bool,
+    pub strip_debug_info: bool,
+    pub use_symlinks: bool,
+}
+
+/// Validation settings for deployment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationConfig {
+    pub validate_components: bool,
+    pub validate_connections: bool,
+    pub lint_wit: bool,
+}
+
+/// Result of deploying component group to workspace
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentResult {
+    pub files_written: Vec<std::path::PathBuf>,
+    pub errors: Vec<String>,
+    pub success: bool,
 }

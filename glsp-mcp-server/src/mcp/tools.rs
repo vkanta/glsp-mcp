@@ -848,7 +848,9 @@ impl DiagramTools {
             // Component Group Management Tools
             Tool {
                 name: "create_component_group".to_string(),
-                description: Some("Create a new component group from selected WASM components".to_string()),
+                description: Some(
+                    "Create a new component group from selected WASM components".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -875,7 +877,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "update_component_group".to_string(),
-                description: Some("Update a component group with new connections or components".to_string()),
+                description: Some(
+                    "Update a component group with new connections or components".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -933,7 +937,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "get_component_group_interfaces".to_string(),
-                description: Some("Get external interfaces available for a component group".to_string()),
+                description: Some(
+                    "Get external interfaces available for a component group".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -969,7 +975,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "generate_bazel_composition".to_string(),
-                description: Some("Generate Bazel configuration for component group composition".to_string()),
+                description: Some(
+                    "Generate Bazel configuration for component group composition".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -993,7 +1001,9 @@ impl DiagramTools {
             },
             Tool {
                 name: "validate_component_group".to_string(),
-                description: Some("Validate a component group for interface compatibility".to_string()),
+                description: Some(
+                    "Validate a component group for interface compatibility".to_string(),
+                ),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -1021,6 +1031,99 @@ impl DiagramTools {
                         }
                     },
                     "required": ["diagramId"]
+                }),
+            },
+            Tool {
+                name: "deploy_component_group".to_string(),
+                description: Some(
+                    "Deploy component group to workspace with BUILD.bazel and WAC files"
+                        .to_string(),
+                ),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group to deploy"
+                        },
+                        "workspacePath": {
+                            "type": "string",
+                            "description": "Path to the workspace directory"
+                        },
+                        "config": {
+                            "type": "object",
+                            "properties": {
+                                "profile": {
+                                    "type": "string",
+                                    "default": "release",
+                                    "description": "Build profile (debug, release, production)"
+                                },
+                                "targetName": {
+                                    "type": "string",
+                                    "description": "Target name for the composition"
+                                },
+                                "packageName": {
+                                    "type": "string",
+                                    "description": "Package name for the composition"
+                                },
+                                "generateWacFile": {
+                                    "type": "boolean",
+                                    "default": true,
+                                    "description": "Generate WAC configuration file"
+                                },
+                                "generateBuildFile": {
+                                    "type": "boolean",
+                                    "default": true,
+                                    "description": "Generate BUILD.bazel file"
+                                },
+                                "optimizations": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enableOptimizations": {
+                                            "type": "boolean",
+                                            "default": true,
+                                            "description": "Enable build optimizations"
+                                        },
+                                        "stripDebugInfo": {
+                                            "type": "boolean",
+                                            "default": false,
+                                            "description": "Strip debug information"
+                                        },
+                                        "useSymlinks": {
+                                            "type": "boolean",
+                                            "default": false,
+                                            "description": "Use symlinks for dependencies"
+                                        }
+                                    }
+                                },
+                                "validation": {
+                                    "type": "object",
+                                    "properties": {
+                                        "validateComponents": {
+                                            "type": "boolean",
+                                            "default": true,
+                                            "description": "Validate components during build"
+                                        },
+                                        "validateConnections": {
+                                            "type": "boolean",
+                                            "default": true,
+                                            "description": "Validate interface connections"
+                                        },
+                                        "lintWit": {
+                                            "type": "boolean",
+                                            "default": true,
+                                            "description": "Lint WIT interfaces"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": ["diagramId", "groupId", "workspacePath"]
                 }),
             },
         ];
@@ -1097,11 +1200,14 @@ impl DiagramTools {
             // Component group tools
             "create_component_group" => self.create_component_group(params.arguments).await,
             "update_component_group" => self.update_component_group(params.arguments).await,
-            "get_component_group_interfaces" => self.get_component_group_interfaces(params.arguments).await,
+            "get_component_group_interfaces" => {
+                self.get_component_group_interfaces(params.arguments).await
+            }
             "delete_component_group" => self.delete_component_group(params.arguments).await,
             "generate_bazel_composition" => self.generate_bazel_composition(params.arguments).await,
             "validate_component_group" => self.validate_component_group(params.arguments).await,
             "list_component_groups" => self.list_component_groups(params.arguments).await,
+            "deploy_component_group" => self.deploy_component_group(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -2983,28 +3089,30 @@ impl DiagramTools {
     }
 
     // Component Group Management Methods
-    
+
     async fn create_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let name = args.get("name")
+
+        let name = args
+            .get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'name' parameter"))?;
-        
-        let description = args.get("description")
-            .and_then(|v| v.as_str());
-        
-        let component_ids: Vec<String> = args.get("componentIds")
+
+        let description = args.get("description").and_then(|v| v.as_str());
+
+        let component_ids: Vec<String> = args
+            .get("componentIds")
             .and_then(|v| v.as_array())
             .ok_or_else(|| anyhow::anyhow!("Missing 'componentIds' parameter"))?
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
-        
+
         if component_ids.is_empty() {
             return Ok(CallToolResult {
                 content: vec![TextContent {
@@ -3014,115 +3122,131 @@ impl DiagramTools {
                 is_error: Some(true),
             });
         }
-        
+
         // Get the diagram
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
+
         // Validate that all component IDs exist
         for component_id in &component_ids {
             if self.wasm_watcher.get_component(component_id).is_none() {
                 return Ok(CallToolResult {
                     content: vec![TextContent {
                         content_type: "text".to_string(),
-                        text: format!("Component '{}' not found", component_id),
+                        text: format!("Component '{component_id}' not found"),
                     }],
                     is_error: Some(true),
                 });
             }
         }
-        
+
         let mut group = ComponentGroup::new(name.to_string(), description.map(|s| s.to_string()));
-        
+
         // Add all components to the group
         for component_id in component_ids {
             group.add_component(component_id);
         }
-        
+
         let group_id = group.id.clone();
         diagram.add_component_group(group);
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Created component group '{}' with ID: {} in diagram '{}'", name, group_id, diagram_id),
+                text: format!(
+                    "Created component group '{name}' with ID: {group_id} in diagram '{diagram_id}'"
+                ),
             }],
             is_error: None,
         })
     }
-    
+
     async fn update_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let group_id = args.get("groupId")
+
+        let group_id = args
+            .get("groupId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
-        
+
         // Get the diagram
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
-        let group = diagram.get_component_group_mut(group_id)
+
+        let group = diagram
+            .get_component_group_mut(group_id)
             .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
-        
+
         // Update name if provided
         if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
             group.name = name.to_string();
         }
-        
+
         // Update description if provided
         if let Some(description) = args.get("description").and_then(|v| v.as_str()) {
             group.description = Some(description.to_string());
         }
-        
+
         // Update component IDs if provided
         if let Some(component_ids_value) = args.get("componentIds") {
-            let component_ids: Vec<String> = component_ids_value.as_array()
+            let component_ids: Vec<String> = component_ids_value
+                .as_array()
                 .ok_or_else(|| anyhow::anyhow!("Invalid 'componentIds' parameter"))?
                 .iter()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect();
-            
+
             // Clear existing components and add new ones
             group.component_ids.clear();
             for component_id in component_ids {
                 group.add_component(component_id);
             }
         }
-        
+
         // Update internal connections if provided
         if let Some(connections_value) = args.get("internalConnections") {
-            let connections = connections_value.as_array()
+            let connections = connections_value
+                .as_array()
                 .ok_or_else(|| anyhow::anyhow!("Invalid 'internalConnections' parameter"))?;
-            
+
             group.internal_connections.clear();
             for connection_value in connections {
-                let source_component = connection_value.get("sourceComponent")
+                let source_component = connection_value
+                    .get("sourceComponent")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'sourceComponent' in connection"))?;
-                let source_interface = connection_value.get("sourceInterface")
+                let source_interface = connection_value
+                    .get("sourceInterface")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'sourceInterface' in connection"))?;
-                let target_component = connection_value.get("targetComponent")
+                let target_component = connection_value
+                    .get("targetComponent")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'targetComponent' in connection"))?;
-                let target_interface = connection_value.get("targetInterface")
+                let target_interface = connection_value
+                    .get("targetInterface")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'targetInterface' in connection"))?;
-                let connection_type = connection_value.get("connectionType")
+                let connection_type = connection_value
+                    .get("connectionType")
                     .and_then(|v| v.as_str())
                     .unwrap_or("direct");
-                
+
                 let conn_type = match connection_type {
                     "shared" => ConnectionType::Shared,
                     "adapter" => ConnectionType::Adapter,
                     _ => ConnectionType::Direct,
                 };
-                
+
                 let connection = InterfaceConnection::new(
                     source_component.to_string(),
                     source_interface.to_string(),
@@ -3130,31 +3254,42 @@ impl DiagramTools {
                     target_interface.to_string(),
                     conn_type,
                 );
-                
+
                 group.add_connection(connection);
             }
         }
-        
+
         // Update external interfaces if provided
         if let Some(interfaces_value) = args.get("externalInterfaces") {
-            let interfaces = interfaces_value.as_array()
+            let interfaces = interfaces_value
+                .as_array()
                 .ok_or_else(|| anyhow::anyhow!("Invalid 'externalInterfaces' parameter"))?;
-            
+
             group.external_interfaces.clear();
             for interface_value in interfaces {
-                let name = interface_value.get("name")
+                let name = interface_value
+                    .get("name")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'name' in external interface"))?;
-                let interface_type = interface_value.get("interfaceType")
+                let interface_type = interface_value
+                    .get("interfaceType")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing 'interfaceType' in external interface"))?;
-                let source_component = interface_value.get("sourceComponent")
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'interfaceType' in external interface")
+                    })?;
+                let source_component = interface_value
+                    .get("sourceComponent")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceComponent' in external interface"))?;
-                let source_interface = interface_value.get("sourceInterface")
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'sourceComponent' in external interface")
+                    })?;
+                let source_interface = interface_value
+                    .get("sourceInterface")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceInterface' in external interface"))?;
-                
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Missing 'sourceInterface' in external interface")
+                    })?;
+
                 let external_interface = ExternalInterface::from_component_interface(
                     name.to_string(),
                     interface_type.to_string(),
@@ -3162,13 +3297,13 @@ impl DiagramTools {
                     source_interface.to_string(),
                     Vec::new(), // TODO: Extract functions from component interface
                 );
-                
+
                 group.add_external_interface(external_interface);
             }
         }
-        
+
         group.updated_at = chrono::Utc::now();
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -3177,55 +3312,68 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn get_component_group_interfaces(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let group_id = args.get("groupId")
+
+        let group_id = args
+            .get("groupId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
-        
+
         // Get the diagram
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
-        let group = diagram.get_component_group(group_id)
+
+        let group = diagram
+            .get_component_group(group_id)
             .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
-        
+
         let interfaces_json = serde_json::to_string_pretty(&group.external_interfaces)
             .map_err(|e| anyhow::anyhow!("Failed to serialize interfaces: {}", e))?;
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("External interfaces for group '{}':\n{}", group.name, interfaces_json),
+                text: format!(
+                    "External interfaces for group '{}':\n{}",
+                    group.name, interfaces_json
+                ),
             }],
             is_error: None,
         })
     }
-    
+
     async fn delete_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let group_id = args.get("groupId")
+
+        let group_id = args
+            .get("groupId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
-        
+
         // Get the diagram
-        let diagram = self.models.get_mut(diagram_id)
+        let diagram = self
+            .models
+            .get_mut(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
-        let group = diagram.remove_component_group(group_id)
+
+        let group = diagram
+            .remove_component_group(group_id)
             .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -3234,29 +3382,35 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn generate_bazel_composition(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let group_id = args.get("groupId")
+
+        let group_id = args
+            .get("groupId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
-        
-        let format = args.get("format")
+
+        let format = args
+            .get("format")
             .and_then(|v| v.as_str())
             .unwrap_or("both");
-        
+
         // Get the diagram
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
-        let group = diagram.get_component_group(group_id)
+
+        let group = diagram
+            .get_component_group(group_id)
             .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
-        
+
         // Get components from wasm watcher and convert to HashMap for ComponentGroupInfo
         let components_vec = self.wasm_watcher.get_components();
         let available_components: HashMap<String, WasmComponent> = components_vec
@@ -3264,9 +3418,9 @@ impl DiagramTools {
             .map(|comp| (comp.name.clone(), comp.clone()))
             .collect();
         let group_info = ComponentGroupInfo::from_group(group.clone(), &available_components);
-        
+
         let mut result = String::new();
-        
+
         match format {
             "bazel" => {
                 result.push_str(&group_info.generate_bazel_config());
@@ -3274,14 +3428,20 @@ impl DiagramTools {
             "wac" => {
                 result.push_str(&group_info.generate_wac_config());
             }
-            "both" | _ => {
+            "both" => {
+                result.push_str("# Bazel Configuration\n");
+                result.push_str(&group_info.generate_bazel_config());
+                result.push_str("\n\n# WAC Configuration\n");
+                result.push_str(&group_info.generate_wac_config());
+            }
+            _ => {
                 result.push_str("# Bazel Configuration\n");
                 result.push_str(&group_info.generate_bazel_config());
                 result.push_str("\n\n# WAC Configuration\n");
                 result.push_str(&group_info.generate_wac_config());
             }
         }
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
@@ -3290,25 +3450,30 @@ impl DiagramTools {
             is_error: None,
         })
     }
-    
+
     async fn validate_component_group(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
-        let group_id = args.get("groupId")
+
+        let group_id = args
+            .get("groupId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
-        
+
         // Get the diagram
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
-        let group = diagram.get_component_group(group_id)
+
+        let group = diagram
+            .get_component_group(group_id)
             .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
-        
+
         // Get components from wasm watcher and convert to HashMap
         let components_vec = self.wasm_watcher.get_components();
         let available_components: HashMap<String, WasmComponent> = components_vec
@@ -3316,43 +3481,49 @@ impl DiagramTools {
             .map(|comp| (comp.name.clone(), comp.clone()))
             .collect();
         let validation_status = group.validate(&available_components);
-        
+
         let status_json = serde_json::to_string_pretty(&validation_status)
             .map_err(|e| anyhow::anyhow!("Failed to serialize validation status: {}", e))?;
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
-                text: format!("Validation status for group '{}':\n{}", group.name, status_json),
+                text: format!(
+                    "Validation status for group '{}':\n{}",
+                    group.name, status_json
+                ),
             }],
             is_error: Some(!validation_status.is_valid),
         })
     }
-    
+
     async fn list_component_groups(&self, args: Option<Value>) -> Result<CallToolResult> {
         let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
-        
-        let diagram_id = args.get("diagramId")
+
+        let diagram_id = args
+            .get("diagramId")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
-        
+
         // Get the diagram
-        let diagram = self.models.get(diagram_id)
+        let diagram = self
+            .models
+            .get(diagram_id)
             .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
-        
+
         if diagram.component_groups.is_empty() {
             return Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
-                    text: format!("No component groups found in diagram '{}'", diagram_id),
+                    text: format!("No component groups found in diagram '{diagram_id}'"),
                 }],
                 is_error: None,
             });
         }
-        
+
         let mut result = String::new();
-        result.push_str(&format!("Component Groups in diagram '{}':\n", diagram_id));
-        
+        result.push_str(&format!("Component Groups in diagram '{diagram_id}':\n"));
+
         for (id, group) in &diagram.component_groups {
             result.push_str(&format!(
                 "- {} ({}): {} components\n",
@@ -3360,28 +3531,251 @@ impl DiagramTools {
                 id,
                 group.component_ids.len()
             ));
-            
+
             if !group.component_ids.is_empty() {
-                result.push_str(&format!("  Components: {}\n", group.component_ids.join(", ")));
+                result.push_str(&format!(
+                    "  Components: {}\n",
+                    group.component_ids.join(", ")
+                ));
             }
-            
+
             if !group.internal_connections.is_empty() {
-                result.push_str(&format!("  Internal connections: {}\n", group.internal_connections.len()));
+                result.push_str(&format!(
+                    "  Internal connections: {}\n",
+                    group.internal_connections.len()
+                ));
             }
-            
+
             if !group.external_interfaces.is_empty() {
-                result.push_str(&format!("  External interfaces: {}\n", group.external_interfaces.len()));
+                result.push_str(&format!(
+                    "  External interfaces: {}\n",
+                    group.external_interfaces.len()
+                ));
             }
-            
+
             result.push('\n');
         }
-        
+
         Ok(CallToolResult {
             content: vec![TextContent {
                 content_type: "text".to_string(),
                 text: result,
             }],
             is_error: None,
+        })
+    }
+
+    async fn deploy_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+
+        let diagram_id = args
+            .get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+
+        let group_id = args
+            .get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+
+        let workspace_path = args
+            .get("workspacePath")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'workspacePath' parameter"))?;
+
+        // Get the diagram
+        let diagram = self
+            .models
+            .get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+
+        let group = diagram
+            .get_component_group(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+
+        // Get components from wasm watcher
+        let components_vec = self.wasm_watcher.get_components();
+        let available_components: HashMap<String, WasmComponent> = components_vec
+            .into_iter()
+            .map(|comp| (comp.name.clone(), comp.clone()))
+            .collect();
+
+        // Create ComponentGroupInfo
+        let group_info = ComponentGroupInfo::from_group(group.clone(), &available_components);
+
+        // Parse config or use defaults
+        let config = if let Some(config_value) = args.get("config") {
+            let profile = config_value
+                .get("profile")
+                .and_then(|v| v.as_str())
+                .unwrap_or("release")
+                .to_string();
+
+            let target_name = config_value
+                .get("targetName")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&group.name.replace(' ', "_").to_lowercase())
+                .to_string();
+
+            let package_name = config_value
+                .get("packageName")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&group.name.replace(' ', "-").to_lowercase())
+                .to_string();
+
+            let generate_wac_file = config_value
+                .get("generateWacFile")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+
+            let generate_build_file = config_value
+                .get("generateBuildFile")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+
+            // Parse optimization config
+            let optimizations = if let Some(opt_config) = config_value.get("optimizations") {
+                crate::wasm::OptimizationConfig {
+                    enable_optimizations: opt_config
+                        .get("enableOptimizations")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                    strip_debug_info: opt_config
+                        .get("stripDebugInfo")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    use_symlinks: opt_config
+                        .get("useSymlinks")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                }
+            } else {
+                crate::wasm::OptimizationConfig {
+                    enable_optimizations: true,
+                    strip_debug_info: false,
+                    use_symlinks: false,
+                }
+            };
+
+            // Parse validation config
+            let validation = if let Some(val_config) = config_value.get("validation") {
+                crate::wasm::ValidationConfig {
+                    validate_components: val_config
+                        .get("validateComponents")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                    validate_connections: val_config
+                        .get("validateConnections")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                    lint_wit: val_config
+                        .get("lintWit")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                }
+            } else {
+                crate::wasm::ValidationConfig {
+                    validate_components: true,
+                    validate_connections: true,
+                    lint_wit: true,
+                }
+            };
+
+            crate::wasm::DeploymentConfig {
+                group_id: group_id.to_string(),
+                group_name: group.name.clone(),
+                profile,
+                target_name,
+                package_name,
+                generate_wac_file,
+                generate_build_file,
+                optimizations,
+                validation,
+            }
+        } else {
+            // Default config
+            crate::wasm::DeploymentConfig {
+                group_id: group_id.to_string(),
+                group_name: group.name.clone(),
+                profile: "release".to_string(),
+                target_name: group.name.replace(' ', "_").to_lowercase(),
+                package_name: group.name.replace(' ', "-").to_lowercase(),
+                generate_wac_file: true,
+                generate_build_file: true,
+                optimizations: crate::wasm::OptimizationConfig {
+                    enable_optimizations: true,
+                    strip_debug_info: false,
+                    use_symlinks: false,
+                },
+                validation: crate::wasm::ValidationConfig {
+                    validate_components: true,
+                    validate_connections: true,
+                    lint_wit: true,
+                },
+            }
+        };
+
+        // Deploy to workspace
+        let workspace_path = std::path::Path::new(workspace_path);
+        let result = group_info
+            .deploy_to_workspace(workspace_path, &config)
+            .await?;
+
+        // Format response
+        let mut response = format!(
+            "Deployment {} for component group '{}' ({})\n\n",
+            if result.success {
+                "succeeded"
+            } else {
+                "failed"
+            },
+            group.name,
+            group_id
+        );
+
+        if !result.files_written.is_empty() {
+            response.push_str("Files written:\n");
+            for file_path in &result.files_written {
+                response.push_str(&format!("  - {}\n", file_path.display()));
+            }
+            response.push('\n');
+        }
+
+        if !result.errors.is_empty() {
+            response.push_str("Errors:\n");
+            for error in &result.errors {
+                response.push_str(&format!("  - {error}\n"));
+            }
+            response.push('\n');
+        }
+
+        response.push_str("Deployment configuration:\n");
+        response.push_str(&format!("  - Profile: {}\n", config.profile));
+        response.push_str(&format!("  - Target name: {}\n", config.target_name));
+        response.push_str(&format!("  - Package name: {}\n", config.package_name));
+        response.push_str(&format!(
+            "  - Generate WAC file: {}\n",
+            config.generate_wac_file
+        ));
+        response.push_str(&format!(
+            "  - Generate BUILD file: {}\n",
+            config.generate_build_file
+        ));
+        response.push_str(&format!(
+            "  - Optimizations enabled: {}\n",
+            config.optimizations.enable_optimizations
+        ));
+        response.push_str(&format!(
+            "  - Validation enabled: {}\n",
+            config.validation.validate_components
+        ));
+
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: response,
+            }],
+            is_error: Some(!result.success),
         })
     }
 }
