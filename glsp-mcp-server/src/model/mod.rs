@@ -1,4 +1,5 @@
 use crate::selection::SelectionState;
+use crate::wasm::ComponentGroup;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -24,6 +25,8 @@ pub struct DiagramModel {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub component_groups: HashMap<String, ComponentGroup>,
 }
 
 fn default_name() -> String {
@@ -308,6 +311,7 @@ impl DiagramModel {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             metadata: HashMap::new(),
+            component_groups: HashMap::new(),
         }
     }
 
@@ -364,6 +368,33 @@ impl DiagramModel {
             }
         }
         None
+    }
+
+    pub fn add_component_group(&mut self, group: ComponentGroup) {
+        self.component_groups.insert(group.id.clone(), group);
+        self.revision += 1;
+        self.updated_at = chrono::Utc::now();
+    }
+
+    pub fn remove_component_group(&mut self, group_id: &str) -> Option<ComponentGroup> {
+        let removed = self.component_groups.remove(group_id);
+        if removed.is_some() {
+            self.revision += 1;
+            self.updated_at = chrono::Utc::now();
+        }
+        removed
+    }
+
+    pub fn get_component_group(&self, group_id: &str) -> Option<&ComponentGroup> {
+        self.component_groups.get(group_id)
+    }
+
+    pub fn get_component_group_mut(&mut self, group_id: &str) -> Option<&mut ComponentGroup> {
+        self.component_groups.get_mut(group_id)
+    }
+
+    pub fn list_component_groups(&self) -> Vec<&ComponentGroup> {
+        self.component_groups.values().collect()
     }
 }
 

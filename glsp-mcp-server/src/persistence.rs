@@ -328,6 +328,7 @@ impl PersistenceManager {
             elements,
             selection: Some(crate::selection::SelectionState::new()),
             metadata: content.metadata,
+            component_groups: HashMap::new(),
         };
 
         // Add nodes

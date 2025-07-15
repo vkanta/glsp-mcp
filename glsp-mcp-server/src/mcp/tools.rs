@@ -3,7 +3,10 @@ use crate::database::{BoxedDatasetManager, SensorQuery};
 use crate::mcp::protocol::{CallToolParams, CallToolResult, TextContent, Tool};
 use crate::model::{DiagramModel, Edge, ElementType, ModelElement, Node, Position};
 use crate::selection::SelectionMode;
-use crate::wasm::{WasmComponent, WasmComponentChange, WasmFileWatcher};
+use crate::wasm::{
+    ComponentGroup, ComponentGroupInfo, ConnectionType, ExternalInterface, InterfaceConnection,
+    WasmComponent, WasmComponentChange, WasmFileWatcher,
+};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
@@ -842,6 +845,184 @@ impl DiagramTools {
                     "required": ["componentName"]
                 }),
             },
+            // Component Group Management Tools
+            Tool {
+                name: "create_component_group".to_string(),
+                description: Some("Create a new component group from selected WASM components".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram to add the component group to"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Name for the component group"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Description of the component group"
+                        },
+                        "componentIds": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of component IDs to include in the group"
+                        }
+                    },
+                    "required": ["diagramId", "name", "componentIds"]
+                }),
+            },
+            Tool {
+                name: "update_component_group".to_string(),
+                description: Some("Update a component group with new connections or components".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group to update"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "New name for the component group"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "New description for the component group"
+                        },
+                        "componentIds": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Updated list of component IDs"
+                        },
+                        "internalConnections": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "sourceComponent": {"type": "string"},
+                                    "sourceInterface": {"type": "string"},
+                                    "targetComponent": {"type": "string"},
+                                    "targetInterface": {"type": "string"},
+                                    "connectionType": {"type": "string"}
+                                }
+                            },
+                            "description": "Internal connections between components"
+                        },
+                        "externalInterfaces": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "interfaceType": {"type": "string"},
+                                    "sourceComponent": {"type": "string"},
+                                    "sourceInterface": {"type": "string"}
+                                }
+                            },
+                            "description": "External interfaces exposed by the group"
+                        }
+                    },
+                    "required": ["diagramId", "groupId"]
+                }),
+            },
+            Tool {
+                name: "get_component_group_interfaces".to_string(),
+                description: Some("Get external interfaces available for a component group".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group"
+                        }
+                    },
+                    "required": ["diagramId", "groupId"]
+                }),
+            },
+            Tool {
+                name: "delete_component_group".to_string(),
+                description: Some("Delete a component group".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group to delete"
+                        }
+                    },
+                    "required": ["diagramId", "groupId"]
+                }),
+            },
+            Tool {
+                name: "generate_bazel_composition".to_string(),
+                description: Some("Generate Bazel configuration for component group composition".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group"
+                        },
+                        "format": {
+                            "type": "string",
+                            "enum": ["bazel", "wac", "both"],
+                            "default": "both",
+                            "description": "Format of the generated configuration"
+                        }
+                    },
+                    "required": ["diagramId", "groupId"]
+                }),
+            },
+            Tool {
+                name: "validate_component_group".to_string(),
+                description: Some("Validate a component group for interface compatibility".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram containing the component group"
+                        },
+                        "groupId": {
+                            "type": "string",
+                            "description": "ID of the component group to validate"
+                        }
+                    },
+                    "required": ["diagramId", "groupId"]
+                }),
+            },
+            Tool {
+                name: "list_component_groups".to_string(),
+                description: Some("List all component groups in a diagram".to_string()),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "diagramId": {
+                            "type": "string",
+                            "description": "ID of the diagram to list component groups from"
+                        }
+                    },
+                    "required": ["diagramId"]
+                }),
+            },
         ];
 
         // Filter out tools that have been converted to resources
@@ -913,6 +1094,14 @@ impl DiagramTools {
             "validate_wasm_component" => self.validate_wasm_component(params.arguments).await,
             // "list_uploaded_components" => self.list_uploaded_components(params.arguments).await, // Converted to resource
             "delete_uploaded_component" => self.delete_uploaded_component(params.arguments).await,
+            // Component group tools
+            "create_component_group" => self.create_component_group(params.arguments).await,
+            "update_component_group" => self.update_component_group(params.arguments).await,
+            "get_component_group_interfaces" => self.get_component_group_interfaces(params.arguments).await,
+            "delete_component_group" => self.delete_component_group(params.arguments).await,
+            "generate_bazel_composition" => self.generate_bazel_composition(params.arguments).await,
+            "validate_component_group" => self.validate_component_group(params.arguments).await,
+            "list_component_groups" => self.list_component_groups(params.arguments).await,
             _ => Ok(CallToolResult {
                 content: vec![TextContent {
                     content_type: "text".to_string(),
@@ -2788,6 +2977,409 @@ impl DiagramTools {
                     component_name,
                     deleted.join(", ")
                 ),
+            }],
+            is_error: None,
+        })
+    }
+
+    // Component Group Management Methods
+    
+    async fn create_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let name = args.get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'name' parameter"))?;
+        
+        let description = args.get("description")
+            .and_then(|v| v.as_str());
+        
+        let component_ids: Vec<String> = args.get("componentIds")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'componentIds' parameter"))?
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        
+        if component_ids.is_empty() {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: "At least one component ID is required".to_string(),
+                }],
+                is_error: Some(true),
+            });
+        }
+        
+        // Get the diagram
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        // Validate that all component IDs exist
+        for component_id in &component_ids {
+            if self.wasm_watcher.get_component(component_id).is_none() {
+                return Ok(CallToolResult {
+                    content: vec![TextContent {
+                        content_type: "text".to_string(),
+                        text: format!("Component '{}' not found", component_id),
+                    }],
+                    is_error: Some(true),
+                });
+            }
+        }
+        
+        let mut group = ComponentGroup::new(name.to_string(), description.map(|s| s.to_string()));
+        
+        // Add all components to the group
+        for component_id in component_ids {
+            group.add_component(component_id);
+        }
+        
+        let group_id = group.id.clone();
+        diagram.add_component_group(group);
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("Created component group '{}' with ID: {} in diagram '{}'", name, group_id, diagram_id),
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn update_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let group_id = args.get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+        
+        // Get the diagram
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        let group = diagram.get_component_group_mut(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+        
+        // Update name if provided
+        if let Some(name) = args.get("name").and_then(|v| v.as_str()) {
+            group.name = name.to_string();
+        }
+        
+        // Update description if provided
+        if let Some(description) = args.get("description").and_then(|v| v.as_str()) {
+            group.description = Some(description.to_string());
+        }
+        
+        // Update component IDs if provided
+        if let Some(component_ids_value) = args.get("componentIds") {
+            let component_ids: Vec<String> = component_ids_value.as_array()
+                .ok_or_else(|| anyhow::anyhow!("Invalid 'componentIds' parameter"))?
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            
+            // Clear existing components and add new ones
+            group.component_ids.clear();
+            for component_id in component_ids {
+                group.add_component(component_id);
+            }
+        }
+        
+        // Update internal connections if provided
+        if let Some(connections_value) = args.get("internalConnections") {
+            let connections = connections_value.as_array()
+                .ok_or_else(|| anyhow::anyhow!("Invalid 'internalConnections' parameter"))?;
+            
+            group.internal_connections.clear();
+            for connection_value in connections {
+                let source_component = connection_value.get("sourceComponent")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceComponent' in connection"))?;
+                let source_interface = connection_value.get("sourceInterface")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceInterface' in connection"))?;
+                let target_component = connection_value.get("targetComponent")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'targetComponent' in connection"))?;
+                let target_interface = connection_value.get("targetInterface")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'targetInterface' in connection"))?;
+                let connection_type = connection_value.get("connectionType")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("direct");
+                
+                let conn_type = match connection_type {
+                    "shared" => ConnectionType::Shared,
+                    "adapter" => ConnectionType::Adapter,
+                    _ => ConnectionType::Direct,
+                };
+                
+                let connection = InterfaceConnection::new(
+                    source_component.to_string(),
+                    source_interface.to_string(),
+                    target_component.to_string(),
+                    target_interface.to_string(),
+                    conn_type,
+                );
+                
+                group.add_connection(connection);
+            }
+        }
+        
+        // Update external interfaces if provided
+        if let Some(interfaces_value) = args.get("externalInterfaces") {
+            let interfaces = interfaces_value.as_array()
+                .ok_or_else(|| anyhow::anyhow!("Invalid 'externalInterfaces' parameter"))?;
+            
+            group.external_interfaces.clear();
+            for interface_value in interfaces {
+                let name = interface_value.get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'name' in external interface"))?;
+                let interface_type = interface_value.get("interfaceType")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'interfaceType' in external interface"))?;
+                let source_component = interface_value.get("sourceComponent")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceComponent' in external interface"))?;
+                let source_interface = interface_value.get("sourceInterface")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing 'sourceInterface' in external interface"))?;
+                
+                let external_interface = ExternalInterface::from_component_interface(
+                    name.to_string(),
+                    interface_type.to_string(),
+                    source_component.to_string(),
+                    source_interface.to_string(),
+                    Vec::new(), // TODO: Extract functions from component interface
+                );
+                
+                group.add_external_interface(external_interface);
+            }
+        }
+        
+        group.updated_at = chrono::Utc::now();
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("Updated component group '{}'", group.name),
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn get_component_group_interfaces(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let group_id = args.get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+        
+        // Get the diagram
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        let group = diagram.get_component_group(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+        
+        let interfaces_json = serde_json::to_string_pretty(&group.external_interfaces)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize interfaces: {}", e))?;
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("External interfaces for group '{}':\n{}", group.name, interfaces_json),
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn delete_component_group(&mut self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let group_id = args.get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+        
+        // Get the diagram
+        let diagram = self.models.get_mut(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        let group = diagram.remove_component_group(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("Deleted component group '{}'", group.name),
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn generate_bazel_composition(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let group_id = args.get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+        
+        let format = args.get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("both");
+        
+        // Get the diagram
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        let group = diagram.get_component_group(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+        
+        // Get components from wasm watcher and convert to HashMap for ComponentGroupInfo
+        let components_vec = self.wasm_watcher.get_components();
+        let available_components: HashMap<String, WasmComponent> = components_vec
+            .into_iter()
+            .map(|comp| (comp.name.clone(), comp.clone()))
+            .collect();
+        let group_info = ComponentGroupInfo::from_group(group.clone(), &available_components);
+        
+        let mut result = String::new();
+        
+        match format {
+            "bazel" => {
+                result.push_str(&group_info.generate_bazel_config());
+            }
+            "wac" => {
+                result.push_str(&group_info.generate_wac_config());
+            }
+            "both" | _ => {
+                result.push_str("# Bazel Configuration\n");
+                result.push_str(&group_info.generate_bazel_config());
+                result.push_str("\n\n# WAC Configuration\n");
+                result.push_str(&group_info.generate_wac_config());
+            }
+        }
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: result,
+            }],
+            is_error: None,
+        })
+    }
+    
+    async fn validate_component_group(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        let group_id = args.get("groupId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'groupId' parameter"))?;
+        
+        // Get the diagram
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        let group = diagram.get_component_group(group_id)
+            .ok_or_else(|| anyhow::anyhow!("Component group not found"))?;
+        
+        // Get components from wasm watcher and convert to HashMap
+        let components_vec = self.wasm_watcher.get_components();
+        let available_components: HashMap<String, WasmComponent> = components_vec
+            .into_iter()
+            .map(|comp| (comp.name.clone(), comp.clone()))
+            .collect();
+        let validation_status = group.validate(&available_components);
+        
+        let status_json = serde_json::to_string_pretty(&validation_status)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize validation status: {}", e))?;
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: format!("Validation status for group '{}':\n{}", group.name, status_json),
+            }],
+            is_error: Some(!validation_status.is_valid),
+        })
+    }
+    
+    async fn list_component_groups(&self, args: Option<Value>) -> Result<CallToolResult> {
+        let args = args.ok_or_else(|| anyhow::anyhow!("Missing arguments"))?;
+        
+        let diagram_id = args.get("diagramId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'diagramId' parameter"))?;
+        
+        // Get the diagram
+        let diagram = self.models.get(diagram_id)
+            .ok_or_else(|| anyhow::anyhow!("Diagram not found"))?;
+        
+        if diagram.component_groups.is_empty() {
+            return Ok(CallToolResult {
+                content: vec![TextContent {
+                    content_type: "text".to_string(),
+                    text: format!("No component groups found in diagram '{}'", diagram_id),
+                }],
+                is_error: None,
+            });
+        }
+        
+        let mut result = String::new();
+        result.push_str(&format!("Component Groups in diagram '{}':\n", diagram_id));
+        
+        for (id, group) in &diagram.component_groups {
+            result.push_str(&format!(
+                "- {} ({}): {} components\n",
+                group.name,
+                id,
+                group.component_ids.len()
+            ));
+            
+            if !group.component_ids.is_empty() {
+                result.push_str(&format!("  Components: {}\n", group.component_ids.join(", ")));
+            }
+            
+            if !group.internal_connections.is_empty() {
+                result.push_str(&format!("  Internal connections: {}\n", group.internal_connections.len()));
+            }
+            
+            if !group.external_interfaces.is_empty() {
+                result.push_str(&format!("  External interfaces: {}\n", group.external_interfaces.len()));
+            }
+            
+            result.push('\n');
+        }
+        
+        Ok(CallToolResult {
+            content: vec![TextContent {
+                content_type: "text".to_string(),
+                text: result,
             }],
             is_error: None,
         })

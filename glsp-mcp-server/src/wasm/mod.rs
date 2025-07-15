@@ -14,10 +14,11 @@ pub use execution_engine::{
 pub use filesystem_watcher::{FileSystemWatcher, WasmChangeType, WasmComponentChange};
 pub use graphics_renderer::{CanvasCommand, GraphicsConfig, ImageFormat, WasmGraphicsRenderer};
 pub use pipeline::{
-    BackoffStrategy, ConnectionType, DataConnection, DataMapping, DataTransform, ExecutionMode,
+    BackoffStrategy, DataConnection, DataMapping, DataTransform, ExecutionMode,
     ExecutionStats, PersistenceSettings, PipelineConfig, PipelineExecution, PipelineSettings,
     PipelineStage, PipelineState, RetryConfig, StageExecutionSettings, StageResult, StageStats,
     WasmPipelineEngine,
+    ConnectionType as PipelineConnectionType,
 };
 pub use security_scanner::{
     SecurityAnalysis, SecurityIssue, SecurityIssueType, SecurityRiskLevel, WasmSecurityScanner,
@@ -46,6 +47,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
+
+// Re-export component grouping types (defined in this module)
+// Note: WasmComponent, WasmFileWatcher, WasmFunction, WasmInterface, WasmParam are already defined
+// Adding new types: ComponentGroup, ComponentGroupInfo, ConnectionType, ExternalInterface, InterfaceConnection, ValidationStatus
 
 /// WASM interface definition representing import or export interfaces
 ///
@@ -97,6 +103,88 @@ pub struct WasmComponent {
     pub dependencies: Vec<String>,
     pub security_analysis: Option<SecurityAnalysis>,
     pub last_security_scan: Option<DateTime<Utc>>,
+}
+
+/// Connection type for interface connections
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionType {
+    /// Direct connection between components
+    Direct,
+    /// Connection through a shared interface
+    Shared,
+    /// Connection through an adapter
+    Adapter,
+}
+
+/// Interface connection between components in a group
+///
+/// Represents a connection between two components' interfaces, specifying
+/// how the output of one component connects to the input of another.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InterfaceConnection {
+    pub id: String,
+    pub source_component: String,
+    pub source_interface: String,
+    pub source_function: Option<String>,
+    pub target_component: String,
+    pub target_interface: String,
+    pub target_function: Option<String>,
+    pub connection_type: ConnectionType,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// External interface exposed by a component group
+///
+/// Represents an interface that is exposed to the outside world
+/// from a component group, aggregating internal component interfaces.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalInterface {
+    pub id: String,
+    pub name: String,
+    pub interface_type: String, // 'import' or 'export'
+    pub source_component: String,
+    pub source_interface: String,
+    pub functions: Vec<WasmFunction>,
+    pub description: Option<String>,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// Component group containing multiple WASM components
+///
+/// Represents a logical grouping of WASM components that work together
+/// as a single unit, with defined internal connections and external interfaces.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentGroup {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub component_ids: Vec<String>,
+    pub internal_connections: Vec<InterfaceConnection>,
+    pub external_interfaces: Vec<ExternalInterface>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// Information about a component group for MCP providers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentGroupInfo {
+    pub group: ComponentGroup,
+    pub components: Vec<WasmComponent>,
+    pub bazel_config: Option<String>,
+    pub wac_config: Option<String>,
+    pub validation_status: Option<ValidationStatus>,
+}
+
+/// Validation status for component groups
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationStatus {
+    pub is_valid: bool,
+    pub issues: Vec<String>,
+    pub interface_compatibility: bool,
+    pub timing_constraints_met: bool,
+    pub last_validated: DateTime<Utc>,
 }
 
 #[derive(Clone)]
@@ -1097,5 +1185,270 @@ impl WasmFileWatcher {
 
         info!("WASM file watcher successfully changed to new path");
         Ok(())
+    }
+}
+
+impl InterfaceConnection {
+    /// Create a new interface connection
+    pub fn new(
+        source_component: String,
+        source_interface: String,
+        target_component: String,
+        target_interface: String,
+        connection_type: ConnectionType,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            source_component,
+            source_interface,
+            source_function: None,
+            target_component,
+            target_interface,
+            target_function: None,
+            connection_type,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Create a function-level connection
+    pub fn new_function_connection(
+        source_component: String,
+        source_interface: String,
+        source_function: String,
+        target_component: String,
+        target_interface: String,
+        target_function: String,
+        connection_type: ConnectionType,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            source_component,
+            source_interface,
+            source_function: Some(source_function),
+            target_component,
+            target_interface,
+            target_function: Some(target_function),
+            connection_type,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
+impl ExternalInterface {
+    /// Create a new external interface from an internal component interface
+    pub fn from_component_interface(
+        name: String,
+        interface_type: String,
+        source_component: String,
+        source_interface: String,
+        functions: Vec<WasmFunction>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            name,
+            interface_type,
+            source_component,
+            source_interface,
+            functions,
+            description: None,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
+impl ComponentGroup {
+    /// Create a new component group
+    pub fn new(name: String, description: Option<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            name,
+            description,
+            component_ids: Vec::new(),
+            internal_connections: Vec::new(),
+            external_interfaces: Vec::new(),
+            created_at: now,
+            updated_at: now,
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Add a component to the group
+    pub fn add_component(&mut self, component_id: String) {
+        if !self.component_ids.contains(&component_id) {
+            self.component_ids.push(component_id);
+            self.updated_at = Utc::now();
+        }
+    }
+
+    /// Remove a component from the group
+    pub fn remove_component(&mut self, component_id: &str) -> bool {
+        if let Some(pos) = self.component_ids.iter().position(|id| id == component_id) {
+            self.component_ids.remove(pos);
+            
+            // Remove any connections involving this component
+            self.internal_connections.retain(|conn| {
+                conn.source_component != component_id && conn.target_component != component_id
+            });
+            
+            // Remove any external interfaces from this component
+            self.external_interfaces.retain(|iface| {
+                iface.source_component != component_id
+            });
+            
+            self.updated_at = Utc::now();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Add an internal connection between components
+    pub fn add_connection(&mut self, connection: InterfaceConnection) {
+        // Validate that both components are in the group
+        if self.component_ids.contains(&connection.source_component) 
+            && self.component_ids.contains(&connection.target_component) {
+            self.internal_connections.push(connection);
+            self.updated_at = Utc::now();
+        }
+    }
+
+    /// Add an external interface
+    pub fn add_external_interface(&mut self, interface: ExternalInterface) {
+        // Validate that the source component is in the group
+        if self.component_ids.contains(&interface.source_component) {
+            self.external_interfaces.push(interface);
+            self.updated_at = Utc::now();
+        }
+    }
+
+    /// Get all components that have unconnected interfaces
+    pub fn get_unconnected_components(&self) -> Vec<&String> {
+        // This would require component interface analysis
+        // For now, return all components
+        self.component_ids.iter().collect()
+    }
+
+    /// Validate the component group
+    pub fn validate(&self, components: &HashMap<String, WasmComponent>) -> ValidationStatus {
+        let mut issues = Vec::new();
+        let mut interface_compatibility = true;
+
+        // Check that all component IDs exist
+        for component_id in &self.component_ids {
+            if !components.contains_key(component_id) {
+                issues.push(format!("Component '{}' not found", component_id));
+                interface_compatibility = false;
+            }
+        }
+
+        // Check that all connections reference valid components and interfaces
+        for connection in &self.internal_connections {
+            if !self.component_ids.contains(&connection.source_component) {
+                issues.push(format!("Connection source component '{}' not in group", connection.source_component));
+                interface_compatibility = false;
+            }
+            if !self.component_ids.contains(&connection.target_component) {
+                issues.push(format!("Connection target component '{}' not in group", connection.target_component));
+                interface_compatibility = false;
+            }
+        }
+
+        // Check that all external interfaces reference valid components
+        for interface in &self.external_interfaces {
+            if !self.component_ids.contains(&interface.source_component) {
+                issues.push(format!("External interface source component '{}' not in group", interface.source_component));
+                interface_compatibility = false;
+            }
+        }
+
+        ValidationStatus {
+            is_valid: issues.is_empty(),
+            issues,
+            interface_compatibility,
+            timing_constraints_met: true, // TODO: Implement timing validation
+            last_validated: Utc::now(),
+        }
+    }
+}
+
+impl ComponentGroupInfo {
+    /// Create component group info from a group and component map
+    pub fn from_group(group: ComponentGroup, all_components: &HashMap<String, WasmComponent>) -> Self {
+        let components = group.component_ids
+            .iter()
+            .filter_map(|id| all_components.get(id).cloned())
+            .collect();
+
+        Self {
+            group,
+            components,
+            bazel_config: None,
+            wac_config: None,
+            validation_status: None,
+        }
+    }
+
+    /// Generate Bazel configuration for this component group
+    pub fn generate_bazel_config(&self) -> String {
+        let group_name = self.group.name.replace(' ', "_").to_lowercase();
+        
+        let mut config = format!(
+            "# Generated Bazel configuration for component group: {}\n",
+            self.group.name
+        );
+        config.push_str("load(\"//bazel:wasm_component_rules.bzl\", \"wac_compose\")\n\n");
+        
+        config.push_str(&format!(
+            "wac_compose(\n    name = \"{}\",\n",
+            group_name
+        ));
+        
+        config.push_str("    components = [\n");
+        for component in &self.components {
+            config.push_str(&format!("        \"//{}:component\",\n", component.name));
+        }
+        config.push_str("    ],\n");
+        
+        config.push_str(&format!(
+            "    wac_config = \"{}.wac.toml\",\n",
+            group_name
+        ));
+        config.push_str(&format!("    output = \"{}.wasm\",\n", group_name));
+        config.push_str("    validate_timing = True,\n");
+        config.push_str("    validate_safety = True,\n");
+        config.push_str(")\n");
+        
+        config
+    }
+
+    /// Generate WAC configuration for this component group
+    pub fn generate_wac_config(&self) -> String {
+        let mut config = format!(
+            "# WAC configuration for component group: {}\n",
+            self.group.name
+        );
+        config.push_str("[package]\n");
+        config.push_str(&format!("name = \"{}\"\n", self.group.name.replace(' ', "-").to_lowercase()));
+        config.push_str("version = \"0.1.0\"\n\n");
+        
+        config.push_str("[dependencies]\n");
+        for component in &self.components {
+            config.push_str(&format!("{} = {{ path = \"{}\" }}\n", component.name, component.path));
+        }
+        config.push_str("\n");
+        
+        config.push_str("[compose]\n");
+        for connection in &self.group.internal_connections {
+            config.push_str(&format!(
+                "connect({}:{}, {}:{})\n",
+                connection.source_component,
+                connection.source_interface,
+                connection.target_component,
+                connection.target_interface
+            ));
+        }
+        
+        config
     }
 }
