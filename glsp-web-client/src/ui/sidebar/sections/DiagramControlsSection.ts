@@ -520,7 +520,7 @@ export class DiagramControlsSection {
         }
     }
     
-    private refresh(): void {
+    public refresh(): void {
         if (this.element) {
             const newContent = this.createContent();
             this.element.replaceWith(newContent);

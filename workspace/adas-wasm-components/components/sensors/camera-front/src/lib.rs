@@ -1,6 +1,7 @@
-// Camera Front ECU Component - Unified interface to work around wit-bindgen multi-interface issues
-use camera_front_ecu_bindings::exports::adas::camera_front::camera_ecu::{
-    self, Config, FrameInfo, Status, Stats, Health, TestResult,
+// Camera Front ECU Component - Complex multi-interface implementation
+use camera_front_ecu_bindings::exports::adas::camera_front::{
+    camera_sensor::{self, Config, FrameInfo, Status, Stats},
+    diagnostics::{self, Health, TestResult},
 };
 
 use std::cell::RefCell;
@@ -53,7 +54,7 @@ fn get_timestamp_ms() -> u64 {
 // Component implementation with unified interface
 struct Component;
 
-impl camera_ecu::Guest for Component {
+impl camera_sensor::Guest for Component {
     // === SENSOR OPERATIONS ===
     
     fn initialize(cfg: Config) -> Result<(), String> {
@@ -191,8 +192,9 @@ impl camera_ecu::Guest for Component {
         });
     }
 
-    // === DIAGNOSTIC OPERATIONS ===
-    
+}
+
+impl diagnostics::Guest for Component {
     fn get_health() -> Health {
         STATE.with(|state| state.borrow().health.clone())
     }
@@ -248,7 +250,7 @@ impl camera_ecu::Guest for Component {
     fn get_report() -> String {
         STATE.with(|state| {
             let s = state.borrow();
-            let stats = Self::get_stats();
+            let stats = <Component as camera_sensor::Guest>::get_stats();
             
             format!(
                 r#"Camera Front ECU Diagnostic Report

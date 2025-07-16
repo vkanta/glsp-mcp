@@ -73,6 +73,7 @@ async fn main() {
             commands::set_workspace_directory,
             commands::validate_workspace,
             commands::create_workspace_structure,
+            commands::rescan_workspace,
         ])
         .setup(|app| {
             // Wait for MCP server to initialize

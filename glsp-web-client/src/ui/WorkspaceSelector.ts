@@ -240,6 +240,16 @@ export class WorkspaceSelector {
             // Add to recent workspaces
             await window.__TAURI__.invoke('add_recent_workspace', { workspacePath: workspacePath });
             
+            // Rescan workspace to discover existing files
+            try {
+                await window.__TAURI__.invoke('rescan_workspace');
+                console.log('Workspace rescan completed successfully');
+            } catch (rescanError) {
+                console.warn('Workspace rescan failed:', rescanError);
+                // Continue with workspace selection even if rescan fails
+                this.showError('Warning: File rescan failed, some files may not be immediately visible');
+            }
+            
             // Update UI
             this.currentWorkspace = workspacePath;
             this.updateWorkspaceDisplay();
@@ -258,7 +268,7 @@ export class WorkspaceSelector {
         }
     }
 
-    private async loadRecentWorkspaces(): Promise<void> {
+    public async loadRecentWorkspaces(): Promise<void> {
         try {
             const workspaces: WorkspaceInfo[] = await window.__TAURI__.invoke('get_recent_workspaces');
             this.displayRecentWorkspaces(workspaces);

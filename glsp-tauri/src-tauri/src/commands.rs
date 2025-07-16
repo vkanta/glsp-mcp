@@ -379,3 +379,10 @@ pub async fn create_workspace_structure(
         .create_workspace_structure(&workspace_path)
         .await
 }
+
+/// Rescan workspace to discover existing files using MCP
+#[command]
+pub async fn rescan_workspace(state: State<'_, AppState>) -> Result<String, String> {
+    info!("Rescanning workspace to discover existing files");
+    state.mcp_client.rescan_workspace().await
+}

@@ -1,7 +1,6 @@
 package adas:camera-front@0.1.0;
 
-interface camera-ecu {
-    /// Camera configuration
+interface camera-sensor {
     record config {
         width: u32,
         height: u32,
@@ -11,7 +10,6 @@ interface camera-ecu {
         auto-white-balance: bool,
     }
 
-    /// Frame metadata
     record frame-info {
         timestamp: u64,
         frame-number: u64,
@@ -20,7 +18,6 @@ interface camera-ecu {
         temperature-celsius: f32,
     }
 
-    /// Camera status
     enum status {
         inactive,
         initializing,
@@ -28,7 +25,6 @@ interface camera-ecu {
         error,
     }
 
-    /// Performance statistics
     record stats {
         frames-processed: u64,
         frames-dropped: u64,
@@ -38,7 +34,16 @@ interface camera-ecu {
         bandwidth-mbps: f32,
     }
 
-    /// Health status levels
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    process-frame: func() -> result<frame-info, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
     enum health {
         healthy,
         degraded,
@@ -46,7 +51,6 @@ interface camera-ecu {
         offline,
     }
 
-    /// Diagnostic test result
     record test-result {
         name: string,
         passed: bool,
@@ -54,42 +58,12 @@ interface camera-ecu {
         duration-ms: f32,
     }
 
-    // === SENSOR OPERATIONS ===
-    
-    /// Initialize camera with configuration
-    initialize: func(cfg: config) -> result<_, string>;
-    
-    /// Start camera capture
-    start: func() -> result<_, string>;
-    
-    /// Stop camera capture
-    stop: func() -> result<_, string>;
-    
-    /// Process a frame (simulated)
-    process-frame: func() -> result<frame-info, string>;
-    
-    /// Get current status
-    get-status: func() -> status;
-    
-    /// Get performance statistics
-    get-stats: func() -> stats;
-    
-    /// Reset statistics
-    reset-stats: func();
-
-    // === DIAGNOSTIC OPERATIONS ===
-    
-    /// Get overall health
     get-health: func() -> health;
-    
-    /// Run diagnostic tests
     run-diagnostics: func() -> list<test-result>;
-    
-    /// Get detailed status report
     get-report: func() -> string;
 }
 
-/// Camera front sensor world with unified interface
 world camera-front {
-    export camera-ecu;
+    export camera-sensor;
+    export diagnostics;
 }

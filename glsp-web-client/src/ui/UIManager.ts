@@ -293,7 +293,8 @@ export class UIManager {
                 console.log('UIManager: Creating WorkspaceSelector');
                 this.workspaceSelector = new WorkspaceSelector(workspaceContainer, (workspacePath) => {
                     console.log('Workspace changed to:', workspacePath);
-                    // You can add additional handling here if needed
+                    // Refresh UI components that depend on workspace content
+                    this.refreshWorkspaceUI();
                 });
                 console.log('UIManager: WorkspaceSelector created successfully');
             } else {
@@ -1735,6 +1736,33 @@ export class UIManager {
                 collapsed: true
             });
         }
+    }
+
+    /**
+     * Refresh UI components that depend on workspace content
+     */
+    public refreshWorkspaceUI(): void {
+        console.log('UIManager: Refreshing workspace UI components...');
+        
+        // Refresh component library to show newly discovered WASM components
+        if (this.componentLibrarySection) {
+            console.log('UIManager: Refreshing component library');
+            this.componentLibrarySection.refresh();
+        }
+        
+        // Refresh diagram controls to show any new diagrams
+        if (this.diagramControlsSection) {
+            console.log('UIManager: Refreshing diagram controls');
+            this.diagramControlsSection.refresh();
+        }
+        
+        // Update recent workspaces list
+        if (this.workspaceSelector) {
+            console.log('UIManager: Refreshing workspace selector');
+            this.workspaceSelector.loadRecentWorkspaces();
+        }
+        
+        console.log('UIManager: Workspace UI refresh completed');
     }
 
     public destroy(): void {

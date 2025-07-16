@@ -18,11 +18,11 @@ bazel_dep(name = "bazel_skylib", version = "1.7.1")
 # Add rules_rust with WASI P2 support
 bazel_dep(name = "rules_rust", version = "0.62.0")
 
-# For now, use git_override since we haven't published to BCR yet
+# Use latest rules_wasm_component with hybrid strategy support
 git_override(
     module_name = "rules_wasm_component",
     remote = "https://github.com/pulseengine/rules_wasm_component.git",
-    commit = "9905b76",  # Fix: duplicate macro definition issue
+    commit = "81572e45d06a6ddfcadea0b886d60dc966141171",  # Latest: wrapper fix for multi-interface components
 )
 
 # Use rules_rust fork with WASI P2 support
@@ -32,12 +32,13 @@ git_override(
     commit = "1945773a",  # Latest fix including rust_toolchain
 )
 
-# Configure WASM toolchain to download standard tools for now (test if issue is resolved in newer version)
+# Configure WASM toolchain with hybrid strategy to use forked wit-bindgen with export macro fix
 wasm_toolchain = use_extension("@rules_wasm_component//wasm:extensions.bzl", "wasm_toolchain")
 wasm_toolchain.register(
     name = "adas_tools",
-    strategy = "download",  # Download prebuilt tools
-    version = "1.235.0",  # Use latest version to see if issue is already fixed
+    strategy = "hybrid",  # Use hybrid strategy for forked wit-bindgen
+    wit_bindgen_url = "https://github.com/avrabe/wit-bindgen.git",
+    wit_bindgen_commit = "23796bc4caa7e224d3dce9cc044ed89bcfca074a",  # Fixed export macro visibility for multi-interface components
 )
 use_repo(wasm_toolchain, "adas_tools_toolchains")
 

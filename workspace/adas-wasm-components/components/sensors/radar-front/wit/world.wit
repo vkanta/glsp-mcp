@@ -1,5 +1,69 @@
 package adas:radar-front@0.1.0;
 
+interface radar-sensor {
+    record config {
+        range-meters: f32,
+        resolution-cm: f32,
+        field-of-view-degrees: f32,
+        frequency-ghz: f32,
+        detection-threshold: f32,
+    }
+
+    record detection {
+        range-meters: f32,
+        angle-degrees: f32,
+        velocity-ms: f32,
+        signal-strength: f32,
+        target-type: string,
+        confidence: f32,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        detections-processed: u64,
+        false-positives: u64,
+        average-range: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+        power-watts: f32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    process-frame: func() -> result<list<detection>, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world radar-front {
-    export process-frame: func() -> string;
+    export radar-sensor;
+    export diagnostics;
 }

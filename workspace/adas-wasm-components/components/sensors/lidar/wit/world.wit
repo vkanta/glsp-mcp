@@ -1,5 +1,74 @@
 package adas:lidar@0.1.0;
 
+interface lidar-sensor {
+    record config {
+        range-meters: f32,
+        resolution-cm: f32,
+        field-of-view-degrees: f32,
+        scan-rate-hz: f32,
+        detection-threshold: f32,
+    }
+
+    record point {
+        x: f32,
+        y: f32,
+        z: f32,
+        intensity: f32,
+        timestamp: u64,
+    }
+
+    record scan {
+        points: list<point>,
+        timestamp: u64,
+        scan-id: u64,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        scans-processed: u64,
+        points-processed: u64,
+        average-points-per-scan: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+        power-watts: f32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    process-frame: func() -> result<scan, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world lidar {
-    export process-frame: func() -> string;
+    export lidar-sensor;
+    export diagnostics;
 }
