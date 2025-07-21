@@ -1,5 +1,78 @@
 package adas:camera-surround@0.1.0;
 
+interface camera-sensor {
+    record config {
+        camera-count: u32,
+        resolution-width: u32,
+        resolution-height: u32,
+        fps: u32,
+        format: string,
+        stitching-enabled: bool,
+        overlap-degrees: f32,
+    }
+
+    record surround-view {
+        timestamp: u64,
+        frame-number: u64,
+        camera-frames: list<camera-frame>,
+        stitched-image: option<string>,
+    }
+
+    record camera-frame {
+        camera-id: u32,
+        position: string,
+        image-data: string,
+        exposure-ms: f32,
+        gain: f32,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        frames-processed: u64,
+        frames-dropped: u64,
+        average-fps: f32,
+        stitching-success-rate: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+        bandwidth-mbps: f32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    process-frame: func() -> result<surround-view, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world camera-surround {
-    export process-frame: func() -> string;
+    export camera-sensor;
+    export diagnostics;
 }

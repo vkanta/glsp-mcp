@@ -1,5 +1,119 @@
 package adas:behavior-prediction@0.1.0;
 
+interface prediction-engine {
+    record config {
+        model-name: string,
+        prediction-horizon-seconds: f32,
+        confidence-threshold: f32,
+        max-tracked-objects: u32,
+        temporal-window-frames: u32,
+        motion-models: list<string>,
+    }
+
+    record object-state {
+        object-id: u32,
+        position: position,
+        velocity: velocity,
+        acceleration: velocity,
+        heading-degrees: f32,
+        object-type: string,
+        confidence: f32,
+        timestamp: u64,
+    }
+
+    record position {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record velocity {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record trajectory-point {
+        position: position,
+        velocity: velocity,
+        timestamp-offset-ms: u32,
+        confidence: f32,
+    }
+
+    record predicted-trajectory {
+        object-id: u32,
+        trajectory-points: list<trajectory-point>,
+        motion-model: string,
+        risk-level: risk-level,
+        collision-probability: f32,
+    }
+
+    enum risk-level {
+        low,
+        medium,
+        high,
+        critical,
+    }
+
+    record prediction-result {
+        trajectories: list<predicted-trajectory>,
+        processing-time-ms: f32,
+        frame-number: u64,
+        timestamp: u64,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        frames-processed: u64,
+        objects-tracked: u64,
+        predictions-generated: u64,
+        average-processing-time-ms: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    predict-trajectories: func(objects: list<object-state>) -> result<prediction-result, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world behavior-prediction {
-    export process-frame: func() -> string;
+    // WASI-NN imports temporarily disabled pending rules_wasm_component dependency resolution
+    // import wasi:nn/graph@0.2.0-rc-2024-10-28;
+    // import wasi:nn/tensor@0.2.0-rc-2024-10-28;
+    // import wasi:nn/inference@0.2.0-rc-2024-10-28;
+    // import wasi:nn/errors@0.2.0-rc-2024-10-28;
+    
+    export prediction-engine;
+    export diagnostics;
 }

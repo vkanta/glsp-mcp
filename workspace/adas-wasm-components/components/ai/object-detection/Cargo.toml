@@ -18,6 +18,7 @@ image = { workspace = true }
 ndarray = { workspace = true }
 lazy_static = { workspace = true }
 bytemuck = { workspace = true }
+adas-wasi-nn-utils = { workspace = true }
 
 # Configuration for building WASM components
 # Profile configuration inherited from workspace

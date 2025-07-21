@@ -1,5 +1,131 @@
 package adas:sensor-fusion@0.1.0;
 
+interface fusion-engine {
+    record config {
+        fusion-rate-hz: f32,
+        confidence-threshold: f32,
+        max-sensor-latency-ms: u32,
+        kalman-filter-enabled: bool,
+        sensor-weights: list<sensor-weight>,
+        coordinate-system: string,
+    }
+
+    record sensor-weight {
+        sensor-type: string,
+        weight: f32,
+        reliability-factor: f32,
+    }
+
+    record sensor-data {
+        sensor-id: string,
+        sensor-type: string,
+        data-type: string,
+        raw-data: string,
+        confidence: f32,
+        timestamp: u64,
+        coordinate-frame: string,
+    }
+
+    record fused-object {
+        object-id: u32,
+        position: position,
+        velocity: velocity,
+        acceleration: velocity,
+        orientation: orientation,
+        dimensions: dimensions,
+        object-type: string,
+        confidence: f32,
+        source-sensors: list<string>,
+        timestamp: u64,
+    }
+
+    record position {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record velocity {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    record orientation {
+        roll: f32,
+        pitch: f32,
+        yaw: f32,
+    }
+
+    record dimensions {
+        length: f32,
+        width: f32,
+        height: f32,
+    }
+
+    record fusion-result {
+        fused-objects: list<fused-object>,
+        sensor-status: list<sensor-status>,
+        processing-time-ms: f32,
+        frame-number: u64,
+        timestamp: u64,
+    }
+
+    record sensor-status {
+        sensor-id: string,
+        is-active: bool,
+        latency-ms: u32,
+        data-quality: f32,
+        last-update: u64,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        frames-processed: u64,
+        objects-fused: u64,
+        sensors-active: u32,
+        average-processing-time-ms: f32,
+        fusion-accuracy: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    fuse-sensor-data: func(sensor-inputs: list<sensor-data>) -> result<fusion-result, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world sensor-fusion {
-    export process-frame: func() -> string;
+    export fusion-engine;
+    export diagnostics;
 }

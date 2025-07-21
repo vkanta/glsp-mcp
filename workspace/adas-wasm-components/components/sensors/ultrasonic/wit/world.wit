@@ -1,5 +1,81 @@
 package adas:ultrasonic@0.1.0;
 
+interface ultrasonic-sensor {
+    record config {
+        sensor-count: u32,
+        max-range-cm: u32,
+        resolution-cm: u32,
+        frequency-khz: u32,
+        detection-threshold: f32,
+        position-mapping: list<sensor-position>,
+    }
+
+    record sensor-position {
+        sensor-id: u32,
+        position: string,
+        angle-degrees: f32,
+        height-cm: u32,
+    }
+
+    record distance-reading {
+        sensor-id: u32,
+        distance-cm: u32,
+        confidence: f32,
+        timestamp: u64,
+    }
+
+    record sensor-array-data {
+        readings: list<distance-reading>,
+        timestamp: u64,
+        frame-number: u64,
+    }
+
+    enum status {
+        inactive,
+        initializing,
+        active,
+        error,
+    }
+
+    record stats {
+        measurements-processed: u64,
+        out-of-range-detections: u64,
+        average-distance-cm: f32,
+        cpu-percent: f32,
+        memory-mb: u32,
+        power-watts: f32,
+    }
+
+    initialize: func(cfg: config) -> result<_, string>;
+    start: func() -> result<_, string>;
+    stop: func() -> result<_, string>;
+    process-frame: func() -> result<sensor-array-data, string>;
+    get-status: func() -> status;
+    get-stats: func() -> stats;
+    reset-stats: func();
+}
+
+interface diagnostics {
+    enum health {
+        healthy,
+        degraded,
+        critical,
+        offline,
+    }
+
+    record test-result {
+        name: string,
+        passed: bool,
+        message: string,
+        duration-ms: f32,
+    }
+
+    get-health: func() -> health;
+    run-diagnostics: func() -> list<test-result>;
+    get-report: func() -> string;
+}
+
 world ultrasonic {
-    export process-frame: func() -> string;
+    export ultrasonic-sensor;
+    export diagnostics;
 }
