@@ -25,6 +25,10 @@ components/*/src/bindings/
 *.component.wasm
 *.core.wasm
 
+# WebAssembly Component Model build directories
+/deps/
+/deps-symlink/
+
 # wasm-tools generated files
 *.embed.wasm
 *.component.validated
