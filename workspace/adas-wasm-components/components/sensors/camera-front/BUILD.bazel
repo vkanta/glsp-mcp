@@ -1,29 +1,15 @@
-"""Camera Front ECU Component - Bazel Build"""
+"""Camera Front ECU Component - Optimized Build with ADAS macros"""
 
-load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
+load("//adas-build:adas_component.bzl", "adas_camera_component")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for camera component
-wit_library(
-    name = "camera_front_interfaces",
-    srcs = ["wit/world.wit"],
-    package_name = "adas:camera-front",
-)
-
-# Build camera front component with multiple profiles using new API
-rust_wasm_component_bindgen(
+# Camera Front ECU Component
+adas_camera_component(
     name = "camera_front_ecu",
     srcs = ["src/lib.rs"],
-    wit = ":camera_front_interfaces",
-    profiles = ["debug", "release"],
-)
-
-# Test the camera component
-rust_wasm_component_test(
-    name = "camera_front_test",
-    component = ":camera_front_ecu",
+    wit_world = "wit/world.wit",
+    package_name = "adas:camera-front",
 )
 
 # For compatibility with existing system, create aliases

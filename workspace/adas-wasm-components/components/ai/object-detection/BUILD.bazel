@@ -1,27 +1,17 @@
-"""Object Detection AI Component - Bazel Build"""
+"""Object Detection AI Component - Optimized Build with ADAS macros"""
 
-load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
+load("//adas-build:adas_component.bzl", "adas_ai_component")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for component
-wit_library(
-    name = "object_detection_ai_interfaces",
-    srcs = ["wit/world.wit"],
-    package_name = "adas:object-detection",
-)
-
-# Build component
-rust_wasm_component_bindgen(
+# Object Detection AI Component with WASI-NN integration
+adas_ai_component(
     name = "object_detection_ai",
     srcs = ["src/lib.rs"],
-    wit = ":object_detection_ai_interfaces",
-    profiles = ["debug", "release"],
-)
-
-# Test the component
-rust_wasm_component_test(
-    name = "object_detection_ai_test",
-    component = ":object_detection_ai",
+    wit_world = "wit/world.wit",
+    model_files = [
+        "models/yolov5n.onnx",
+        "//models:yolov5n.onnx",  # Reference to shared model
+    ],
+    package_name = "adas:object-detection",
 )

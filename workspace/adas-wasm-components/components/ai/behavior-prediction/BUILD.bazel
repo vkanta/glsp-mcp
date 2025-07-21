@@ -1,27 +1,13 @@
-"""Behavior Prediction AI Component - Bazel Build"""
+"""Behavior Prediction AI Component - Optimized Build with ADAS macros"""
 
-load("@rules_wasm_component//wit:defs.bzl", "wit_library")
-load("@rules_wasm_component//rust:defs.bzl", "rust_wasm_component_bindgen", "rust_wasm_component_test")
+load("//adas-build:adas_component.bzl", "adas_ai_component")
 
 package(default_visibility = ["//visibility:public"])
 
-# WIT interfaces for component
-wit_library(
-    name = "behavior_prediction_ai_interfaces",
-    srcs = ["wit/world.wit"],
-    package_name = "adas:behavior-prediction",
-)
-
-# Build component
-rust_wasm_component_bindgen(
+# Behavior Prediction AI Component with WASI-NN integration
+adas_ai_component(
     name = "behavior_prediction_ai",
-    srcs = ["src/lib.rs"],
-    wit = ":behavior_prediction_ai_interfaces",
-    profiles = ["debug", "release", "optimized"],
-)
-
-# Test the component
-rust_wasm_component_test(
-    name = "behavior_prediction_ai_test",
-    component = ":behavior_prediction_ai",
+    srcs = ["src/lib.rs", "src/social_lstm.rs", "src/trajectory.rs"],
+    wit_world = "wit/world.wit",
+    package_name = "adas:behavior-prediction",
 )
