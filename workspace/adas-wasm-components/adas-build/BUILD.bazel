@@ -1,0 +1,17 @@
+"""ADAS build utilities and shared macros"""
+
+package(default_visibility = ["//visibility:public"])
+
+# Export the macro file for use by other packages
+exports_files([
+    "adas_component.bzl",
+])
+
+# Documentation target
+filegroup(
+    name = "docs",
+    srcs = [
+        "adas_component.bzl",
+        "README.md",
+    ],
+)

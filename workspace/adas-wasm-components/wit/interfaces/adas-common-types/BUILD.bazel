@@ -1,0 +1,11 @@
+"""ADAS Common Types interfaces"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+
+package(default_visibility = ["//visibility:public"])
+
+wit_library(
+    name = "types",
+    package_name = "adas:common-types",
+    srcs = ["types.wit"],
+)

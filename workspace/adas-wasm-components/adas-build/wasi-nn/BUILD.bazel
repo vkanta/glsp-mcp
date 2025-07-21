@@ -1,0 +1,26 @@
+"""Shared WASI-NN utilities for ADAS AI components"""
+
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# Shared WASI-NN utility library (does not implement WASI-NN, just provides helpers)
+rust_library(
+    name = "wasi_nn_utils",
+    srcs = ["src/lib.rs"],
+    edition = "2021",
+    crate_name = "adas_wasi_nn_utils",
+)
+
+# Test target for WASI-NN utilities
+rust_test(
+    name = "wasi_nn_utils_test",
+    crate = ":wasi_nn_utils",
+    edition = "2021",
+)
+
+# Export the library for easy inclusion
+alias(
+    name = "lib",
+    actual = ":wasi_nn_utils",
+)

@@ -1,0 +1,15 @@
+"""ADAS Data interfaces"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+
+package(default_visibility = ["//visibility:public"])
+
+wit_library(
+    name = "data",
+    package_name = "adas:data",
+    srcs = [
+        "data.wit",
+        "data-flow.wit",
+    ],
+    deps = ["//wit/interfaces/adas-common-types:types"],
+)

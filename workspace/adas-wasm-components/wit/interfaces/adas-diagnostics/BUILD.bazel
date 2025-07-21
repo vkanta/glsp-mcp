@@ -1,0 +1,15 @@
+"""ADAS Diagnostics interfaces"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+
+package(default_visibility = ["//visibility:public"])
+
+wit_library(
+    name = "diagnostics",
+    package_name = "adas:diagnostics",
+    srcs = [
+        "diagnostics.wit",
+        "component-info.wit",
+    ],
+    deps = ["//wit/interfaces/adas-common-types:types"],
+)

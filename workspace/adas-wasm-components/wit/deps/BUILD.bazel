@@ -1,0 +1,13 @@
+"""WIT dependencies for ADAS components"""
+
+load("@rules_wasm_component//wit:defs.bzl", "wit_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# WASI-NN WIT interfaces following rules_wasm_component patterns
+wit_library(
+    name = "wasi-nn",
+    srcs = ["wasi-nn/wit/wasi-nn.wit"],
+    package_name = "wasi:nn@0.2.0-rc-2024-10-28",
+    world = "ml",  # Specify the world from the WIT file
+)
