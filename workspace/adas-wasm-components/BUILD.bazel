@@ -58,8 +58,37 @@ wit_library(
     package_name = "adas:orchestration",
 )
 
-# Complete ADAS system composition using rules_wasm_component
-wac_compose(
+# Complete ADAS system composition using optimized component groups
+load("//adas-build:adas_component.bzl", "adas_component_group")
+
+# Sensor component group
+adas_component_group(
+    name = "adas_sensor_group",
+    components = {
+        "camera-front": "//components/sensors/camera-front:camera_front_ecu",
+        "camera-surround": "//components/sensors/camera-surround:camera_surround_ecu",
+        "lidar": "//components/sensors/lidar:lidar_ecu",
+        "radar-front": "//components/sensors/radar-front:radar_front_ecu",
+        "radar-corner": "//components/sensors/radar-corner:radar_corner_ecu",
+        "ultrasonic": "//components/sensors/ultrasonic:ultrasonic_ecu",
+    },
+    composition_file = "adas-sensors.wac",
+    profile = "release",
+)
+
+# AI processing component group
+adas_component_group(
+    name = "adas_ai_group",
+    components = {
+        "object-detection": "//components/ai/object-detection:object_detection_ai",
+        "behavior-prediction": "//components/ai/behavior-prediction:behavior_prediction_ai",
+    },
+    composition_file = "adas-ai.wac",
+    profile = "release",
+)
+
+# Complete ADAS system composition
+adas_component_group(
     name = "adas_complete_system",
     components = {
         # Sensor Layer (FEO Phase 1)
