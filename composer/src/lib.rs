@@ -1,25 +1,22 @@
-mod bindings;
+wit_bindgen::generate!({
+    path: "../wit",
+    world: "math",
+    exports: {
+        generate_all,
+    }
+});
 
-use bindings::example::math::math::{self, Point};
-use bindings::example::user::user::{self, UserProfile};
+pub struct Math;
 
-struct MathImpl;
-struct UserImpl;
-
-impl math::Guest for MathImpl {
-    fn distance_from_origin(p: Point) -> f64 {
-        (p.x * p.x + p.y * p.y).sqrt()
+impl Math {
+    pub fn add_points(p1: bindings::Point, p2: bindings::Point) -> bindings::Point {
+        bindings::Point {
+            x: p1.x + p2.x,
+            y: p1.y + p2.y,
+        }
     }
 }
 
-impl user::Guest for UserImpl {
-    fn greet_user(profile: UserProfile) -> String {
-        format!(
-            "Hello, {}! Your ID is {} and you are {}.",
-            profile.username,
-            profile.id,
-            if profile.is_active { "active" } else { "inactive" }
-        )
-    }
+pub fn compose_points(p1: bindings::Point, p2: bindings::Point) -> bindings::Point {
+    Math::add_points(p1, p2)
 }
-

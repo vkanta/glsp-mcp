@@ -1,0 +1,37 @@
+{
+  "id": "d6269386-beac-4d94-834f-ef28483856bd",
+  "name": "Test",
+  "diagram_type": "workflow",
+  "revision": 6,
+  "created_at": "2025-08-06T14:39:42.291027636Z",
+  "updated_at": "2025-08-06T14:39:42.291030283Z",
+  "nodes": [
+    {
+      "id": "0348d6a6-7818-46ed-9287-16aedb6a225c",
+      "node_type": "task",
+      "label": "Start",
+      "properties": {
+        "label": "Start"
+      }
+    },
+    {
+      "id": "0e2e748b-ffbb-4402-ac26-f5ecbbdf83cf",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "0348d6a6-7818-46ed-9287-16aedb6a225c",
+        "targetId": "ed55ae82-25eb-431c-b923-fbf99bb176b1"
+      }
+    },
+    {
+      "id": "ed55ae82-25eb-431c-b923-fbf99bb176b1",
+      "node_type": "task",
+      "label": "Process",
+      "properties": {
+        "label": "Process"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

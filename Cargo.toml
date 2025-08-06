@@ -2,7 +2,8 @@
 members = [
     "glsp-mcp-server",
     "glsp-tauri/src-tauri",
-    "composer"
+	#"composer",
+    "tasklist_mcp_client"
 ]
 resolver = "2"
 
