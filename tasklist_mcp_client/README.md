@@ -39,14 +39,22 @@ The image below shows the generated diagram rendered in the WASM Component Desig
 
 ```bash
 cargo run
+
+
+📦 Dependencies
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.5", features = ["v4"] }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 regex = "1.10"
+
+
+📁 Project Structure
+
 src/
 ├── main.rs         # Sends JSON-RPC calls to create the diagram
 ├── tasklist.rs     # (optional) TaskList data model if modularized
 e9a74450-277e-4662-a28b-511a8eecaa84.png  # Screenshot image
+
 
