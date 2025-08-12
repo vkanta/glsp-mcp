@@ -1,0 +1,82 @@
+{
+  "id": "824a576f-baeb-45a4-b226-72ad07544fde",
+  "name": "Amt-Test-Diagram",
+  "diagram_type": "workflow",
+  "revision": 17,
+  "created_at": "2025-08-12T09:43:57.823592134Z",
+  "updated_at": "2025-08-12T09:43:57.823596449Z",
+  "nodes": [
+    {
+      "id": "bb5e0967-ed34-4d98-9757-e3305ddab7df",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    },
+    {
+      "id": "f9c497fa-2979-4808-97b7-213e26f2324c",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    },
+    {
+      "id": "737f4583-c561-4959-91c5-69ce015cb532",
+      "node_type": "task",
+      "label": "amt-composer:simple",
+      "properties": {
+        "label": "amt-composer:simple"
+      }
+    },
+    {
+      "id": "1bd8b2f7-8bfe-4ebf-a557-6282cc2739f2",
+      "node_type": "task",
+      "label": "amt-compose:bridge@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge@0.1.0"
+      }
+    },
+    {
+      "id": "5ae70353-e933-4f94-844f-e787326f8de9",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    },
+    {
+      "id": "aa703445-fd12-4348-9cc0-932a9d985339",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    },
+    {
+      "id": "94c30eb3-4a59-47a0-90b6-44fcaea9a1f7",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    },
+    {
+      "id": "5a5f9d87-43a1-4bcc-9d2a-70c71c8035cb",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "737f4583-c561-4959-91c5-69ce015cb532",
+        "targetId": "737f4583-c561-4959-91c5-69ce015cb532"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

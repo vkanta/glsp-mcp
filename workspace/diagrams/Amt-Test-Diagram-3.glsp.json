@@ -1,0 +1,76 @@
+{
+  "id": "5516ed95-3058-4b45-8a8c-b237d9f132c8",
+  "name": "Amt-Test-Diagram-3",
+  "diagram_type": "workflow",
+  "revision": 17,
+  "created_at": "2025-08-12T13:56:00.624760412Z",
+  "updated_at": "2025-08-12T13:56:00.624764279Z",
+  "nodes": [
+    {
+      "id": "164e8425-2a74-458a-8f47-78305385de10",
+      "node_type": "task",
+      "label": "amt-composer:simple/guest-main",
+      "properties": {
+        "label": "amt-composer:simple/guest-main"
+      }
+    },
+    {
+      "id": "aff0e11f-4b5c-48a4-8446-4ca9875f12b7",
+      "node_type": "task",
+      "label": "amt-compose:bridge@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge@0.1.0"
+      }
+    },
+    {
+      "id": "be995c3f-bbc0-4555-abc9-c132043eeb57",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies-types",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies-types"
+      }
+    },
+    {
+      "id": "d32d39fe-4b00-43a1-9a3c-de32887a5b7d",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest"
+      }
+    },
+    {
+      "id": "08d39fac-364d-46f2-a256-8d09712ca7cb",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies"
+      }
+    },
+    {
+      "id": "c5f7465d-1ed3-48f8-b49d-0bc96a27a16f",
+      "node_type": "task",
+      "label": "amt-compose:bridge/fallible@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge/fallible@0.1.0"
+      }
+    },
+    {
+      "id": "de2e2411-8d5f-4ec0-822a-6facf2fef2b5",
+      "node_type": "task",
+      "label": "amt-composer:simple",
+      "properties": {
+        "label": "amt-composer:simple"
+      }
+    },
+    {
+      "id": "95bfb9ee-a1b1-42d9-a01e-88c5a5d17585",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest-types",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest-types"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}
