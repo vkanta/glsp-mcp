@@ -57,4 +57,15 @@ src/
 ├── tasklist.rs     # (optional) TaskList data model if modularized
 e9a74450-277e-4662-a28b-511a8eecaa84.png  # Screenshot image
 
+What changed & why
+DRY JSON-RPC: DiagramToolClient centralizes request/response handling, text extraction, and UUID parsing, replacing repeated blocks.
 
+Unified UUID parsing: extract_uuid_from_text replaces the two nearly identical extract_*_id functions.
+
+Borrow instead of clone: wit_interfaces_as_tasks(&Resolve, &Package) and iteration over resolve.packages.iter() avoid unnecessary moves.
+
+Smaller, focused functions: build_task_list_from_amt_compose builds the graph; generate_diagram_from_amt drives the whole flow.
+
+Error handling: Removed unwrap/expect; added anyhow::Context for traceable failures.
+
+Docs: Added /// comments for all public structs and functions.
