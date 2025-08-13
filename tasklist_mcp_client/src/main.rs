@@ -1,5 +1,4 @@
 use amt_compose::codegen_core::CanonicalNameExt;
-use amt_compose::project;
 use amt_compose::wit_bindgen_core::wit_parser::{Package, Resolve};
 use anyhow::Error;
 use regex::Regex;
@@ -57,11 +56,10 @@ fn build_transitions(parent: &Task, children: &Vec<Task>) -> Vec<Transition> {
             id: Uuid::new_v4().to_string(),
         })
         .collect();
-    edges
+    dbg!(edges)
 }
 
 fn get_wit_interfaces(r: Resolve, p: &Package) -> Result<Vec<Task>, Error> {
-    let shape = String::from("interface");
     let mut the_interfaces = Vec::<Task>::new();
     for (_, id) in &p.interfaces {
         let mut i_task = Task::default(); // this task contains the interface data
@@ -80,11 +78,7 @@ fn get_wit_interfaces(r: Resolve, p: &Package) -> Result<Vec<Task>, Error> {
 /// this function collects data from the amt compose
 /// returns a tasklist to be displayed
 fn amt_compose_task_list() -> Result<TaskList, Error> {
-    use amt_compose::{
-        build::{BuildArgs, BuildContext},
-        core::LogTracker,
-        project::ProjectContext,
-    };
+    use amt_compose::{core::LogTracker, project::ProjectContext};
 
     let config_path = "amt-compose.yaml"; // relative (to project_path) or absolute
     let project_path = "/home/vkanta/wspaces/glsp-mcp/workspace/amt/simple";
@@ -125,7 +119,7 @@ fn main() {
             "name": "create_diagram",
             "arguments": {
                 "diagramType": "workflow",
-                "name": "Amt-Test-Diagram-3"
+                "name": "Amt-Test-Diagram-5"
             }
         },
         "id": 1
@@ -223,8 +217,8 @@ fn main() {
                 "arguments": {
                     "diagramId": diagram_id,
                     "edgeType": "sequence-flow",
-                    "sourceId": transition.source_task_id,
-                    "targetId":transition.target_task_id
+                    "sourceId": source_id,
+                    "targetId":target_id
                 }
             },
             "id": id_counter
@@ -285,7 +279,7 @@ fn extract_node_id(text: &str) -> Option<String> {
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str().to_string())
 }
-
+#[warn(dead_code)]
 fn sample_tasklist() -> TaskList {
     TaskList {
         id: Uuid::new_v4().to_string(),
