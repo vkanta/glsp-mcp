@@ -103,9 +103,7 @@ pub fn wit_interfaces_as_tasks(resolve: &Resolve, package: &Package) -> Result<V
 
     for (_, iface_id) in &package.interfaces {
         let mut t = Task::default();
-        t.name = resolve
-            .interface_canon_by_id(*iface_id)
-            .unwrap_or_default();
+        t.name = resolve.interface_canon_by_id(*iface_id).unwrap_or_default();
 
         // Collect function names and prefix for readability in the diagram.
         let func_names: Vec<String> = resolve.interfaces[*iface_id]
@@ -131,10 +129,7 @@ pub fn wit_interfaces_as_tasks(resolve: &Resolve, package: &Package) -> Result<V
 /// - A `Transition` is created from the package task to each interface task.
 ///
 /// Returns a complete `TaskList` ready to be posted to the diagram tool.
-pub fn build_task_list_from_amt_compose(
-    config_path: &str,
-    project_path: &str,
-) -> Result<TaskList> {
+pub fn build_task_list_from_amt_compose(config_path: &str, project_path: &str) -> Result<TaskList> {
     use amt_compose::{core::LogTracker, project::ProjectContext};
 
     let logger = LogTracker::new_boxed();
@@ -142,9 +137,7 @@ pub fn build_task_list_from_amt_compose(
     let project = ProjectContext::new(config_path, project_path, quiet, logger)
         .context("Failed to open amt-compose project")?;
 
-    let resolve = project
-        .wit()
-        .resolve();
+    let resolve = project.wit().resolve();
 
     let mut out = TaskList {
         id: Uuid::new_v4().to_string(),
@@ -224,7 +217,7 @@ impl<'a> DiagramToolClient<'a> {
     ///
     /// The diagram tool replies with a structure like:
     /// `{ result: { content: [ { text: "...ID: <uuid>..." } ] } }`.
-    fn extract_text(&self, response: &Value) -> Result<&str> {
+    fn extract_text(response: &Value) -> Result<&str> {
         response
             .get("result")
             .and_then(|r| r.get("content"))
@@ -237,8 +230,7 @@ impl<'a> DiagramToolClient<'a> {
     /// Parse a UUID that follows the pattern `ID: <uuid>` within `text`.
     fn extract_uuid_from_text(&self, text: &str) -> Result<String> {
         // Compiled lazily per call; for hot paths you can memoize or use once_cell.
-        let re = Regex::new(r"ID:\s*([a-f0-9-]{36})")
-            .context("Failed to compile UUID regex")?;
+        let re = Regex::new(r"ID:\s*([a-f0-9-]{36})").context("Failed to compile UUID regex")?;
         re.captures(text)
             .and_then(|caps| caps.get(1))
             .map(|m| m.as_str().to_string())
@@ -249,7 +241,7 @@ impl<'a> DiagramToolClient<'a> {
     pub fn create_diagram(&self, diagram_type: &str, name: &str, id: i64) -> Result<String> {
         let args = json!({ "diagramType": diagram_type, "name": name });
         let resp = self.rpc_call("create_diagram", args, id)?;
-        let text = self.extract_text(&resp)?;
+        let text = Self::extract_text(&resp)?;
         self.extract_uuid_from_text(text)
     }
 
@@ -269,7 +261,7 @@ impl<'a> DiagramToolClient<'a> {
             "label": label
         });
         let resp = self.rpc_call("create_node", args, id)?;
-        let text = self.extract_text(&resp)?;
+        let text = Self::extract_text(&resp)?;
         self.extract_uuid_from_text(text)
     }
 
@@ -290,7 +282,7 @@ impl<'a> DiagramToolClient<'a> {
         });
         let resp = self.rpc_call("create_edge", args, id)?;
         // Edge responses often don't embed a new ID; we still check status via presence of result.
-        self.extract_text(&resp).ok();
+        Self::extract_text(&resp).ok();
         Ok(())
     }
 
@@ -359,13 +351,8 @@ pub fn generate_diagram_from_amt(
     let mut id_map: HashMap<String, String> = HashMap::new();
 
     for task in &tasklist.tasks {
-        let assigned_id = tool.create_node(
-            &diagram_id,
-            "task",
-            &task.name,
-            &task.position,
-            next_id,
-        )?;
+        let assigned_id =
+            tool.create_node(&diagram_id, "task", &task.name, &task.position, next_id)?;
         next_id += 1;
         id_map.insert(task.id.clone(), assigned_id);
     }
@@ -433,4 +420,3 @@ fn sample_tasklist() -> TaskList {
         }],
     }
 }
-
