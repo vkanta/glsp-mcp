@@ -1,78 +1,13 @@
 {
-  "id": "2812a3bd-1a13-4d0c-b094-ab2fc19754f0",
+  "id": "78eec06e-484e-41e6-affd-6c9cf314a1a2",
   "name": "Amt-Test-Diagram-5",
   "diagram_type": "workflow",
-  "revision": 27,
-  "created_at": "2025-08-13T10:16:16.640490081Z",
-  "updated_at": "2025-08-13T10:16:16.640493993Z",
+  "revision": 29,
+  "created_at": "2025-09-06T22:19:55.260133897Z",
+  "updated_at": "2025-09-06T22:19:55.260137817Z",
   "nodes": [
     {
-      "id": "61a739da-275c-477b-a313-ad9c15fdd081",
-      "node_type": "task",
-      "label": "amt-composer:simple",
-      "properties": {
-        "label": "amt-composer:simple"
-      }
-    },
-    {
-      "id": "817ab002-f881-496c-8989-0ae0b0e8fd87",
-      "node_type": "task",
-      "label": "amt-composer:simple/guest-main",
-      "properties": {
-        "label": "amt-composer:simple/guest-main"
-      }
-    },
-    {
-      "id": "680db224-9509-4fb9-bed6-5d18d76666e1",
-      "node_type": "sequence-flow",
-      "label": null,
-      "properties": {
-        "sourceId": "61a739da-275c-477b-a313-ad9c15fdd081",
-        "targetId": "39e2d522-aaf5-46df-aa3b-c16c7a161877"
-      }
-    },
-    {
-      "id": "39e2d522-aaf5-46df-aa3b-c16c7a161877",
-      "node_type": "task",
-      "label": "amt-composer:simple/host-goodies",
-      "properties": {
-        "label": "amt-composer:simple/host-goodies"
-      }
-    },
-    {
-      "id": "22b78303-3c5c-4c54-aaf9-3b218ad56333",
-      "node_type": "task",
-      "label": "amt-composer:simple/host-goodies-types",
-      "properties": {
-        "label": "amt-composer:simple/host-goodies-types"
-      }
-    },
-    {
-      "id": "2ef40357-7eed-4f36-b407-2236f173016a",
-      "node_type": "task",
-      "label": "amt-compose:bridge/fallible@0.1.0",
-      "properties": {
-        "label": "amt-compose:bridge/fallible@0.1.0"
-      }
-    },
-    {
-      "id": "5e4be02d-5e24-4106-94a8-9fa7133d6577",
-      "node_type": "task",
-      "label": "amt-compose:bridge@0.1.0",
-      "properties": {
-        "label": "amt-compose:bridge@0.1.0"
-      }
-    },
-    {
-      "id": "57554197-62f0-425d-8340-4013c1dc290e",
-      "node_type": "task",
-      "label": "amt-composer:simple/inter-guest-types",
-      "properties": {
-        "label": "amt-composer:simple/inter-guest-types"
-      }
-    },
-    {
-      "id": "cde6a93c-8b58-4d39-b68c-89f0144d95ba",
+      "id": "71271131-b4be-4597-85af-a48817c45039",
       "node_type": "task",
       "label": "amt-composer:simple/inter-guest",
       "properties": {
@@ -80,39 +15,113 @@
       }
     },
     {
-      "id": "6d171654-8ef3-47f4-acaf-d0d443e9a88e",
-      "node_type": "sequence-flow",
-      "label": null,
+      "id": "7b375e1b-a147-4853-8ea4-c2024ecd473e",
+      "node_type": "task",
+      "label": "amt-composer:simple/guest-main",
       "properties": {
-        "sourceId": "61a739da-275c-477b-a313-ad9c15fdd081",
-        "targetId": "817ab002-f881-496c-8989-0ae0b0e8fd87"
+        "label": "amt-composer:simple/guest-main"
       }
     },
     {
-      "id": "d20bff32-a459-4d77-b9a4-04b0b57e8076",
+      "id": "d9d50d49-0f2a-4d43-970e-99819f5110c7",
       "node_type": "sequence-flow",
       "label": null,
       "properties": {
-        "sourceId": "61a739da-275c-477b-a313-ad9c15fdd081",
-        "targetId": "57554197-62f0-425d-8340-4013c1dc290e"
+        "sourceId": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+        "targetId": "71271131-b4be-4597-85af-a48817c45039"
       }
     },
     {
-      "id": "b97e3535-c6c9-4301-9e67-ed7690c63d6c",
+      "id": "ad49a6d6-5902-4ad8-8b4d-f40f4eda2fa0",
       "node_type": "sequence-flow",
       "label": null,
       "properties": {
-        "sourceId": "61a739da-275c-477b-a313-ad9c15fdd081",
-        "targetId": "cde6a93c-8b58-4d39-b68c-89f0144d95ba"
+        "sourceId": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+        "targetId": "95ef2403-140a-4044-a0b6-befc9f110d8d"
       }
     },
     {
-      "id": "2ef16370-8ec9-4051-9127-b95bc71627f3",
+      "id": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+      "node_type": "task",
+      "label": "amt-composer:simple",
+      "properties": {
+        "label": "amt-composer:simple"
+      }
+    },
+    {
+      "id": "111aa192-bafe-4d79-a65c-5123c6e5415a",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest-types",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest-types"
+      }
+    },
+    {
+      "id": "95ef2403-140a-4044-a0b6-befc9f110d8d",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies-types",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies-types"
+      }
+    },
+    {
+      "id": "eefa835f-19e3-4df5-9efb-f60cd137137d",
       "node_type": "sequence-flow",
       "label": null,
       "properties": {
-        "targetId": "22b78303-3c5c-4c54-aaf9-3b218ad56333",
-        "sourceId": "61a739da-275c-477b-a313-ad9c15fdd081"
+        "sourceId": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+        "targetId": "7b375e1b-a147-4853-8ea4-c2024ecd473e"
+      }
+    },
+    {
+      "id": "c1581527-70aa-4bd9-978e-985920cef27d",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+        "targetId": "111aa192-bafe-4d79-a65c-5123c6e5415a"
+      }
+    },
+    {
+      "id": "f97d3bb5-a4b0-4228-8a14-c9d0ee6735b2",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "a5dbf16f-14c5-41cf-ad69-90034de92471",
+        "targetId": "c652e8f8-1150-4f40-9b04-b61398306f3b"
+      }
+    },
+    {
+      "id": "96607ca2-dd66-4202-b967-96859d60c3d5",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "d3c1c2ad-78fc-4887-90ec-ca6baecef114",
+        "targetId": "20d4f80f-099b-46d0-8941-a25355b4ca96"
+      }
+    },
+    {
+      "id": "a5dbf16f-14c5-41cf-ad69-90034de92471",
+      "node_type": "task",
+      "label": "amt-compose:bridge@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge@0.1.0"
+      }
+    },
+    {
+      "id": "20d4f80f-099b-46d0-8941-a25355b4ca96",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies"
+      }
+    },
+    {
+      "id": "c652e8f8-1150-4f40-9b04-b61398306f3b",
+      "node_type": "task",
+      "label": "amt-compose:bridge/fallible@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge/fallible@0.1.0"
       }
     }
   ],

@@ -25,6 +25,7 @@ pub struct McpError {
     pub data: Option<Value>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct McpToolCall {
     pub name: String,
@@ -67,6 +68,7 @@ impl McpClient {
     }
 
     /// Update the server port if it changes
+    #[allow(dead_code)]
     pub fn update_port(&self, new_port: u16) {
         let mut url = self.base_url.lock().unwrap();
         *url = format!("http://localhost:{}/messages", new_port);
@@ -253,6 +255,7 @@ impl McpClient {
     }
 
     /// Set WASM components path using MCP tool
+    #[allow(dead_code)]
     pub async fn set_wasm_components_path(&self, wasm_path: &str) -> Result<String, String> {
         let result = self
             .call_tool(
@@ -282,6 +285,7 @@ impl McpClient {
     }
 
     /// Set diagrams path using MCP tool
+    #[allow(dead_code)]
     pub async fn set_diagrams_path(&self, diagrams_path: &str) -> Result<String, String> {
         let result = self
             .call_tool(

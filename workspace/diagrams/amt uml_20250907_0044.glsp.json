@@ -1,0 +1,105 @@
+{
+  "id": "b55f1ed2-cf79-44c1-a8c7-1a76edde9034",
+  "name": "amt uml_20250907_0044",
+  "diagram_type": "workflow",
+  "revision": 23,
+  "created_at": "2025-09-06T22:44:45.437539610Z",
+  "updated_at": "2025-09-06T22:44:45.437545700Z",
+  "nodes": [
+    {
+      "id": "c372429a-0fb7-449d-81a0-614baf29227b",
+      "node_type": "task",
+      "label": "amt-composer:simple/guest-main",
+      "properties": {
+        "label": "amt-composer:simple/guest-main"
+      }
+    },
+    {
+      "id": "74fd28dd-e807-4204-b2e3-bd25d2b66f6f",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies"
+      }
+    },
+    {
+      "id": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72",
+      "node_type": "task",
+      "label": "amt-composer:simple",
+      "properties": {
+        "label": "amt-composer:simple"
+      }
+    },
+    {
+      "id": "46689c56-69db-4c23-9d7a-2936339ca1c9",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72",
+        "targetId": "c372429a-0fb7-449d-81a0-614baf29227b"
+      }
+    },
+    {
+      "id": "a2107ec5-8a2b-4bf8-bb19-791b41ce6d2b",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "e4aa4991-1732-4868-9291-37eb51011fd3",
+        "sourceId": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72"
+      }
+    },
+    {
+      "id": "695ecafa-541d-4eb9-9fcd-d33b4c57bfa2",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "09bba0a2-9173-4e79-bd9e-778b8cf9c7d4",
+        "sourceId": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72"
+      }
+    },
+    {
+      "id": "09bba0a2-9173-4e79-bd9e-778b8cf9c7d4",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest-types",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest-types"
+      }
+    },
+    {
+      "id": "9cd7601d-92d4-43a2-bb3e-33b803c73d10",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "74fd28dd-e807-4204-b2e3-bd25d2b66f6f",
+        "sourceId": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72"
+      }
+    },
+    {
+      "id": "b6fe6b35-a062-4d54-8a49-384f4287f59b",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72",
+        "targetId": "0770e360-5ee5-4886-b0f2-b1731bb75c18"
+      }
+    },
+    {
+      "id": "e4aa4991-1732-4868-9291-37eb51011fd3",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies-types",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies-types"
+      }
+    },
+    {
+      "id": "0770e360-5ee5-4886-b0f2-b1731bb75c18",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

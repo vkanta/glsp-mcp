@@ -1,0 +1,130 @@
+{
+  "id": "3ff8d4e5-a5e4-461d-bb38-cea86cc15cb5",
+  "name": "amt uml_20250907_0050",
+  "diagram_type": "workflow",
+  "revision": 29,
+  "created_at": "2025-09-06T22:50:45.298216313Z",
+  "updated_at": "2025-09-06T22:50:45.298219441Z",
+  "nodes": [
+    {
+      "id": "26b5669f-0260-4106-8f69-569bb4469fc7",
+      "node_type": "task",
+      "label": "amt-composer:simple",
+      "properties": {
+        "label": "amt-composer:simple"
+      }
+    },
+    {
+      "id": "bfb3800e-5125-4347-be0b-4f046ec9ecfb",
+      "node_type": "task",
+      "label": "amt-composer:simple/guest-main",
+      "properties": {
+        "label": "amt-composer:simple/guest-main"
+      }
+    },
+    {
+      "id": "709c272f-a3ff-4eee-b398-b26658717ea9",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest"
+      }
+    },
+    {
+      "id": "3d70e9c6-838e-49cc-95dc-e757454c6450",
+      "node_type": "task",
+      "label": "amt-composer:simple/inter-guest-types",
+      "properties": {
+        "label": "amt-composer:simple/inter-guest-types"
+      }
+    },
+    {
+      "id": "f2cec7ef-8df4-4c74-a7dc-83fe7bd6cf35",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies"
+      }
+    },
+    {
+      "id": "251548df-864a-424e-a5bd-09b501fbfc8c",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "26b5669f-0260-4106-8f69-569bb4469fc7",
+        "targetId": "f2cec7ef-8df4-4c74-a7dc-83fe7bd6cf35"
+      }
+    },
+    {
+      "id": "9a864759-00c0-45a0-befc-3d71468d6df6",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "26b5669f-0260-4106-8f69-569bb4469fc7",
+        "targetId": "3d70e9c6-838e-49cc-95dc-e757454c6450"
+      }
+    },
+    {
+      "id": "cbfbe97e-bf0f-4ddd-a15d-e77a371b9248",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "bfb3800e-5125-4347-be0b-4f046ec9ecfb",
+        "sourceId": "26b5669f-0260-4106-8f69-569bb4469fc7"
+      }
+    },
+    {
+      "id": "df4463d5-854a-4a03-9d88-092a788123cd",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "sourceId": "befc2f46-102a-4fb8-b85e-f11ae29771a4",
+        "targetId": "b6d87bfb-59ab-41ad-be42-d989fdfc58a1"
+      }
+    },
+    {
+      "id": "1e84c386-df77-4e7e-88db-ca02820a50d1",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "8c4b494e-0da4-4c86-8117-8b4d2e2bc360",
+        "sourceId": "26b5669f-0260-4106-8f69-569bb4469fc7"
+      }
+    },
+    {
+      "id": "b6d87bfb-59ab-41ad-be42-d989fdfc58a1",
+      "node_type": "task",
+      "label": "amt-compose:bridge/fallible@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge/fallible@0.1.0"
+      }
+    },
+    {
+      "id": "8c4b494e-0da4-4c86-8117-8b4d2e2bc360",
+      "node_type": "task",
+      "label": "amt-composer:simple/host-goodies-types",
+      "properties": {
+        "label": "amt-composer:simple/host-goodies-types"
+      }
+    },
+    {
+      "id": "befc2f46-102a-4fb8-b85e-f11ae29771a4",
+      "node_type": "task",
+      "label": "amt-compose:bridge@0.1.0",
+      "properties": {
+        "label": "amt-compose:bridge@0.1.0"
+      }
+    },
+    {
+      "id": "4b914480-ff80-41a7-a798-2010f4b0718b",
+      "node_type": "sequence-flow",
+      "label": null,
+      "properties": {
+        "targetId": "709c272f-a3ff-4eee-b398-b26658717ea9",
+        "sourceId": "26b5669f-0260-4106-8f69-569bb4469fc7"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {}
+}

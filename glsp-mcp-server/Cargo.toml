@@ -50,7 +50,7 @@ lru = { workspace = true }
 sha2 = { workspace = true }
 
 # Database abstraction dependencies
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+sqlx = { version = "0.8.6", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
 influxdb = { version = "0.7", optional = true }
 base64 = "0.21"

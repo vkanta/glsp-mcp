@@ -1,31 +1,9 @@
 {
-  "diagram_id": "78eec06e-484e-41e6-affd-6c9cf314a1a2",
-  "revision": 29,
-  "updated_at": "2025-09-06T22:19:55.260137817Z",
+  "diagram_id": "b55f1ed2-cf79-44c1-a8c7-1a76edde9034",
+  "revision": 23,
+  "updated_at": "2025-09-06T22:44:45.437545700Z",
   "elements": {
-    "95ef2403-140a-4044-a0b6-befc9f110d8d": {
-      "bounds": {
-        "x": 650.0,
-        "y": 50.0,
-        "width": 100.0,
-        "height": 50.0
-      },
-      "z_index": null,
-      "visible": true,
-      "style": {}
-    },
-    "a5dbf16f-14c5-41cf-ad69-90034de92471": {
-      "bounds": {
-        "x": 800.0,
-        "y": 50.0,
-        "width": 100.0,
-        "height": 50.0
-      },
-      "z_index": null,
-      "visible": true,
-      "style": {}
-    },
-    "111aa192-bafe-4d79-a65c-5123c6e5415a": {
+    "09bba0a2-9173-4e79-bd9e-778b8cf9c7d4": {
       "bounds": {
         "x": 500.0,
         "y": 50.0,
@@ -36,7 +14,7 @@
       "visible": true,
       "style": {}
     },
-    "71271131-b4be-4597-85af-a48817c45039": {
+    "c372429a-0fb7-449d-81a0-614baf29227b": {
       "bounds": {
         "x": 50.0,
         "y": 50.0,
@@ -47,9 +25,9 @@
       "visible": true,
       "style": {}
     },
-    "d3c1c2ad-78fc-4887-90ec-ca6baecef114": {
+    "e4aa4991-1732-4868-9291-37eb51011fd3": {
       "bounds": {
-        "x": 350.0,
+        "x": 650.0,
         "y": 50.0,
         "width": 100.0,
         "height": 50.0
@@ -58,7 +36,18 @@
       "visible": true,
       "style": {}
     },
-    "7b375e1b-a147-4853-8ea4-c2024ecd473e": {
+    "0770e360-5ee5-4886-b0f2-b1731bb75c18": {
+      "bounds": {
+        "x": 800.0,
+        "y": 50.0,
+        "width": 100.0,
+        "height": 50.0
+      },
+      "z_index": null,
+      "visible": true,
+      "style": {}
+    },
+    "74fd28dd-e807-4204-b2e3-bd25d2b66f6f": {
       "bounds": {
         "x": 200.0,
         "y": 50.0,
@@ -69,20 +58,9 @@
       "visible": true,
       "style": {}
     },
-    "20d4f80f-099b-46d0-8941-a25355b4ca96": {
+    "b19ad90b-6a5b-4615-ad2a-f22d96dd5f72": {
       "bounds": {
-        "x": 950.0,
-        "y": 50.0,
-        "width": 100.0,
-        "height": 50.0
-      },
-      "z_index": null,
-      "visible": true,
-      "style": {}
-    },
-    "c652e8f8-1150-4f40-9b04-b61398306f3b": {
-      "bounds": {
-        "x": 1100.0,
+        "x": 350.0,
         "y": 50.0,
         "width": 100.0,
         "height": 50.0
